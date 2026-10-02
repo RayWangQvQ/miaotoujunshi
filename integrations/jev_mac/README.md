@@ -61,7 +61,7 @@ OpenRouter 使用官方 `https://openrouter.ai/api/v1/chat/completions`，回复
 同一文本不重复调用，调用至少间隔十秒；开启时已有消息不重复分析。换会话不扩展授权范围。
 编辑设置、资料、详情或核对文字时暂停轮询。重启和清空本轮都关闭自动分析。
 
-“关系档案”复用项目 `scripts/memory_store.py`，首次需在界面明确同意。
+“关系档案”复用项目 `goutoujunshi/scripts/memory_store.py`，首次需在界面明确同意。
 保存设置时仅更新用户填写的当前对象有限字段，不从模型输出自动写入事实，不保存整份聊天。
 支持查看、暂停／恢复、撤销上次保存、删除当前对象（再次确认）和撤回同意。
 未启用时不创建档案，暂停时不召回或更新，选定对象后才载入具体资料。
@@ -161,7 +161,8 @@ security add-generic-password -a default -s ai.miaotoujunshi.typesafe -U -w
 仓库根目录运行：
 
 ```bash
-python3 -B scripts/validate_skill.py
+python3 -B scripts/validate_layout.py
+python3 -B goutoujunshi/scripts/validate_skill.py --runtime
 python3 -B -m unittest discover -s tests -v
 ```
 

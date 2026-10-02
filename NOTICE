@@ -11,8 +11,26 @@ The ports under `integrations/` are derivative works of the upstream Jev Chat
 assistant and each carries its own LICENSE and attribution files. They are
 **not** covered by the root LICENSE.
 
-Written in this repository: `SKILL.md`, `agents/`, `references/`, `examples/`,
-`scripts/`, `tests/`, `GLOSSARY.md`, `docs/`.
+Written in this repository: the repository tooling under `scripts/`, the ports
+under `integrations/`, `tests/`, the root governance files (`README.md`, `NOTICE`,
+`LICENSE`, `GLOSSARY.md`, `AGENTS.md`, `PRIVACY.md`, `docs/`, `.github/`), and the
+local additions inside the skill payload directory described below.
+
+## Provenance of the skill payload
+
+`goutoujunshi/` is the skill payload: `SKILL.md`, `references/`,
+`agents/openai.yaml`, `assets/reference-library-135.png`,
+`scripts/memory_store.py` and `scripts/validate_skill.py`. It was copied from
+[shengjidaguai-china/goutoujunshi](https://github.com/shengjidaguai-china/goutoujunshi)
+and is maintained here as a fork; most of it is byte-identical to upstream and
+`scripts/check_upstream.py` reports what has drifted. Same author and same MIT
+licence as the root `LICENSE`, so the root licence covers it.
+
+Upstream's own governance files (`README.md`, `README_EN.md`, `LICENSE`,
+`LICENSE.zh-CN.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`,
+`SECURITY.md`, `.gitignore`, `.github/*`) and its `documentation/` development
+notes are deliberately **not** imported. The root `documentation/` in this
+repository is app-layer material, not upstream's documentation directory.
 
 ## Provenance and attribution per port
 

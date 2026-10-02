@@ -10,8 +10,21 @@ from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 ROOT = Path(__file__).resolve().parents[1]
 PREFIX = "miaotoujunshi-mac"
-FILES = ("README.md", "PRIVACY.md", "LICENSE", "SKILL.md", "scripts/memory_store.py")
-DIRS = ("integrations/jev_mac", "references", "examples/relationship_cases", "assets", "agents", "documentation")
+FILES = (
+    "README.md",
+    "PRIVACY.md",
+    "LICENSE",
+    "goutoujunshi/SKILL.md",
+    "goutoujunshi/scripts/memory_store.py",
+)
+DIRS = (
+    "goutoujunshi/references",
+    "goutoujunshi/agents",
+    "goutoujunshi/assets",
+    "integrations/jev_mac",
+    "examples/relationship_cases",
+    "documentation",
+)
 EXCLUDED = {".venv", "__pycache__", ".DS_Store", "settings.local.json", "settings.local.tmp"}
 
 INSTALL = """#!/bin/zsh

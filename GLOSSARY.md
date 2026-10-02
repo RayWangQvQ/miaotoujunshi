@@ -1,10 +1,16 @@
 # 术语表
 
-本仓库同时存在两层命名，**不要混用**。
+本仓库同时存在两层命名，**不要混用**。两层的内容各自收在自己的目录里：
+Skill 层在 `goutoujunshi/`，应用层在 `integrations/`。
 
-## 应用层（integrations/）
+## 应用层（`integrations/`，另有根级例外）
 
 用户可见、可安装、可打包的桌面与移动应用。
+
+主体在 `integrations/`，但有四项目录归属属于本层却留在仓库根：
+`tests/`（只测应用集成）、`documentation/`（应用截图与设计稿）、`examples/`（演示案例，
+运行期消费者是 `integrations/jev_mac/trend.py`，不是 skill）、`PRIVACY.md`（数据使用说明，
+根级是 GitHub 惯例）。四者与其余根级条目一并登记在 `scripts/validate_layout.py` 的白名单里。
 
 | 术语 | 含义 |
 | --- | --- |
@@ -14,9 +20,18 @@
 | Jev Chat | 上游 `jev-chat-jarvis` 的品牌名。应用侧**不再使用**，以免违反 NOTICE 的署名禁令。仍作为策略判断服务名（TypeSafe Jev）出现在配置界面 |
 | preview 包 | 未签名/未公证的源码或调试构建，仅供自行安装验收，不是商店发布版 |
 
-## Skill 层（SKILL.md、agents/、references/、examples/）
+## Skill 层（`goutoujunshi/`）
 
-可独立分发的 AI 能力包，不随应用改名。
+可独立分发的 AI 能力包，不随应用改名。载体是根级目录 `goutoujunshi/`，成员为：
+`SKILL.md`、`agents/openai.yaml`、`assets/`、`references/`、`scripts/memory_store.py`、
+`scripts/validate_skill.py`。
+
+归属判据：**该文件在上游 `shengjidaguai-china/goutoujunshi` 有同源对应，且不是上游的仓库治理文件**
+（上游的 `README.md`、`LICENSE`、`CHANGELOG.md`、`CONTRIBUTING.md`、`CODE_OF_CONDUCT.md`、
+`SECURITY.md`、`.gitignore`、`.github/*` 与本仓无关，未导入）。本仓自有的 `scripts/` 脚本不属这一层。
+
+成员与上游的漂移用 `python3 -B scripts/check_upstream.py` 检查；参与比对的路径清单由该脚本的
+`TRACKED_FILES`/`TRACKED_DIRS` 定义。被删除的追踪文件由该脚本的 `tracked but missing` 一行报出。
 
 | 术语 | 含义 |
 | --- | --- |
@@ -41,6 +56,9 @@
 - 改应用显示名 → 只动 `integrations/` 与 `PRIVACY.md`。
 - 改悬浮球显示名 → 只动球面与球自带文案（球的窗口标题、无障碍标签）；应用显示名与技术标识不动。
 - 改 Skill 标识 → 需同时评估已安装用户的升级路径，另开 ADR。
+- 往仓库根新增条目 → 必须在同一次提交里登记进 `scripts/validate_layout.py` 的白名单，并注明所属层与留在根的理由；未登记的条目会让 CI 失败。
+- Skill 层内容只放 `goutoujunshi/`，应用层内容只放 `integrations/`（上表四项目录例外除外）。
+- 上游 `goutoujunshi` 的 `documentation/`（7 个开发文档）**未导入**；本仓 `documentation/` 是应用目录，与上游同名但不同义，不要按上游语义理解。
 - model prompt 中的自称属于 Skill 语义层，不随应用改名而变。
 - 上游 `jev-chat` 的版权、许可证与 NOTICE 段落是署名义务，任何情况下不得改写。
 - 面板头部有分析时显示「分析所属会话」，无分析时显示「当前会话」；不得显示裸包名。

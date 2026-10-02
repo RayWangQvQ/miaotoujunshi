@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 from experience import PROFILE_FIELDS, empty_profile, validate_profile
 
-SCRIPT = Path(__file__).resolve().parents[2] / 'scripts' / 'memory_store.py'
+SCRIPT = Path(__file__).resolve().parents[2] / 'goutoujunshi' / 'scripts' / 'memory_store.py'
 
 
 class MemoryBridge:

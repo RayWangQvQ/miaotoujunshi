@@ -3,7 +3,7 @@ import json
 import math
 
 from client import Config, DEEPSEEK_BASE, DEEPSEEK_MODEL, complete, read_deepseek_keychain
-from core import ROOT, STRATEGIES, reference_paths
+from core import SKILL_ROOT, STRATEGIES, reference_paths
 from jev import CRITERIA, StrategyDecision
 
 LABELS = 'ABCDEFG'
@@ -144,11 +144,11 @@ def choice_messages(snapshot, scene, background, evidence, labels):
     ]
 
 
-def decide(config, snapshot, scene, background, root=ROOT):
+def decide(config, snapshot, scene, background, skill_root=SKILL_ROOT):
     if len(background) > 3000:
         raise ValueError('背景请控制在 3000 字以内')
     paths = reference_paths(scene)
-    guidance = (root / paths[0]).read_text(encoding='utf-8').split('## 常用话术库', 1)[0]
+    guidance = (skill_root / paths[0]).read_text(encoding='utf-8').split('## 常用话术库', 1)[0]
     raw = complete(config, evidence_messages(snapshot, scene, background, guidance), json_mode=True)
     try:
         fallback = parse_decision(raw, config.model)

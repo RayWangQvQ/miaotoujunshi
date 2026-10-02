@@ -10,8 +10,14 @@ candidate replies → **one-tap fill, never auto-send**.
 
 | Layer | Location | What it is |
 | --- | --- | --- |
-| Skill | `SKILL.md`, `agents/`, `references/`, `examples/` | The `goutoujunshi` / 狗头军师 capability pack, distributable on its own |
+| Skill | `goutoujunshi/` | The `goutoujunshi` / 狗头军师 payload — `SKILL.md`, `references/`, `agents/`, `assets/`, `scripts/`. A maintained fork of the upstream skill; `scripts/check_upstream.py` reports the drift |
 | Apps | `integrations/jev_android`, `integrations/jev_windows`, `integrations/jev_mac` | Floating ball + screenshot/OCR + candidate replies |
+| Repo tooling | `scripts/` | `validate_layout.py` (root-entry allowlist), `check_upstream.py` (upstream drift), `package_mac.py` (macOS source zip) |
+
+Every entry at the repository root is registered with the layer it belongs to in
+`scripts/validate_layout.py`; an unregistered entry fails the build. The app layer
+has four registered root-level exceptions — `tests/`, `documentation/`,
+`examples/` and `PRIVACY.md` — each with its reason recorded there.
 
 The repository deliberately carries three names at three layers: the Skill layer
 (`goutoujunshi` / 狗头军师), the app layer (`miaotoujunshi` / 喵头军师), and
@@ -35,8 +41,14 @@ live in [NOTICE](NOTICE); privacy notes in [PRIVACY.md](PRIVACY.md).
 
 ```bash
 python -B -m unittest discover -s tests
-python -B scripts/validate_skill.py
+python -B scripts/validate_layout.py
+python -B goutoujunshi/scripts/validate_skill.py --runtime
+python -B scripts/check_upstream.py    # network required; read-only drift report
 ```
 
-> Do not run `compileall` over `scripts/`: the `scripts/__pycache__` it produces
-> makes `validate_skill.py` fail, and has to be cleaned up by hand.
+> `validate_skill.py` ships inside the payload directory, so it needs `--runtime`:
+> without it the script demands the repository-level `README.md` and `LICENSE` in
+> its own root, which is now `goutoujunshi/`.
+>
+> Do not run `compileall` over the repository: the `__pycache__` it produces makes
+> `validate_skill.py` fail, and has to be cleaned up by hand.
