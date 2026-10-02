@@ -58,6 +58,11 @@ ALLOWED: dict[str, tuple[str, str]] = {
     "scripts": (GOVERNANCE, "repository-level tooling"),
     "docs": (GOVERNANCE, "ADRs and agent working notes"),
     ".github": (GOVERNANCE, "CI workflows"),
+    ".vscode": (
+        GOVERNANCE,
+        "editor, task and debug configurations; committed so the Android debug "
+        "channel and its device resolver travel with the code",
+    ),
     ".gitignore": (GOVERNANCE, "git ignore rules"),
     "AGENTS.md": (GOVERNANCE, "agent instructions"),
     "GLOSSARY.md": (GOVERNANCE, "domain glossary"),
@@ -67,8 +72,9 @@ ALLOWED: dict[str, tuple[str, str]] = {
 }
 
 # Used only when the working tree is not a git checkout (for example a source
-# zip): directories that are ignored by .gitignore and never committed.
-IGNORED = {".venv", "dist", ".workbuddy", ".vscode", "__pycache__", "build"}
+# zip): directories that are ignored by .gitignore and never committed. A
+# tracked root directory must appear in ALLOWED instead of being listed here.
+IGNORED = {".venv", "dist", ".workbuddy", "__pycache__", "build"}
 
 
 def root_entries() -> list[str]:
