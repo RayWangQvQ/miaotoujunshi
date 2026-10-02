@@ -36,9 +36,15 @@ ALLOWED: dict[str, tuple[str, str]] = {
     # Skill layer: the upstream-sourced payload lives in its own directory, which
     # is the whole point of the boundary. See docs/adr/0003.
     SKILL_DIR: (SKILL, "skill payload directory; the directory is the boundary"),
-    # App layer. `integrations/` holds the three ports; the remaining three are
-    # app-layer content that has to sit at the root for a concrete reason.
+    # App layer. `integrations/` holds the three ports; the rest are app-layer
+    # content that has to sit at the root for a concrete reason. Do not count
+    # them here: this dict is the count.
     "integrations": (APP, "the three platform ports"),
+    "references": (
+        APP,
+        "shared app-layer reference material used by all three ports; it belongs "
+        "to no single port, so no integrations/<port>/ directory can hold it",
+    ),
     "tests": (APP, "tests for the app integrations"),
     "documentation": (APP, "app screenshots and design notes"),
     "examples": (

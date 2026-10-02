@@ -55,6 +55,7 @@ class JevTests(unittest.TestCase):
         self.assertEqual(request["state"]["transcript"], snapshot.transcript)
         self.assertIn("七种策略", request["state"]["strategy_guide"])
         self.assertNotIn("常用话术库", request["state"]["strategy_guide"])
+        self.assertNotIn("话术演练模式", request["state"]["strategy_guide"])
         self.assertNotIn(snapshot.transcript, str(request["questions"]))
         self.assertEqual(set(request["questions"]["reply_strategy"]["criteria"]), set(STRATEGIES))
         self.assertNotIn(self.config.key, json.dumps(request))

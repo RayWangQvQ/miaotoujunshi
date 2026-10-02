@@ -112,3 +112,21 @@ decidable.**
 - ADR-0001's layer table lists skill-layer paths that this change supersedes. Its
   decision ("rename only the app layer") still stands and is not amended here; only
   its path list is stale.
+- **Amendment (2026-10-02): the one local-only file left the payload.** The Context
+  above recorded "one local-only `references/` document" without acting on it, yet
+  decision 2 already said files this repository writes itself stay out of the
+  directory — so the payload was in violation of its own criterion from the start.
+  That file, `references/practical/桌面OCR对话接入.md`, is app-layer material: it
+  describes the macOS desktop entry, and every rule it states is already implemented
+  in `integrations/jev_mac` (`core.py` evidence handling and output contract,
+  `experience.py`'s window-plus-title binding, the consent-gated `memory_bridge.py`).
+  Nothing ever read it: `reference_paths()` never loaded it, so no rule in it ever
+  reached a model, and its claim that the desktop entry does not call the long-term
+  memory script was stale. It is deleted; its content now lives in
+  `integrations/jev_mac/README.md`, both `SKILL.md` routes pointing at it are gone,
+  and `GLOSSARY.md` carries the hardened rule that the payload may differ from
+  upstream only by modifications, never by additions. `check_upstream.py` now
+  reports zero "only this repo has" paths, so the payload's whole delta is two
+  modified files. **Superseded:** both of those files were subsequently restored to
+  upstream, making the payload byte-identical and the "modify but never add" rule
+  obsolete. See ADR-0004.

@@ -11,7 +11,7 @@ import urllib.request
 from dataclasses import dataclass, field
 
 from client import NoRedirect
-from core import SKILL_ROOT, STRATEGIES, reference_paths
+from core import STRATEGIES, reference_paths
 
 ENDPOINT = "https://api.typesafe.ai/v1/systemone"
 KEYCHAIN_SERVICE = "ai.miaotoujunshi.typesafe"
@@ -76,12 +76,13 @@ class StrategyDecision:
                 "method": self.method, "evidence": self.evidence}
 
 
-def build_request(config, snapshot, scene, background, skill_root=SKILL_ROOT):
+def build_request(config, snapshot, scene, background):
     if len(background) > 3000:
         raise ValueError("背景请控制在 3000 字以内")
-    paths = reference_paths(scene)
     # Use the project's actual strategy guide, without unrelated example replies.
-    guidance = (skill_root / paths[0]).read_text(encoding="utf-8").split("## 常用话术库", 1)[0]
+    # Only the payload file is read here; this app's tone rules stay out of the
+    # strategy decision.
+    guidance = reference_paths(scene)[0].read_text(encoding="utf-8").split("## 常用话术库", 1)[0]
     return {
         "model": config.model,
         "state": {"conversation": snapshot.title, "transcript": snapshot.transcript,

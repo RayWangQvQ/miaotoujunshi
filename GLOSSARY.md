@@ -7,10 +7,10 @@ Skill 层在 `goutoujunshi/`，应用层在 `integrations/`。
 
 用户可见、可安装、可打包的桌面与移动应用。
 
-主体在 `integrations/`，但有四项目录归属属于本层却留在仓库根：
-`tests/`（只测应用集成）、`documentation/`（应用截图与设计稿）、`examples/`（演示案例，
-运行期消费者是 `integrations/jev_mac/trend.py`，不是 skill）、`PRIVACY.md`（数据使用说明，
-根级是 GitHub 惯例）。四者与其余根级条目一并登记在 `scripts/validate_layout.py` 的白名单里。
+主体在 `integrations/`，另有若干根级例外——`tests/`（只测应用集成）、`documentation/`（应用截图与设计稿）、
+`examples/`（演示案例，运行期消费者是 `integrations/jev_mac/trend.py`，不是 skill）、`PRIVACY.md`
+（数据使用说明，根级是 GitHub 惯例）、`references/`（三端共用的参考材料，不属于任何单端）。
+根级例外逐项登记在 `scripts/validate_layout.py` 的白名单里，以那里为准。
 
 | 术语 | 含义 |
 | --- | --- |
@@ -57,7 +57,13 @@ Skill 层在 `goutoujunshi/`，应用层在 `integrations/`。
 - 改悬浮球显示名 → 只动球面与球自带文案（球的窗口标题、无障碍标签）；应用显示名与技术标识不动。
 - 改 Skill 标识 → 需同时评估已安装用户的升级路径，另开 ADR。
 - 往仓库根新增条目 → 必须在同一次提交里登记进 `scripts/validate_layout.py` 的白名单，并注明所属层与留在根的理由；未登记的条目会让 CI 失败。
-- Skill 层内容只放 `goutoujunshi/`，应用层内容只放 `integrations/`（上表四项目录例外除外）。
+- Skill 层内容只放 `goutoujunshi/`，应用层内容只放 `integrations/`（根级例外见上节与白名单）。
+- 两个 `references/` 不同层：`goutoujunshi/references/` 是 skill 载荷的参考库（上游所有，逐字节一致）；
+  根级 `references/` 是应用层三端共用的参考材料（本仓所有）。跨端共用的应用层内容一律放根级后者，
+  **不要放进某个单端目录**。
+- 载荷目录 `goutoujunshi/` 必须与上游**逐字节一致**：`check_upstream.py` 的 `drifted` 与
+  `only this repo has` 两行都必须恒为 0。本仓对 skill 内容的任何意见一律落在应用层，
+  不改载荷；要改 skill 本身只能提给上游（见 `docs/adr/0004`）。
 - 上游 `goutoujunshi` 的 `documentation/`（7 个开发文档）**未导入**；本仓 `documentation/` 是应用目录，与上游同名但不同义，不要按上游语义理解。
 - model prompt 中的自称属于 Skill 语义层，不随应用改名而变。
 - 上游 `jev-chat` 的版权、许可证与 NOTICE 段落是署名义务，任何情况下不得改写。
