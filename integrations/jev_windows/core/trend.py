@@ -12,7 +12,7 @@ except ImportError:
     import shared
 
 # The CSV contract and its limits are shared by all three ports
-# (references/data/trend-rules.json, see docs/adr/0005).
+# (miaotoujunshi/references/data/trend-rules.json, see docs/adr/0006).
 _RULES = shared.data("trend-rules.json")
 MAX_BYTES = _RULES["max_bytes"]
 MAX_MESSAGES = _RULES["max_messages"]
@@ -35,7 +35,7 @@ def demo_cases() -> tuple[tuple[str, str], ...]:
 
 
 def demo(case_id: str) -> tuple[Candle, ...]:
-    """Illustrative candles for one demo case; the file sits in examples/, not here."""
+    """Illustrative candles for one demo case; the file sits in the demo bundle, not here."""
     rows = shared.demo_candles().get(case_id)
     if rows is None:
         raise ValueError("没有这个示例走势")

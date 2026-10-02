@@ -1,28 +1,41 @@
 # 术语表
 
-本仓库同时存在两层命名，**不要混用**。两层的内容各自收在自己的目录里：
-Skill 层在 `goutoujunshi/`，应用层在 `integrations/`。
+本仓库同时存在三层内容命名，**不要混用**。三层的内容各自收在自己的目录里：
+上游 skill 载荷在 `goutoujunshi/`，本仓自有载荷在 `miaotoujunshi/`，应用层实现（三端）在 `integrations/`。
 
 ## 应用层（`integrations/`，另有根级例外）
 
 用户可见、可安装、可打包的桌面与移动应用。
 
 主体在 `integrations/`，另有若干根级例外——`tests/`（只测应用集成）、`documentation/`（应用截图与设计稿）、
-`examples/`（演示案例，三端运行期都读，不是 skill）、`PRIVACY.md`
-（数据使用说明，根级是 GitHub 惯例）、`references/`（跨端公用材料：给模型读的散文在根，
-给代码读的结构化数据在 `references/data/`，不属于任何单端）。
+`PRIVACY.md`（数据使用说明，根级是 GitHub 惯例）。三端在运行期共读的材料不在这里，属于下面的自有载荷层。
 根级例外逐项登记在 `scripts/validate_layout.py` 的白名单里，以那里为准。
 
 | 术语 | 含义 |
 | --- | --- |
 | 喵头军师 | 应用的中文显示名。出现在窗口标题、应用图标名称、通知栏标题、设置页与打包说明中 |
 | 喵球 | 悬浮球的显示名，只是这个 UI 元件的名字，**不是应用名**。只出现在球面与其自带文案（球的窗口标题、无障碍标签）中 |
-| miaotoujunshi | 应用的技术标识前缀。用于 applicationId（`com.miaotoujunshi.chat`）、PyInstaller `NAME`、CI artifact 名、zip 前缀与 dist 目录名 |
+| miaotoujunshi | 应用的技术标识前缀。用于 applicationId（`com.miaotoujunshi.chat`）、PyInstaller `NAME`、CI artifact 名、zip 前缀与 dist 目录名。**也是本仓自有载荷目录名 `miaotoujunshi/`**——同名是有意的：本仓自有的一侧统一叫这个 |
 | Jev Chat | 上游 `jev-chat-jarvis` 的品牌名。应用侧**不再使用**，以免违反 NOTICE 的署名禁令。仍作为策略判断服务名（TypeSafe Jev）出现在配置界面 |
-| 跨端公用材料 | 根级、**设计上供三端运行期读取**的内容：`references/`（散文）、`references/data/`（结构化数据）、`examples/`（演示案例），加上 skill 层的载荷 `goutoujunshi/`。三端一律读文件，不在任一端内联副本 |
+| 跨端公用材料 | **设计上供三端运行期读取**的内容：本仓自有载荷 `miaotoujunshi/`（散文在 `references/knowledge/`，结构化数据在 `references/data/`，演示案例在 `examples/`），加上上游 skill 载荷 `goutoujunshi/`。三端一律读文件，不在任一端内联副本 |
 | preview 包 | 未签名/未公证的源码或调试构建，仅供自行安装验收，不是商店发布版 |
 
-## Skill 层（`goutoujunshi/`）
+## 自有载荷层（`miaotoujunshi/`）
+
+本仓自己写、**三端在运行期共读**的载荷，与上游载荷并列。层名 `miaotoujunshi-skill`
+（`scripts/validate_layout.py` 的登记值）。
+
+成员判据：**三端在运行期读取，且不属于上游 skill 载荷**。按此判据收入 `references/`
+（`knowledge/` 放给模型读的散文，`data/` 放给代码读的结构化数据）与 `examples/`（演示案例）；
+`integrations/`、`tests/`、`documentation/` 只被单端或构建链使用，留在应用层。
+决策、被取代的旧结构与已知代价见 `docs/adr/0006`。
+
+| 术语 | 含义 |
+| --- | --- |
+| 上游载荷 | 目录 `goutoujunshi/`，成员由「上游有同源对应」判据决定，**逐字节一致**，本仓只读不写 |
+| 自有载荷 | 目录 `miaotoujunshi/`，本仓所有、可自由修改；与上游载荷同为「载荷」，但归属与修改权相反 |
+
+## 上游 skill 载荷层（`goutoujunshi/`）
 
 可独立分发的 AI 能力包，不随应用改名。载体是根级目录 `goutoujunshi/`，成员为：
 `SKILL.md`、`agents/openai.yaml`、`assets/`、`references/`、`scripts/memory_store.py`、
@@ -59,16 +72,18 @@ Skill 层在 `goutoujunshi/`，应用层在 `integrations/`。
 - 改悬浮球显示名 → 只动球面与球自带文案（球的窗口标题、无障碍标签）；应用显示名与技术标识不动。
 - 改 Skill 标识 → 需同时评估已安装用户的升级路径，另开 ADR。
 - 往仓库根新增条目 → 必须在同一次提交里登记进 `scripts/validate_layout.py` 的白名单，并注明所属层与留在根的理由；未登记的条目会让 CI 失败。
-- Skill 层内容只放 `goutoujunshi/`，应用层内容只放 `integrations/`（根级例外见上节与白名单）。
-- 两个 `references/` 不同层：`goutoujunshi/references/` 是 skill 载荷的参考库（上游所有，逐字节一致）；
-  根级 `references/` 是应用层三端共用的参考材料（本仓所有）。跨端共用的应用层内容一律放根级后者，
-  **不要放进某个单端目录**；给模型读的散文放根，给代码读的结构化数据放 `references/data/`。
+- 上游载荷内容只放 `goutoujunshi/`，自有载荷内容只放 `miaotoujunshi/`，应用层实现只放 `integrations/`
+  （根级例外见上节与白名单）。
+- 两个 `references/` 不同层：`goutoujunshi/references/` 是上游载荷的参考库（上游所有，逐字节一致）；
+  `miaotoujunshi/references/` 是本仓自有的参考材料（本仓所有；给模型读的散文放 `knowledge/`，
+  给代码读的结构化数据放 `data/`）。跨端共用的材料一律放自有载荷，**不要放进某个单端目录**。
 - **跨端公用材料三端一律在运行期读文件**：不得在任一端内联副本，不得放在 `integrations/<port>/` 下。
-  各端打包必须同步纳入它读到的根级文件（Windows `jev.spec` 的 `datas`、Android 的 `assets`、
-  mac 的 `package_mac.py`）；读不到即报错，不降级回内联副本。取舍与代价见 `docs/adr/0005`。
-- 载荷目录 `goutoujunshi/` 必须与上游**逐字节一致**：`check_upstream.py` 的 `drifted` 与
-  `only this repo has` 两行都必须恒为 0。本仓对 skill 内容的任何意见一律落在应用层，
-  不改载荷；要改 skill 本身只能提给上游（见 `docs/adr/0004`）。
+  各端打包必须**按目录整体**纳入自有载荷（Windows `jev.spec` 的 `datas`、Android 的 `assets`、
+  mac 的 `package_mac.py` 都登记 `miaotoujunshi/` 本身，不逐文件列）；读不到即报错，不降级回内联副本。
+  取舍与代价见 `docs/adr/0005`（读文件不内联）与 `docs/adr/0006`（材料放在哪）。
+- 上游载荷目录 `goutoujunshi/` 必须与上游**逐字节一致**：`check_upstream.py` 的 `drifted` 与
+  `only this repo has` 两行都必须恒为 0。本仓对 skill 内容的任何意见一律落在自有载荷或应用层，
+  不改上游载荷；要改 skill 本身只能提给上游（见 `docs/adr/0004`）。
 - 上游 `goutoujunshi` 的 `documentation/`（7 个开发文档）**未导入**；本仓 `documentation/` 是应用目录，与上游同名但不同义，不要按上游语义理解。
 - model prompt 中的自称属于 Skill 语义层，不随应用改名而变。
 - 上游 `jev-chat` 的版权、许可证与 NOTICE 段落是署名义务，任何情况下不得改写。

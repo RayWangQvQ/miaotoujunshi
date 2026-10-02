@@ -3,9 +3,9 @@ package com.jev.probe.core
 /**
  * Evidence-first rules shared by the Android draft prompt and overlay.
  *
- * The wording itself belongs to all three ports and is read from the repository
- * root at runtime (docs/adr/0005); this object only applies it, so no rule text
- * is retyped here.
+ * The wording itself belongs to all three ports and is read from this
+ * repository's own payload at runtime (docs/adr/0006); this object only applies
+ * it, so no rule text is retyped here.
  */
 object GoutouGuidance {
 

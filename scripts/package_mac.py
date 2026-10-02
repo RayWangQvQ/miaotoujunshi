@@ -22,9 +22,8 @@ DIRS = (
     "goutoujunshi/agents",
     "goutoujunshi/assets",
     "integrations/jev_mac",
-    "examples/relationship_cases",
+    "miaotoujunshi",
     "documentation",
-    "references",
 )
 EXCLUDED = {".venv", "__pycache__", ".DS_Store", "settings.local.json", "settings.local.tmp"}
 

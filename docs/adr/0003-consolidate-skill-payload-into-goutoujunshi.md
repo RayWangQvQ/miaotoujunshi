@@ -58,6 +58,9 @@ decidable.**
 4. **The app layer does not move.** `tests/`, `documentation/`, `examples/` and
    `PRIVACY.md` are app-layer content that stays at the root; each is registered
    in the allowlist as an app-layer root-level exception with its reason.
+   **Superseded by [ADR-0006](0006-own-payload-directory.md):** `examples/` and the
+   root-level `references/` now sit in `miaotoujunshi/`, and the app layer keeps
+   `integrations/`, `tests/`, `documentation/` and `PRIVACY.md` only.
 5. **Sync stays plain files plus `check_upstream.py`,** with its comparison range
    extended to cover the whole payload. No git subtree, no submodule: the payload
    carries deliberate local patches, so a read-only upstream reference would drop
@@ -76,6 +79,9 @@ decidable.**
   Cleanest on paper. Rejected because it discards the repository-root-is-the-skill
   distribution surface, and because every `parents[2]` path, the upstream path
   comparison and the packaging manifest would need a prefix map.
+  **Partly superseded by [ADR-0006](0006-own-payload-directory.md):** a second
+  top-level content tree was adopted for the own payload, and the prefix-map cost was
+  accepted for that move; `integrations/` still stays at the root.
 - **Name the directory `vendor/`.** Would misdescribe a same-author fork with
   deliberate local patches as read-only third-party code.
 - **git subtree or submodule.** See decision 5.

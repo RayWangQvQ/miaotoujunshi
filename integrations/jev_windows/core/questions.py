@@ -1,8 +1,8 @@
 """Fixed Jev question set. Instructions/criteria in English; chat text stays Chinese.
 
 The wording is shared by all three ports and lives in
-`references/data/judge-questions.json` — see docs/adr/0005. It is the wording
-that passed calibration, so it is read, never retyped.
+`miaotoujunshi/references/data/judge-questions.json` — see docs/adr/0006. It is
+the wording that passed calibration, so it is read, never retyped.
 """
 
 from __future__ import annotations

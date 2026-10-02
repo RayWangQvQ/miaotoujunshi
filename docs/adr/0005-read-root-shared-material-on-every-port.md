@@ -2,6 +2,9 @@
 
 - Status: accepted
 - Date: 2026-10-02
+- Amended: [ADR-0006](0006-own-payload-directory.md) moved the shared material out of
+  the repository root into `miaotoujunshi/`. This ADR's decision — read the files at
+  runtime, never keep an inlined copy — is unaffected; only the paths changed.
 
 ## Context
 
@@ -124,6 +127,10 @@ shared wording, so it stays where it is.
 - `references/data/payload-map.json` has one consumer today, macOS, because only macOS names
   a scene. It stays root-level data anyway: the selection is data rather than code, and it is
   the file a scene selector on another port would read.
+  **Correction (ADR-0006):** the consumer claim was not true when this was written — macOS
+  hard-coded the same scene map in `core.py` and read nothing from this file. ADR-0006 removed
+  the hard-coded map, so the sentence now describes the wiring; the file also moved to
+  `miaotoujunshi/references/data/payload-map.json` with repository-root-relative paths.
 - macOS behaviour changes in one visible way: the strategy request now carries the judge
   question set, so a TypeSafe decision costs more tokens than before.
 - Windows and Android prompts grow by the shared tone document and `SKILL.md`, which is the

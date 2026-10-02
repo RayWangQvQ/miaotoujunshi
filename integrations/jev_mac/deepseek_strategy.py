@@ -3,7 +3,7 @@ import json
 import math
 
 from client import Config, DEEPSEEK_BASE, DEEPSEEK_MODEL, complete, read_deepseek_keychain
-from core import SKILL_ROOT, STRATEGIES, shared_data, strategy_guide
+from core import GOUTOU_SKILL_ROOT, STRATEGIES, shared_data, strategy_guide
 from jev import CRITERIA, StrategyDecision
 
 # Label map and rotations are shared with the other ports (docs/adr/0005).
@@ -146,10 +146,10 @@ def choice_messages(snapshot, scene, background, evidence, labels):
     ]
 
 
-def decide(config, snapshot, scene, background, skill_root=SKILL_ROOT):
+def decide(config, snapshot, scene, background, goutou_skill_root=GOUTOU_SKILL_ROOT):
     if len(background) > 3000:
         raise ValueError('背景请控制在 3000 字以内')
-    guidance = strategy_guide(scene, skill_root)
+    guidance = strategy_guide(scene, goutou_skill_root)
     raw = complete(config, evidence_messages(snapshot, scene, background, guidance), json_mode=True)
     try:
         fallback = parse_decision(raw, config.model)

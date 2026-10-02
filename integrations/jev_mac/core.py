@@ -7,27 +7,32 @@ import math
 from dataclasses import dataclass
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
-# The skill payload lives in its own directory at the repository root; the app
-# reads SKILL.md and the payload's own references/ from there at runtime.
-SKILL_ROOT = ROOT / "goutoujunshi"
-# The payload stays byte-identical to upstream; the app layer's shared tone and
-# trade-off rules live in the root-level references/ directory used by all three
-# ports, and are loaded next to the payload file.
-TONE_REFERENCE = ROOT / "references" / "口吻与取舍.md"
-DATA_ROOT = ROOT / "references" / "data"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+# The upstream skill payload has its own directory at the repository root; the app
+# reads SKILL.md and the payload's own references/ from there at runtime. It stays
+# byte-identical to upstream (docs/adr/0004).
+GOUTOU_SKILL_ROOT = REPO_ROOT / "goutoujunshi"
+# This repository's own payload sits next to it: the tone rules, the structured
+# data and the demo cases the three ports read at runtime. Same layer boundary as
+# the upstream payload, but written here (docs/adr/0006).
+MIAOTOU_SKILL_ROOT = REPO_ROOT / "miaotoujunshi"
+# Where the structured data sits. It cannot come from `payload-map.json`: this
+# constant is what locates that file in the first place.
+DATA_ROOT = MIAOTOU_SKILL_ROOT / "references" / "data"
 
 
 def shared_data(name):
-    """One references/data/*.json, shared with the other two ports (docs/adr/0005).
+    """One miaotoujunshi/references/data/*.json, shared by all three ports (docs/adr/0006).
 
-    Read from the root, never inlined here, and a missing file is a hard error:
-    a forgotten packaging entry must fail loudly rather than drift into a copy.
+    Read from this repository's own payload, never inlined here, and a missing file
+    is a hard error: a forgotten packaging entry must fail loudly rather than drift
+    into a copy.
     """
     try:
         return json.loads((DATA_ROOT / name).read_text(encoding="utf-8"))
     except OSError as exc:
-        raise FileNotFoundError(f"缺少跨端公用文件 references/data/{name}") from exc
+        raise FileNotFoundError(
+            f"缺少跨端公用文件 miaotoujunshi/references/data/{name}") from exc
 
 
 def judge_questions():
@@ -106,18 +111,21 @@ def from_capture(data, source='ocr'):
     return Snapshot(title, "\n".join(lines), int(data.get("window", {}).get("wid", 0)), source)
 
 
+# Which payload file belongs to which scene is data, not code (docs/adr/0006). It is
+# the only entry naming every scene, so this port cannot drift from the map, and its
+# paths are repository-root relative, so a later move needs no second convention.
+_PAYLOAD_MAP = shared_data("payload-map.json")
+# The tone rules this app adds on top of the payload. Named by the same map, so a
+# move of the own payload touches one file instead of two.
+TONE_REFERENCE = REPO_ROOT / _PAYLOAD_MAP["shared_tone_document"]
+
+
 def reference_paths(scene):
     """Return absolute paths, payload first: the strategy guide, then this app's tone rules."""
-    paths = [SKILL_ROOT / "references/practical/实战话术编排器：从一句回复到后续分支.md", TONE_REFERENCE]
-    extra = {
-        "日常回复": "references/knowledge/09-在线约会与数字关系.md",
-        "邀约推进": "references/practical/主动表达、第一次见面与自然接触.md",
-        "冲突修复": "references/knowledge/07-沟通冲突与修复.md",
-        "投入与退出": "references/practical/关系投入失衡：互惠判断、降级投入与退出决策.md",
-    }
-    if scene not in extra:
+    scenes = _PAYLOAD_MAP["scene_knowledge"]
+    if scene not in scenes:
         raise ValueError("请选择有效的分析场景")
-    return paths + [SKILL_ROOT / extra[scene]]
+    return [REPO_ROOT / _PAYLOAD_MAP["strategy_guide"], TONE_REFERENCE, REPO_ROOT / scenes[scene]]
 
 
 # The examples that follow this heading are written for the reply model, not for the
@@ -126,22 +134,22 @@ def reference_paths(scene):
 GUIDE_HEADING = "## 常用话术库"
 
 
-def strategy_guide(scene, skill_root=SKILL_ROOT):
+def strategy_guide(scene, goutou_skill_root=GOUTOU_SKILL_ROOT):
     """The payload strategy guide for the scene, cut before its examples section."""
     path = reference_paths(scene)[0]
-    if skill_root != SKILL_ROOT:
-        path = skill_root / path.relative_to(SKILL_ROOT)
+    if goutou_skill_root != GOUTOU_SKILL_ROOT:
+        path = goutou_skill_root / path.relative_to(GOUTOU_SKILL_ROOT)
     return path.read_text(encoding="utf-8").split(GUIDE_HEADING, 1)[0]
 
 
-def build_messages(snapshot, scene, background, skill_root=SKILL_ROOT):
+def build_messages(snapshot, scene, background, goutou_skill_root=GOUTOU_SKILL_ROOT):
     if len(background) > 3000:
         raise ValueError("背景请控制在 3000 字以内")
     lines = [line.strip() for line in snapshot.transcript.splitlines() if line.strip()]
     if all(line.startswith('说话人待确认') or '[OCR待核对]' in line for line in lines):
         raise ValueError('当前对话全部待核对，请先确认说话人和原文，再生成回复')
     paths = reference_paths(scene)
-    skill = (skill_root / "SKILL.md").read_text(encoding="utf-8")
+    skill = (goutou_skill_root / "SKILL.md").read_text(encoding="utf-8")
     references = "\n\n".join(path.read_text(encoding="utf-8") for path in paths)
     system = f"""你是狗头军师桌面回复助手。遵守下方技能与按需知识。
 当前是用户主动提交的一轮即时回复分析；先解决当前消息，缺失档案保持未知，最多问一个关键问题。

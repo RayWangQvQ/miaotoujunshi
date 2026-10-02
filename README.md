@@ -10,19 +10,21 @@ candidate replies → **one-tap fill, never auto-send**.
 
 | Layer | Location | What it is |
 | --- | --- | --- |
-| Skill | `goutoujunshi/` | The `goutoujunshi` / 狗头军师 payload — `SKILL.md`, `references/`, `agents/`, `assets/`, `scripts/`. A maintained fork of the upstream skill; `scripts/check_upstream.py` reports the drift |
+| Upstream payload | `goutoujunshi/` | The `goutoujunshi` / 狗头军师 payload — `SKILL.md`, `references/`, `agents/`, `assets/`, `scripts/`. A maintained fork of the upstream skill, kept byte-identical; `scripts/check_upstream.py` reports the drift |
+| Own payload | `miaotoujunshi/` | This repository's own payload: the shared tone rules (`references/knowledge/`), the structured data (`references/data/`) and the demo cases (`examples/`) all three ports read at runtime. See `docs/adr/0006` |
 | Apps | `integrations/jev_android`, `integrations/jev_windows`, `integrations/jev_mac` | Floating ball + screenshot/OCR + candidate replies |
 | Repo tooling | `scripts/` | `validate_layout.py` (root-entry allowlist), `check_upstream.py` (upstream drift), `package_mac.py` (macOS source zip) |
 
 Every entry at the repository root is registered with the layer it belongs to in
 `scripts/validate_layout.py`; an unregistered entry fails the build. The app layer
-has four registered root-level exceptions — `tests/`, `documentation/`,
-`examples/` and `PRIVACY.md` — each with its reason recorded there.
+has three registered root-level exceptions — `tests/`, `documentation/` and
+`PRIVACY.md` — each with its reason recorded there.
 
-The repository deliberately carries three names at three layers: the Skill layer
-(`goutoujunshi` / 狗头军师), the app layer (`miaotoujunshi` / 喵头军师), and
-「喵球」 for the floating-ball UI element itself. **They are layered on purpose —
-do not mix them.** See [GLOSSARY.md](GLOSSARY.md).
+The repository deliberately carries `miaotoujunshi` / 喵头军师 at three places — the
+app display name, the technical identifier prefix and the own-payload directory —
+while the upstream Skill layer stays `goutoujunshi` / 狗头军师 and the floating-ball
+UI element is 「喵球」. **They are layered on purpose — do not mix them.** See
+[GLOSSARY.md](GLOSSARY.md).
 
 ## Origin, attribution and licensing
 

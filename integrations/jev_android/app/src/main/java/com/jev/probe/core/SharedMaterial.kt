@@ -5,13 +5,14 @@ import org.json.JSONObject
 
 /**
  * The single entry point for the material all three ports share
- * (see docs/adr/0005).
+ * (see docs/adr/0006).
  *
- * The content lives at the repository root — `references/`, `examples/` and the
- * skill payload's `SKILL.md`. The build copies it into `assets/` under the same
- * paths, and this object reads it back at runtime. No copy is kept here: a
- * missing file is a hard error, because failing the first analysis beats
- * silently falling back to an inlined piece of text that goes stale.
+ * The content lives in two payload directories at the repository root — this
+ * repository's own `miaotoujunshi/` and the upstream skill payload's `SKILL.md`.
+ * The build copies both into `assets/` under the same repository paths, and this
+ * object reads them back at runtime. No copy is kept here: a missing file is a
+ * hard error, because failing the first analysis beats silently falling back to
+ * an inlined piece of text that goes stale.
  */
 object SharedMaterial {
     private var reader: ((String) -> String)? = null
@@ -40,18 +41,20 @@ object SharedMaterial {
         return text
     }
 
-    fun data(name: String): JSONObject = JSONObject(raw("references/data/$name"))
+    fun data(name: String): JSONObject = JSONObject(raw("miaotoujunshi/references/data/$name"))
 
-    /** The app layer's shared tone and trade-off rules. */
-    fun toneRules(): String = raw("references/口吻与取舍.md")
+    /** This repository's own shared tone and trade-off rules. */
+    fun toneRules(): String = raw("miaotoujunshi/references/knowledge/口吻与取舍.md")
 
-    /** The skill payload's entry document. Read-only: the payload stays byte-identical. */
+    /** The upstream skill payload's entry document. Read-only: it stays byte-identical. */
     fun skillDocument(): String = raw("goutoujunshi/SKILL.md")
 
     /** The demo case manifest: id, title and the CSV each case reads. */
-    fun caseManifest(): JSONObject = JSONObject(raw("examples/relationship_cases/manifest.json"))
+    fun caseManifest(): JSONObject =
+        JSONObject(raw("miaotoujunshi/examples/relationship_cases/manifest.json"))
 
     /** Illustrative candles per case id, from the same bundle as the manifest. */
     fun demoCandles(): JSONObject =
-        JSONObject(raw("examples/relationship_cases/demo_kline.json")).getJSONObject("cases")
+        JSONObject(raw("miaotoujunshi/examples/relationship_cases/demo_kline.json"))
+            .getJSONObject("cases")
 }

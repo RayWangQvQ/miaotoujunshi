@@ -16,19 +16,20 @@ val releaseProps = Properties().apply {
     }
 }
 
-// Cross-port shared material (root references/, the demo case bundle, and the
-// skill payload's SKILL.md) is read at runtime by core.SharedMaterial under its
-// repository path, so the build copies it into assets/ unchanged. Nothing is
+// Cross-port shared material (this repository's own payload miaotoujunshi/, and the
+// upstream skill payload's SKILL.md) is read at runtime by core.SharedMaterial under
+// its repository path, so the build copies it into assets/ unchanged. Nothing is
 // duplicated into this port: a missing entry fails the first analysis instead.
-// See docs/adr/0005.
+// See docs/adr/0006.
 // integrations/jev_android -> integrations -> repository root.
 val repoRoot = rootProject.projectDir.parentFile.parentFile
 val sharedAssets = layout.buildDirectory.dir("sharedAssets")
 
-val copySharedMaterial by tasks.registering(Copy::class) {
-    description = "Copies the repository-root shared material into assets, paths unchanged"
-    from(File(repoRoot, "references")) { into("references") }
-    from(File(repoRoot, "examples/relationship_cases")) { into("examples/relationship_cases") }
+// Sync, not Copy: Copy leaves files in the destination that the source no longer
+// has, so a moved or renamed payload file would ship alongside its own stale copy.
+val copySharedMaterial by tasks.registering(Sync::class) {
+    description = "Copies the shared payload material into assets, paths unchanged"
+    from(File(repoRoot, "miaotoujunshi")) { into("miaotoujunshi") }
     from(File(repoRoot, "goutoujunshi/SKILL.md")) { into("goutoujunshi") }
     into(sharedAssets)
 }

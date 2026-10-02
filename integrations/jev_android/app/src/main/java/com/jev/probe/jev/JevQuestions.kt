@@ -7,8 +7,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * The fixed Jev question set, read from `references/data/judge-questions.json`
- * — the same calibrated wording Windows and macOS send (docs/adr/0005). Nothing
+ * The fixed Jev question set, read from
+ * `miaotoujunshi/references/data/judge-questions.json` — the same calibrated
+ * wording Windows and macOS send (docs/adr/0005). Nothing
  * is retyped here; this object shapes it for the wire. Instructions/criteria are
  * English, chat text stays Chinese, and the state `from` field uses "me"/"other"
  * (the instructions already refer to "the other person" throughout).

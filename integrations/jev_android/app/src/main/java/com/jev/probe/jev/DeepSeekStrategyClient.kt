@@ -13,7 +13,7 @@ import kotlin.math.exp
 /** Independent DeepSeek route. Token weights are optional evidence, never success odds. */
 class DeepSeekStrategyClient(private val prefs: Prefs) {
     // The strategy vocabulary and its Chinese definitions are shared by all three
-    // ports (references/data/strategy-criteria.json, see docs/adr/0005).
+    // ports (miaotoujunshi/references/data/strategy-criteria.json, docs/adr/0006).
     private val vocabulary = SharedMaterial.data("strategy-criteria.json")
     private val strategies: List<String> = vocabulary.getJSONArray("strategies").let { a ->
         (0 until a.length()).map { a.getString(it) }

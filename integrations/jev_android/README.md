@@ -20,10 +20,10 @@
 
 ## 跨端公用材料
 
-本端在运行期读取仓库根级的共用内容，不在本目录保留副本（见 [ADR 0005](../../docs/adr/0005-read-root-shared-material-on-every-port.md)）：
+本端在运行期读取共用内容，不在本目录保留副本（见 [ADR 0005](../../docs/adr/0005-read-root-shared-material-on-every-port.md)、[ADR 0006](../../docs/adr/0006-own-payload-directory.md)）：
 
-- `references/口吻与取舍.md`、`references/data/*.json`（判断题集、边界词与停止条件、策略词表、长度档、CSV 契约）
-- `examples/relationship_cases/`（示例走势 K 线与其清单）
-- `goutoujunshi/SKILL.md`（skill 载荷入口文档）
+- `miaotoujunshi/references/knowledge/口吻与取舍.md`、`miaotoujunshi/references/data/*.json`（判断题集、边界词与停止条件、策略词表、长度档、CSV 契约）
+- `miaotoujunshi/examples/relationship_cases/`（示例走势 K 线与其清单）
+- `goutoujunshi/SKILL.md`（上游 skill 载荷入口文档）
 
-`app/build.gradle.kts` 的 `copySharedMaterial` 在构建期按原路径把它们复制进 `assets/`，运行期由 `core.SharedMaterial` 读取（`MiaotouApp` 装载）。读不到会直接报错，不回退到内联副本。
+`app/build.gradle.kts` 的 `copySharedMaterial` 在构建期按仓库相对路径把整个 `miaotoujunshi/` 与 `goutoujunshi/SKILL.md` 复制进 `assets/`，运行期由 `core.SharedMaterial` 读取（`MiaotouApp` 装载）。读不到会直接报错，不回退到内联副本。

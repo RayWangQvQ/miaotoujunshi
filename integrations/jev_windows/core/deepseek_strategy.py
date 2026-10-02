@@ -16,7 +16,7 @@ except ImportError:
     from goutou import explicit_boundary
 
 # The strategy vocabulary and its Chinese definitions are shared with the other
-# ports (references/data/strategy-criteria.json, see docs/adr/0005).
+# ports (miaotoujunshi/references/data/strategy-criteria.json, see docs/adr/0006).
 _VOCABULARY = shared.data("strategy-criteria.json")
 STRATEGIES = tuple(_VOCABULARY["strategies"])
 CRITERIA = _VOCABULARY["deepseek_criteria"]

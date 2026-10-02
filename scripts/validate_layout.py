@@ -6,9 +6,10 @@ nothing stopped a new file from landing there without a home. This script is the
 hard gate for that: every entry at the repository root must be registered below
 together with the layer it belongs to. An unregistered entry fails the build.
 
-Layer names reuse the vocabulary already established in GLOSSARY.md: the skill
-layer and the app layer, plus the governance files that belong to neither. Do
-not invent new layer names here.
+Layer names reuse the vocabulary established in GLOSSARY.md and docs/adr/0006:
+the upstream skill payload, this repository's own payload, the app layer, plus
+the governance files that belong to none of them. Adding a layer is a documented
+decision (docs/adr/0006), not a name invented here.
 
 Read-only and dependency-free.
 """
@@ -24,35 +25,38 @@ ROOT = Path(__file__).resolve().parents[1]
 ERRORS: list[str] = []
 
 SKILL = "skill"
+MIAOTOU_SKILL = "miaotoujunshi-skill"
 APP = "app"
 GOVERNANCE = "governance"
 
-# Directory holding the skill payload; the layer boundary itself.
+# Directory holding the upstream skill payload; the layer boundary itself.
 SKILL_DIR = "goutoujunshi"
+
+# Directory holding this repository's own payload; the second layer boundary.
+OWN_PAYLOAD_DIR = "miaotoujunshi"
 
 # Every entry allowed at the repository root: name -> (layer, why it sits here).
 # Adding a file to the root means registering it here in the same commit.
 ALLOWED: dict[str, tuple[str, str]] = {
-    # Skill layer: the upstream-sourced payload lives in its own directory, which
-    # is the whole point of the boundary. See docs/adr/0003.
-    SKILL_DIR: (SKILL, "skill payload directory; the directory is the boundary"),
+    # Upstream payload: the upstream-sourced files live in their own directory,
+    # which is the whole point of the boundary. See docs/adr/0003, docs/adr/0004.
+    SKILL_DIR: (SKILL, "upstream skill payload directory; the directory is the boundary"),
+    # This repository's own payload. Same boundary shape as the upstream one, and
+    # the member rule follows from the criterion: material the three ports read at
+    # runtime which is not part of the upstream payload. See docs/adr/0006.
+    OWN_PAYLOAD_DIR: (
+        MIAOTOU_SKILL,
+        "this repository's own payload directory: the shared tone rules, the "
+        "structured data and the demo cases all three ports read at runtime; it "
+        "belongs to no single port, so no integrations/<port>/ directory can "
+        "hold it",
+    ),
     # App layer. `integrations/` holds the three ports; the rest are app-layer
     # content that has to sit at the root for a concrete reason. Do not count
     # them here: this dict is the count.
     "integrations": (APP, "the three platform ports"),
-    "references": (
-        APP,
-        "shared app-layer material (prose plus data/) read at runtime by all "
-        "three ports; it belongs to no single port, so no integrations/<port>/ "
-        "directory can hold it",
-    ),
     "tests": (APP, "tests for the app integrations"),
     "documentation": (APP, "app screenshots and design notes"),
-    "examples": (
-        APP,
-        "app-layer demo fixtures; the runtime consumer is every port's trend "
-        "reader, not the skill",
-    ),
     "PRIVACY.md": (APP, "app data-use notes; root placement is a GitHub convention"),
     # Governance: neither skill nor app.
     "scripts": (GOVERNANCE, "repository-level tooling"),
@@ -101,10 +105,17 @@ def validate_root_entries() -> None:
 
 
 def _where_it_belongs(name: str) -> str:
-    """Point at the right home for names that are unmistakably layered."""
+    """Point at the right home for names that are unmistakably layered.
+
+    Two payload directories exist, so the destination follows the name: upstream
+    payload members belong to `goutoujunshi/`, this repository's own shared
+    material to `miaotoujunshi/`. See docs/adr/0006.
+    """
     stem = name.split(".", 1)[0].lower()
-    if stem in {"skill", "references", "reference", "agents", "agent", "assets", "asset"}:
-        return f"skill layer: move it under {SKILL_DIR}"
+    if stem in {"skill", "agents", "agent", "assets", "asset"}:
+        return f"upstream payload layer: move it under {SKILL_DIR}"
+    if stem in {"references", "reference", "examples", "example", "data"}:
+        return f"this repository's own payload: move it under {OWN_PAYLOAD_DIR}"
     return "register it here with the layer it belongs to and why it sits at the root"
 
 

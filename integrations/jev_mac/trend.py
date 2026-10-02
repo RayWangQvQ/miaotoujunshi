@@ -14,10 +14,10 @@ from pathlib import Path
 from core import shared_data
 
 
-ROOT = Path(__file__).resolve().parents[2]
-DEMO_DIR = ROOT / "examples" / "relationship_cases"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+DEMO_DIR = REPO_ROOT / "miaotoujunshi" / "examples" / "relationship_cases"
 # The illustrative candles belong to the demo-case bundle, not to this port, so the
-# file sits beside the manifest and the CSVs it describes. See docs/adr/0005.
+# file sits beside the manifest and the CSVs it describes. See docs/adr/0006.
 DEMO_KLINE = DEMO_DIR / "demo_kline.json"
 # The CSV contract and its limits are shared with the other two ports.
 _RULES = shared_data("trend-rules.json")

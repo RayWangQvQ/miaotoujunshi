@@ -7,13 +7,13 @@ import os
 
 NAME = "miaotoujunshi-windows"
 
-# 跨端公用材料（根级 references/、examples/、skill 载荷的 SKILL.md）由 core/shared.py
-# 在运行期按仓库相对路径读取，所以必须随程序一起分发；漏一项就在第一次分析时报错。
-# 目录名保持与仓库一致，SHARED 路径才算得出来。见 docs/adr/0005。
+# 跨端公用材料（本仓自有载荷 miaotoujunshi/、上游 skill 载荷的 SKILL.md）由
+# core/shared.py 在运行期按仓库相对路径读取，所以必须随程序一起分发；漏一项就在
+# 第一次分析时报错。目录名保持与仓库一致，SHARED 路径才算得出来。见 docs/adr/0006。
+# 整棵 miaotoujunshi/ 纳入，以后往自有载荷里加文件不必再改这份清单。
 ROOT = os.path.abspath(os.path.join(SPECPATH, "..", ".."))
 datas = [("LICENSE", "."), ("NOTICE", ".")]
-for shared_dir in ("references", os.path.join("examples", "relationship_cases")):
-    datas.append((os.path.join(ROOT, shared_dir), shared_dir))
+datas.append((os.path.join(ROOT, "miaotoujunshi"), "miaotoujunshi"))
 datas.append((os.path.join(ROOT, "goutoujunshi", "SKILL.md"), "goutoujunshi"))
 binaries = []
 

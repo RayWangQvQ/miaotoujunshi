@@ -5,7 +5,7 @@
 
 第一版按需操作：**读取当前微信 → 核对文字和说话人 → 分析 → 复制或填入草稿 → 用户发送**。
 悬浮窗会给出首选行动、事实／推测／未知、观察窗口、停止条件和至多三条带理由、代价的候选。
-它按用户选择的场景加载话术编排器、三端共用的根级 `references/口吻与取舍.md` 和一份主题知识，不只是套一种“军师语气”。
+它按用户选择的场景加载话术编排器、三端共用的 `miaotoujunshi/references/knowledge/口吻与取舍.md` 和一份主题知识，不只是套一种“军师语气”。
 
 日常界面是 **可拖动的墨绿悬浮球 + 420 × 640 暖白圆角面板**，置顶显示在微信旁边。
 点击悬浮球展开／收起；面板右上角 × 只收起，不退出。首选浅绿卡片、备选暖灰卡片，
@@ -32,7 +32,7 @@ OpenRouter 使用官方 `https://openrouter.ai/api/v1/chat/completions`，回复
 不是本地 OCR。OpenRouter 选项使用同样的聊天区域裁剪和核对流程，截图发给 OpenRouter 配置的识图模型；要先在“配置接口”保存 OpenRouter Key 和支持图像输入的模型 ID。回复模型可以继续选择 DeepSeek，两项互不绑定。设置页会标明上传和计费，未选中云端识图时不上传截图。识别后仍需核对会话名、双方归属和错字。
 接口依据：[DeepSeek 图像理解官方文档](https://api-docs.deepseek.com/zh-cn/guides/vision/)。
 
-候选采用三端共用的根级 `references/口吻与取舍.md` 的自然口吻规则（与话术编排器一起进入回复模型上下文；
+候选采用三端共用的 `miaotoujunshi/references/knowledge/口吻与取舍.md` 的自然口吻规则（与话术编排器一起进入回复模型上下文；
 Jev 策略判断只读话术编排器，不读该文件）：只参考当前会话中可靠归属于用户的原话，贴近其用词、长度和标点；
 没有样本时用朴素口语。分析和可发送文字分开，不强加语气词、土味情话或策略解释，最多给设定数量，
 不为凑数换词重复。全部内容都标为说话人待确认或 OCR 待核对时，本地阻止模型请求，先请用户核对。
@@ -186,13 +186,13 @@ python3 -B -m unittest discover -s tests -v
 
 ## 跨端公用材料
 
-本端在运行期读取仓库根级的共用内容，不在本目录保留副本（见 [ADR 0005](../../docs/adr/0005-read-root-shared-material-on-every-port.md)）：
+本端在运行期读取共用内容，不在本目录保留副本（见 [ADR 0005](../../docs/adr/0005-read-root-shared-material-on-every-port.md)、[ADR 0006](../../docs/adr/0006-own-payload-directory.md)）：
 
-- `references/口吻与取舍.md`、`references/data/*.json`（判断题集、边界词与停止条件、策略词表、长度档、CSV 契约、场景到载荷文件的映射）
-- `examples/relationship_cases/`（示例案例与其示意 K 线）
+- `miaotoujunshi/references/knowledge/口吻与取舍.md`、`miaotoujunshi/references/data/*.json`（判断题集、边界词与停止条件、策略词表、长度档、CSV 契约、场景到载荷文件的映射）
+- `miaotoujunshi/examples/relationship_cases/`（示例案例与其示意 K 线）
 - `goutoujunshi/SKILL.md` 与当前场景对应的载荷参考
 
-`scripts/package_mac.py` 的 `references`、`examples/relationship_cases`、`goutoujunshi/*` 条目负责把它们放进交付包。本端是唯一有分析场景选择器的端，因此也是唯一读取按场景载荷参考的端。
+`scripts/package_mac.py` 把整个 `miaotoujunshi/` 目录与 `goutoujunshi/*` 条目放进交付包。本端是唯一有分析场景选择器的端，因此也是唯一读取按场景载荷参考的端，场景到载荷文件的映射读自 `miaotoujunshi/references/data/payload-map.json`。
 
 ## 上游与许可
 
