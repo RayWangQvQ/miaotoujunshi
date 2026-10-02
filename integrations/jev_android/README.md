@@ -17,3 +17,13 @@
 成功后调试包在 `app/build/outputs/apk/debug/`。应用的设置页可分别配置判断、回复、视觉接口；只有同一协议、主机和端口的接口才能共用密钥，跨服务须分别填写。请仅在自己的设备和有权查看的对话中使用。数据使用见仓库根目录 [说明](../../PRIVACY.md)。
 
 源码来源与署名见本目录的 [LICENSE](LICENSE) 和 [NOTICE](NOTICE)。
+
+## 跨端公用材料
+
+本端在运行期读取仓库根级的共用内容，不在本目录保留副本（见 [ADR 0005](../../docs/adr/0005-read-root-shared-material-on-every-port.md)）：
+
+- `references/口吻与取舍.md`、`references/data/*.json`（判断题集、边界词与停止条件、策略词表、长度档、CSV 契约）
+- `examples/relationship_cases/`（示例走势 K 线与其清单）
+- `goutoujunshi/SKILL.md`（skill 载荷入口文档）
+
+`app/build.gradle.kts` 的 `copySharedMaterial` 在构建期按原路径把它们复制进 `assets/`，运行期由 `core.SharedMaterial` 读取（`MiaotouApp` 装载）。读不到会直接报错，不回退到内联副本。

@@ -42,15 +42,16 @@ ALLOWED: dict[str, tuple[str, str]] = {
     "integrations": (APP, "the three platform ports"),
     "references": (
         APP,
-        "shared app-layer reference material used by all three ports; it belongs "
-        "to no single port, so no integrations/<port>/ directory can hold it",
+        "shared app-layer material (prose plus data/) read at runtime by all "
+        "three ports; it belongs to no single port, so no integrations/<port>/ "
+        "directory can hold it",
     ),
     "tests": (APP, "tests for the app integrations"),
     "documentation": (APP, "app screenshots and design notes"),
     "examples": (
         APP,
-        "app-layer demo fixtures; the runtime consumer is "
-        "integrations/jev_mac/trend.py, not the skill",
+        "app-layer demo fixtures; the runtime consumer is every port's trend "
+        "reader, not the skill",
     ),
     "PRIVACY.md": (APP, "app data-use notes; root placement is a GitHub convention"),
     # Governance: neither skill nor app.

@@ -1,0 +1,28 @@
+{
+  "_provenance": {
+    "strategies": "This repository's own vocabulary, app layer.",
+    "typesafe_criteria": "English criteria sent to the TypeSafe Jev service.",
+    "deepseek_criteria": "Chinese definitions sent to the DeepSeek route. The fuller Windows wording was chosen over Android's shorter one on 2026-10-02; it keeps the constraining clauses ('不取笑脆弱处', '有可信的时间或活动契机')."
+  },
+  "strategies": ["承接", "降压", "调侃", "轻推", "约见", "澄清", "收线"],
+  "typesafe_criteria": {
+    "承接": "Acknowledge the other person's feelings or what they shared; listen without rushing to solve or escalate.",
+    "降压": "Reduce pressure when they are busy, tired, hesitant, or have received repeated questions. Pause pursuit without treating one ambiguous reply as rejection.",
+    "调侃": "Light, respectful playful banter when the other person clearly reciprocates jokes; never mock vulnerability or ignore discomfort.",
+    "轻推": "Move a mutually engaged but stalled conversation one small step forward, without asking for commitment.",
+    "约见": "Offer a concrete, low-pressure meeting when there is reciprocal interest and a credible time/activity opening.",
+    "澄清": "Ask about one key unknown or contradiction that prevents a responsible next step. Do not interrogate or speculate about hidden intentions.",
+    "收线": "Stop pursuing after an explicit refusal or boundary, or repeated one-sided investment/cancellations. A single busy reply alone does not establish this pattern."
+  },
+  "deepseek_criteria": {
+    "承接": "接住对方说的事或感受，不急着推进",
+    "降压": "对方忙、累、迟疑或被连续追问时降低压力",
+    "调侃": "对方也在开玩笑时轻松接话，不取笑脆弱处",
+    "轻推": "双方投入但停滞时推进一个小步骤",
+    "约见": "双方有兴趣且有可信的时间或活动契机时低压邀约",
+    "澄清": "关键事实未知时只问一个必要问题",
+    "收线": "明确拒绝、边界或长期单向投入时停止推进"
+  },
+  "choice_labels": "ABCDEFG",
+  "rotations": [0, 2, 4]
+}

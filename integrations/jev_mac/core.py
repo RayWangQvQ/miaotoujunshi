@@ -15,7 +15,27 @@ SKILL_ROOT = ROOT / "goutoujunshi"
 # trade-off rules live in the root-level references/ directory used by all three
 # ports, and are loaded next to the payload file.
 TONE_REFERENCE = ROOT / "references" / "口吻与取舍.md"
-STRATEGIES = ("承接", "降压", "调侃", "轻推", "约见", "澄清", "收线")
+DATA_ROOT = ROOT / "references" / "data"
+
+
+def shared_data(name):
+    """One references/data/*.json, shared with the other two ports (docs/adr/0005).
+
+    Read from the root, never inlined here, and a missing file is a hard error:
+    a forgotten packaging entry must fail loudly rather than drift into a copy.
+    """
+    try:
+        return json.loads((DATA_ROOT / name).read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise FileNotFoundError(f"缺少跨端公用文件 references/data/{name}") from exc
+
+
+def judge_questions():
+    """The seven calibrated judge questions, in the order the other ports ask them."""
+    return shared_data("judge-questions.json")["questions"]
+
+
+STRATEGIES = tuple(shared_data("strategy-criteria.json")["strategies"])
 MAX_TRANSCRIPT = 12000
 INTENT_CONFIDENCE_NOTE = '这是回复模型对当前意图推测的自评把握，未经过统计校准；不是对方真实意图的已验证概率，也不是回复成功率。'
 
@@ -98,6 +118,20 @@ def reference_paths(scene):
     if scene not in extra:
         raise ValueError("请选择有效的分析场景")
     return paths + [SKILL_ROOT / extra[scene]]
+
+
+# The examples that follow this heading are written for the reply model, not for the
+# strategy models. It is an upstream heading string, so the dependency lives here and
+# in one place only; tests/test_jev_strategy.py locks the truncated result.
+GUIDE_HEADING = "## 常用话术库"
+
+
+def strategy_guide(scene, skill_root=SKILL_ROOT):
+    """The payload strategy guide for the scene, cut before its examples section."""
+    path = reference_paths(scene)[0]
+    if skill_root != SKILL_ROOT:
+        path = skill_root / path.relative_to(SKILL_ROOT)
+    return path.read_text(encoding="utf-8").split(GUIDE_HEADING, 1)[0]
 
 
 def build_messages(snapshot, scene, background, skill_root=SKILL_ROOT):

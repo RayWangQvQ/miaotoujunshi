@@ -11,11 +11,21 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 
+from core import shared_data
+
 
 ROOT = Path(__file__).resolve().parents[2]
 DEMO_DIR = ROOT / "examples" / "relationship_cases"
-MAX_BYTES = 4_000_000
-MAX_MESSAGES = 20_000
+# The illustrative candles belong to the demo-case bundle, not to this port, so the
+# file sits beside the manifest and the CSVs it describes. See docs/adr/0005.
+DEMO_KLINE = DEMO_DIR / "demo_kline.json"
+# The CSV contract and its limits are shared with the other two ports.
+_RULES = shared_data("trend-rules.json")
+MAX_BYTES = _RULES["max_bytes"]
+MAX_MESSAGES = _RULES["max_messages"]
+MAX_EVENT_CHARS = _RULES["max_event_chars"]
+COLUMNS = tuple(_RULES["columns"])
+SENDERS = tuple(_RULES["senders"])
 
 
 @dataclass(frozen=True)
@@ -60,7 +70,7 @@ def load_csv(path: str | Path, title: str = "导入的聊天记录") -> Trend:
     try:
         with source.open(encoding="utf-8-sig", newline="") as handle:
             reader = csv.DictReader(handle)
-            if not reader.fieldnames or not {"timestamp", "sender", "message"}.issubset(reader.fieldnames):
+            if not reader.fieldnames or not set(COLUMNS).issubset(reader.fieldnames):
                 raise ValueError("CSV 需要 timestamp,sender,message 三列")
             for row in reader:
                 count += 1
@@ -71,7 +81,7 @@ def load_csv(path: str | Path, title: str = "导入的聊天记录") -> Trend:
                     raise ValueError("聊天时间没有按升序排列")
                 previous_at = at
                 sender = (row.get("sender") or "").strip()
-                if sender not in {"me", "other"}:
+                if sender not in SENDERS:
                     raise ValueError("sender 只接受 me／other；请先确认双方身份")
                 if not (row.get("message") or "").strip():
                     raise ValueError("存在空消息，请先核对导出文件")
@@ -83,7 +93,7 @@ def load_csv(path: str | Path, title: str = "导入的聊天记录") -> Trend:
                 events = current.events
                 event = (row.get("event") or "").strip()
                 if event:
-                    if len(event) > 160:
+                    if len(event) > MAX_EVENT_CHARS:
                         raise ValueError("事件标注过长，请控制在 160 字以内")
                     events += (event,)
                 candles[-1] = replace(current, high=max(current.high, balance),
@@ -112,7 +122,7 @@ def load_demo(case_id: str) -> Trend:
     if case is None:
         raise ValueError("没有这个合成案例")
     trend = load_csv(DEMO_DIR / case["csv"], case["title"] + " · 合成示例")
-    illustrative = json.loads((Path(__file__).with_name("demo_kline.json")).read_text(encoding="utf-8"))
+    illustrative = json.loads(DEMO_KLINE.read_text(encoding="utf-8"))
     rows = illustrative["cases"].get(case_id)
     if rows is None or len(rows) != len(trend.candles):
         raise ValueError("合成 K 线与聊天日期不匹配")

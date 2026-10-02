@@ -47,7 +47,8 @@ class KlineActivity : AppCompatActivity() {
             text = "选择示例走势，或导入带 timestamp,sender,message 列的聊天 CSV。"
             textSize = 13f; setPadding(0, 12, 0, 12)
         })
-        val names = TrendData.examples.keys.toList()
+        val cases = TrendData.cases()
+        val names = cases.map { it.second }
         val select = Spinner(this)
         select.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, names)
         root.addView(select)
@@ -65,7 +66,7 @@ class KlineActivity : AppCompatActivity() {
         select.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onNothingSelected(parent: AdapterView<*>?) {}
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                chart.setRows(TrendData.example(names[position]))
+                chart.setRows(TrendData.example(cases[position].first))
                 status.text = "${names[position]} · 示例走势"
             }
         }

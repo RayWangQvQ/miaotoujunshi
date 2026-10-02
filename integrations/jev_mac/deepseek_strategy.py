@@ -3,11 +3,13 @@ import json
 import math
 
 from client import Config, DEEPSEEK_BASE, DEEPSEEK_MODEL, complete, read_deepseek_keychain
-from core import SKILL_ROOT, STRATEGIES, reference_paths
+from core import SKILL_ROOT, STRATEGIES, shared_data, strategy_guide
 from jev import CRITERIA, StrategyDecision
 
-LABELS = 'ABCDEFG'
-ROTATIONS = (0, 2, 4)
+# Label map and rotations are shared with the other ports (docs/adr/0005).
+_VOCABULARY = shared_data("strategy-criteria.json")
+LABELS = _VOCABULARY["choice_labels"]
+ROTATIONS = tuple(_VOCABULARY["rotations"])
 
 
 def config():
@@ -147,8 +149,7 @@ def choice_messages(snapshot, scene, background, evidence, labels):
 def decide(config, snapshot, scene, background, skill_root=SKILL_ROOT):
     if len(background) > 3000:
         raise ValueError('背景请控制在 3000 字以内')
-    paths = reference_paths(scene)
-    guidance = (skill_root / paths[0]).read_text(encoding='utf-8').split('## 常用话术库', 1)[0]
+    guidance = strategy_guide(scene, skill_root)
     raw = complete(config, evidence_messages(snapshot, scene, background, guidance), json_mode=True)
     try:
         fallback = parse_decision(raw, config.model)

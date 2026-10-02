@@ -10,10 +10,12 @@ import json
 import re
 
 try:  # 当模块导入 / 当脚本直接跑 都能用
+    from . import shared
     from .jev_client import JevError, _api_key  # 复用 key 读取
     from .llm import chat
     from .providers import DRAFT_PROVIDERS, LLM_ENV
 except ImportError:
+    import shared
     from jev_client import JevError, _api_key
     from llm import chat
     from providers import DRAFT_PROVIDERS, LLM_ENV
@@ -42,16 +44,14 @@ SYSTEM = (
     "输出：只输出一个 JSON 数组，恰好 3 个字符串，别的什么都别写；字符串就是消息本身，不要带「me:」之类的前缀。"
 )
 
-# 狗头军师的判断与出口边界。回复仍由当前配置的生成模型起草，
-# Jev 只提供策略/排序；不把模型判断写成已知事实。
-SYSTEM += (
-    "\n狗头军师规则：先分清可见事实、暂定推测和仍未知，再选择本轮一个主动作。"
-    "对方的意图只是可能解释，不要在回复中宣称看穿了 TA。"
-    "优先保护互惠、边界和用户未来的选择权；明确拒绝时停止推进。"
-    "不要编造见面时间、共同经历、自己做过的事或做不到的承诺。"
-    "一条消息只做一件事；理由、代价、心理分析留在助手界面，不发给对方。"
-    "如果 OCR 把说话人认错，用户会在发送前核对；不要把对方的口吻学成用户的口吻。"
-)
+# 口吻、取舍与判断边界不在这里复述一份：它们由三端共用的
+# `references/口吻与取舍.md` 和 skill 载荷的 `SKILL.md` 在运行期提供
+# （docs/adr/0005）。本模块只保留本端专属的出口契约与解析。
+def _system() -> str:
+    """起草的系统提示：本端出口契约 + 共用的口吻规则与技能说明。"""
+    return (SYSTEM
+            + "\n\n口吻与取舍（应用层三端共用，直接照它写）：\n" + shared.tone_rules()
+            + "\n\n技能说明：\n" + shared.skill_document())
 
 
 def _clean(x: str) -> str:
@@ -202,7 +202,7 @@ def draft_candidates(messages: list, relationship: str, provider: str = "deepsee
     # 1.2：DeepSeek 自己推荐的闲聊档位，0.8 出来的话太板正
     # max_tokens：三句话本来 400 够，但思考过程也算进 max_tokens，开了思考模式 400 会把答案截断
     call = lambda turns: chat(  # noqa: E731 —— 三个参数会变，其余每次都一样
-        spec.protocol, base_url or spec.base, key, model or spec.default, SYSTEM, turns,
+        spec.protocol, base_url or spec.base, key, model or spec.default, _system(), turns,
         temperature=1.2, max_tokens=4000 if thinking else 400, thinking=thinking,
         extra_body=spec.extra(thinking), timeout=timeout)
 

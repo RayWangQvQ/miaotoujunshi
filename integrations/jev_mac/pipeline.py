@@ -1,16 +1,14 @@
 """One explicit request: optional Jev strategy, then configured reply generation."""
 from client import complete
-from core import build_messages, parse_advice, parse_rewrite
+from core import build_messages, parse_advice, parse_rewrite, shared_data
 from jev import decide
 from deepseek_strategy import decide as decide_deepseek
 from ranking import rank_candidates
 import json
 
-TONE_GUIDANCE = {
-    '稳健': '朴素、贴题，像平时接话；不写客服式确认或过度安慰。',
-    '会撩': '有双方接梗或亲近的依据才加一点玩笑或欣赏；没有依据就自然接话，不硬撩、不造金句。',
-    '直接': '把想说的事说清楚；不命令、不故作冷淡，不把普通聊天写成关系宣言。',
-}
+# The per-tone one-liners live with the other shared reply preferences so the three
+# ports read one copy (docs/adr/0005).
+TONE_GUIDANCE = shared_data("reply-preferences.json")["tone_guidance"]
 
 
 def analyze_snapshot(snapshot, scene, background, reply_config, jev_config=None, preferences=None,
@@ -29,13 +27,22 @@ def analyze_snapshot(snapshot, scene, background, reply_config, jev_config=None,
                 decide_deepseek(deepseek_strategy_config, snapshot, scene, background)
                 if deepseek_strategy_config else None)
     if decision:
-        import json
         messages[0]["content"] += (
             "\n本轮主策略已由独立策略判断步骤选定，strategy 字段必须为：" + decision.strategy +
             "。围绕它生成分析与回复；可以建议不回复并返回空候选。" +
             "这些概率只反映模型对策略选择的不确定性，不是关系事实或回复成功率。")
+        judge = (decision.evidence or {}).get("judge")
+        if judge:
+            messages[0]["content"] += (
+                "\njudge_evidence 是同一轮判断给出的七项结构化答案（模型推测，不是已证实事实）："
+                "true_intent、she_needs、best_action 是可能的意图、对方需要和建议动作，"
+                "danger_level 是 0 到 9 的紧张度，literal_question、should_reply_now、"
+                "tension_resolved 是布尔值。分析与回复顺着它，但不得写成对方真实意图、概率或读心结论；"
+                "可见事实优先，与原文冲突时以原文为准。")
         payload = json.loads(messages[1]["content"])
         payload["strategy_decision"] = decision.as_dict()
+        if judge:
+            payload["judge_evidence"] = judge
         messages[1]["content"] = json.dumps(payload, ensure_ascii=False)
     advice = parse_advice(complete(reply_config, messages))
     if preferences is not None and (len(advice['candidates']) > settings['count'] or any(

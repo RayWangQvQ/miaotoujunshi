@@ -184,6 +184,16 @@ python3 -B -m unittest discover -s tests -v
 离线测试还覆盖 Jev 策略响应校验、服务调用顺序、密钥隔离、错误脱敏及策略冲突时拒绝候选。
 真实运行需另外验证：OCR 内容、说话人纠错、两个模型的输出质量、切换会话后拒绝回填、保留草稿、只填不发。
 
+## 跨端公用材料
+
+本端在运行期读取仓库根级的共用内容，不在本目录保留副本（见 [ADR 0005](../../docs/adr/0005-read-root-shared-material-on-every-port.md)）：
+
+- `references/口吻与取舍.md`、`references/data/*.json`（判断题集、边界词与停止条件、策略词表、长度档、CSV 契约、场景到载荷文件的映射）
+- `examples/relationship_cases/`（示例案例与其示意 K 线）
+- `goutoujunshi/SKILL.md` 与当前场景对应的载荷参考
+
+`scripts/package_mac.py` 的 `references`、`examples/relationship_cases`、`goutoujunshi/*` 条目负责把它们放进交付包。本端是唯一有分析场景选择器的端，因此也是唯一读取按场景载荷参考的端。
+
 ## 上游与许可
 
 `vendor/perception.py` 与 `vendor/fill.py` 来自

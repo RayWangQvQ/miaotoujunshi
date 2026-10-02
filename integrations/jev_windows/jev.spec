@@ -3,8 +3,19 @@
 onedir 不是 onefile：PySide6 + onnxruntime 打出来 ~150MB，onefile 每次启动都要解压一遍，慢且占临时盘。
 只在 Windows 上跑，下面的 collect_all 也只认 Windows 上装好的那几个包。"""
 from PyInstaller.utils.hooks import collect_all
+import os
 
 NAME = "miaotoujunshi-windows"
+
+# 跨端公用材料（根级 references/、examples/、skill 载荷的 SKILL.md）由 core/shared.py
+# 在运行期按仓库相对路径读取，所以必须随程序一起分发；漏一项就在第一次分析时报错。
+# 目录名保持与仓库一致，SHARED 路径才算得出来。见 docs/adr/0005。
+ROOT = os.path.abspath(os.path.join(SPECPATH, "..", ".."))
+datas = [("LICENSE", "."), ("NOTICE", ".")]
+for shared_dir in ("references", os.path.join("examples", "relationship_cases")):
+    datas.append((os.path.join(ROOT, shared_dir), shared_dir))
+datas.append((os.path.join(ROOT, "goutoujunshi", "SKILL.md"), "goutoujunshi"))
+binaries = []
 
 hiddenimports = [
     # spawn 出来的采集子进程按名字 import app.worker，再顺着它拉 capture/ocr；
@@ -12,9 +23,9 @@ hiddenimports = [
     "app.worker", "app.capture", "app.ocr", "app.cloud_ocr", "app.fill", "app.overlay", "app.settings",
     "app.version", "app.update", "app.debugwin", "app.trend_ui", "app.review",  # lazy windows
     "core.engine", "core.draft", "core.jev_client", "core.questions", "core.providers",
-    "core.llm", "core.deepseek_strategy", "core.trend", "core.experience",
+    "core.llm", "core.deepseek_strategy", "core.trend", "core.experience", "core.shared",
 ]
-datas, binaries = [("LICENSE", "."), ("NOTICE", ".")], []
+
 for pkg in (
     "rapidocr_onnxruntime",  # .onnx 模型 + config.yaml 是包数据，不收就是启动即炸
     "onnxruntime",           # capi 下面那堆 DLL

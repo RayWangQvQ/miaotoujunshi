@@ -8,8 +8,9 @@ Skill 层在 `goutoujunshi/`，应用层在 `integrations/`。
 用户可见、可安装、可打包的桌面与移动应用。
 
 主体在 `integrations/`，另有若干根级例外——`tests/`（只测应用集成）、`documentation/`（应用截图与设计稿）、
-`examples/`（演示案例，运行期消费者是 `integrations/jev_mac/trend.py`，不是 skill）、`PRIVACY.md`
-（数据使用说明，根级是 GitHub 惯例）、`references/`（三端共用的参考材料，不属于任何单端）。
+`examples/`（演示案例，三端运行期都读，不是 skill）、`PRIVACY.md`
+（数据使用说明，根级是 GitHub 惯例）、`references/`（跨端公用材料：给模型读的散文在根，
+给代码读的结构化数据在 `references/data/`，不属于任何单端）。
 根级例外逐项登记在 `scripts/validate_layout.py` 的白名单里，以那里为准。
 
 | 术语 | 含义 |
@@ -18,6 +19,7 @@ Skill 层在 `goutoujunshi/`，应用层在 `integrations/`。
 | 喵球 | 悬浮球的显示名，只是这个 UI 元件的名字，**不是应用名**。只出现在球面与其自带文案（球的窗口标题、无障碍标签）中 |
 | miaotoujunshi | 应用的技术标识前缀。用于 applicationId（`com.miaotoujunshi.chat`）、PyInstaller `NAME`、CI artifact 名、zip 前缀与 dist 目录名 |
 | Jev Chat | 上游 `jev-chat-jarvis` 的品牌名。应用侧**不再使用**，以免违反 NOTICE 的署名禁令。仍作为策略判断服务名（TypeSafe Jev）出现在配置界面 |
+| 跨端公用材料 | 根级、**设计上供三端运行期读取**的内容：`references/`（散文）、`references/data/`（结构化数据）、`examples/`（演示案例），加上 skill 层的载荷 `goutoujunshi/`。三端一律读文件，不在任一端内联副本 |
 | preview 包 | 未签名/未公证的源码或调试构建，仅供自行安装验收，不是商店发布版 |
 
 ## Skill 层（`goutoujunshi/`）
@@ -60,7 +62,10 @@ Skill 层在 `goutoujunshi/`，应用层在 `integrations/`。
 - Skill 层内容只放 `goutoujunshi/`，应用层内容只放 `integrations/`（根级例外见上节与白名单）。
 - 两个 `references/` 不同层：`goutoujunshi/references/` 是 skill 载荷的参考库（上游所有，逐字节一致）；
   根级 `references/` 是应用层三端共用的参考材料（本仓所有）。跨端共用的应用层内容一律放根级后者，
-  **不要放进某个单端目录**。
+  **不要放进某个单端目录**；给模型读的散文放根，给代码读的结构化数据放 `references/data/`。
+- **跨端公用材料三端一律在运行期读文件**：不得在任一端内联副本，不得放在 `integrations/<port>/` 下。
+  各端打包必须同步纳入它读到的根级文件（Windows `jev.spec` 的 `datas`、Android 的 `assets`、
+  mac 的 `package_mac.py`）；读不到即报错，不降级回内联副本。取舍与代价见 `docs/adr/0005`。
 - 载荷目录 `goutoujunshi/` 必须与上游**逐字节一致**：`check_upstream.py` 的 `drifted` 与
   `only this repo has` 两行都必须恒为 0。本仓对 skill 内容的任何意见一律落在应用层，
   不改载荷；要改 skill 本身只能提给上游（见 `docs/adr/0004`）。

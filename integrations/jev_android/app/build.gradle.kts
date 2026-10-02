@@ -16,9 +16,33 @@ val releaseProps = Properties().apply {
     }
 }
 
+// Cross-port shared material (root references/, the demo case bundle, and the
+// skill payload's SKILL.md) is read at runtime by core.SharedMaterial under its
+// repository path, so the build copies it into assets/ unchanged. Nothing is
+// duplicated into this port: a missing entry fails the first analysis instead.
+// See docs/adr/0005.
+// integrations/jev_android -> integrations -> repository root.
+val repoRoot = rootProject.projectDir.parentFile.parentFile
+val sharedAssets = layout.buildDirectory.dir("sharedAssets")
+
+val copySharedMaterial by tasks.registering(Copy::class) {
+    description = "Copies the repository-root shared material into assets, paths unchanged"
+    from(File(repoRoot, "references")) { into("references") }
+    from(File(repoRoot, "examples/relationship_cases")) { into("examples/relationship_cases") }
+    from(File(repoRoot, "goutoujunshi/SKILL.md")) { into("goutoujunshi") }
+    into(sharedAssets)
+}
+
+// AGP resolves an assets srcDir to a plain directory, so the copy is wired in by
+// hand: without this a stale assets/ tree survives a change to the shared material.
+tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }
+    .configureEach { dependsOn(copySharedMaterial) }
+
 android {
     namespace = "com.jev.probe"
     compileSdk = 35
+
+    sourceSets["main"].assets.srcDir(sharedAssets)
 
     defaultConfig {
         applicationId = "com.miaotoujunshi.chat"
@@ -81,4 +105,7 @@ dependencies {
     // it works on phones with no Google Play services and needs no model download.
     implementation("com.google.mlkit:text-recognition-chinese:16.0.1")
     testImplementation("junit:junit:4.13.2")
+    // 单测跑在 JVM 上，android.jar 里的 org.json 全是 "not mocked" 桩，
+    // 而 core.SharedMaterial 要解析公用 JSON。测试用真实现，设备上仍用系统的。
+    testImplementation("org.json:json:20180813")
 }

@@ -1,0 +1,13 @@
+{
+  "_provenance": "This repository's own text, app layer.",
+  "no_contact_terms": [
+    "不要再联系我",
+    "别再联系我",
+    "不要再给我发消息",
+    "别再给我发消息",
+    "不要再找我",
+    "别再找我",
+    "请不要联系我"
+  ],
+  "stop_condition": "对方明确拒绝或要求停止联系时，停止推进。"
+}

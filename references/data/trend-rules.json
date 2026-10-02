@@ -1,0 +1,11 @@
+{
+  "_provenance": "This repository's own contract, app layer. Limits only; the user-facing error wording stays port-local.",
+  "columns": ["timestamp", "sender", "message"],
+  "senders": ["me", "other"],
+  "timestamp_format": "YYYY-MM-DD HH:MM:SS",
+  "max_bytes": 4000000,
+  "max_messages": 20000,
+  "max_event_chars": 160,
+  "metric": "message_balance",
+  "metric_note": "An 'other' message adds one and a 'me' message subtracts one. It is not a relationship quality score."
+}

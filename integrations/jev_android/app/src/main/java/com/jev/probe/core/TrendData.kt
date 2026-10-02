@@ -1,5 +1,6 @@
 package com.jev.probe.core
 
+import org.json.JSONObject
 import java.io.InputStream
 import java.io.ByteArrayOutputStream
 import java.time.LocalDateTime
@@ -8,43 +9,51 @@ import java.time.LocalDateTime
 data class TrendCandle(val date: String, val open: Int, val high: Int, val low: Int, val close: Int)
 
 object TrendData {
-    val examples: Map<String, List<List<Int>>> = linkedMapOf(
-        "双向升温" to listOf(listOf(50,56,48,54), listOf(54,64,53,61), listOf(61,72,60,70),
-            listOf(70,76,68,74), listOf(74,82,72,79), listOf(79,86,77,83)),
-        "热聊后降温" to listOf(listOf(50,59,48,57), listOf(57,65,55,63), listOf(63,66,58,60),
-            listOf(60,63,51,54), listOf(54,56,43,46), listOf(46,52,44,49), listOf(49,50,45,47),
-            listOf(47,49,34,38)),
-        "冲突后修复" to listOf(listOf(55,61,53,59), listOf(59,61,28,36), listOf(36,49,34,45),
-            listOf(45,63,43,60), listOf(60,68,58,65)),
-        "忙但仍兑现" to listOf(listOf(50,55,48,53), listOf(53,62,51,59), listOf(59,60,55,58),
-            listOf(58,60,55,58), listOf(58,65,56,63), listOf(63,76,61,73), listOf(73,80,71,77)),
-        "明确边界后收线" to listOf(listOf(50,54,48,51), listOf(51,53,38,41), listOf(41,42,35,37))
-    )
+    /** CSV contract and limits, shared with the other two ports (docs/adr/0005). */
+    private val rules: JSONObject get() = SharedMaterial.data("trend-rules.json")
 
-    fun example(name: String): List<TrendCandle> =
-        (examples[name] ?: error("没有这个示例走势")).mapIndexed { i, row ->
-            TrendCandle("示例 ${i + 1}", row[0], row[1], row[2], row[3])
+    /** (case id, display title), from the manifest in the shared demo case bundle. */
+    fun cases(): List<Pair<String, String>> {
+        val rows = SharedMaterial.caseManifest().getJSONArray("cases")
+        return (0 until rows.length()).map {
+            val row = rows.getJSONObject(it)
+            row.getString("id") to row.getString("title")
         }
+    }
+
+    /** Illustrative candles for one case id; they live beside the manifest, not here. */
+    fun example(caseId: String): List<TrendCandle> {
+        val rows = SharedMaterial.demoCandles().optJSONArray(caseId) ?: error("没有这个示例走势")
+        return (0 until rows.length()).map { i ->
+            val row = rows.getJSONArray(i)
+            TrendCandle(row.getString(0), row.getInt(1), row.getInt(2), row.getInt(3), row.getInt(4))
+        }
+    }
 
     fun fromCsv(input: InputStream): List<TrendCandle> {
+        val limits = rules
+        val maxBytes = limits.getInt("max_bytes")
+        val maxMessages = limits.getInt("max_messages")
+        val columns = limits.getJSONArray("columns").let { a -> (0 until a.length()).map { a.getString(it) } }
+        val senders = limits.getJSONArray("senders").let { a -> (0 until a.length()).map { a.getString(it) } }
         val bytes = input.use { source ->
             val out = ByteArrayOutputStream()
             val chunk = ByteArray(8192)
-            while (out.size() <= 4_000_000) {
+            while (out.size() <= maxBytes) {
                 val n = source.read(chunk)
                 if (n < 0) break
                 out.write(chunk, 0, n)
             }
             out.toByteArray()
         }
-        require(bytes.size <= 4_000_000) { "CSV 超过 4 MB，请缩小范围" }
+        require(bytes.size <= maxBytes) { "CSV 超过 4 MB，请缩小范围" }
         val text = bytes.toString(Charsets.UTF_8).removePrefix("\uFEFF")
         val records = parseCsv(text)
         require(records.isNotEmpty()) { "CSV 没有内容" }
         val header = records.first().map { it.trim() }
-        val t = header.indexOf("timestamp"); val s = header.indexOf("sender"); val m = header.indexOf("message")
-        require(t >= 0 && s >= 0 && m >= 0) { "CSV 需要 timestamp,sender,message 三列" }
-        require(records.size in 2..20_001) { "聊天记录须为 1 到 20000 条" }
+        val t = header.indexOf(columns[0]); val s = header.indexOf(columns[1]); val m = header.indexOf(columns[2])
+        require(t >= 0 && s >= 0 && m >= 0) { "CSV 需要 ${columns.joinToString(",")} 三列" }
+        require(records.size in 2..maxMessages + 1) { "聊天记录须为 1 到 $maxMessages 条" }
         val candles = ArrayList<TrendCandle>()
         var balance = 0
         var previous: LocalDateTime? = null
@@ -55,7 +64,7 @@ object TrendData {
             require(previous == null || !at.isBefore(previous)) { "聊天时间须按升序排列" }
             previous = at
             val sender = record[s].trim()
-            require(sender == "me" || sender == "other") { "sender 只接受 me／other" }
+            require(sender in senders) { "sender 只接受 ${senders.joinToString("／")}" }
             require(record[m].isNotBlank()) { "存在空消息，请核对 CSV" }
             val date = at.toLocalDate().toString()
             if (candles.isEmpty() || candles.last().date != date)

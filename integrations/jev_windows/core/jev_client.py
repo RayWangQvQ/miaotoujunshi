@@ -214,9 +214,9 @@ if __name__ == "__main__":
     import typesafe_sdk
 
     try:
-        from .questions import JUDGE_QUESTIONS, build_rank_question
+        from .questions import build_rank_question, judge_questions
     except ImportError:
-        from questions import JUDGE_QUESTIONS, build_rank_question
+        from questions import build_rank_question, judge_questions
 
     os.environ.pop(JEV_ENV, None)
     os.environ["OPENROUTER_API_KEY"] = "or-key"
@@ -226,7 +226,7 @@ if __name__ == "__main__":
     except JevError:
         pass
     os.environ[JEV_ENV] = "ts-key"
-    questions = dict(JUDGE_QUESTIONS)
+    questions = judge_questions()
     questions.update(build_rank_question(["甲", "乙", "丙"]))
     seen: dict = {}
 

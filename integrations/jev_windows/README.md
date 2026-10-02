@@ -18,3 +18,13 @@ py -3.11 -m venv .venv
 密钥写入当前 Windows 用户的 `GOUTOU_JEV_API_KEY`、`GOUTOU_DEEPSEEK_STRATEGY_KEY`、`GOUTOU_LLM_API_KEY` 和 `GOUTOU_OCR_API_KEY` 环境变量（按实际选择填写）；识图来源与回复来源相同时可以复用回复 Key。不会读取原版 Jev 安装时保存的 Key。其他设置写在本目录的 `config.json`，已被 Git 忽略。`build.bat` 可在 Windows 上生成可执行目录和 `dist/miaotoujunshi-windows-preview.zip`；ZIP 解压后保持整个目录完整，从其中运行 `.exe`。数据使用见仓库根目录 [说明](../../PRIVACY.md)。
 
 源码来源及第三方组件许可见本目录的 [LICENSE](LICENSE) 与 [NOTICE](NOTICE)。特别是 PySide6-Fluent-Widgets 会影响 Windows 发布包的许可条件；发布时须单独核对。
+
+## 跨端公用材料
+
+本端在运行期读取仓库根级的共用内容，不在本目录保留副本（见 [ADR 0005](../../docs/adr/0005-read-root-shared-material-on-every-port.md)）：
+
+- `references/口吻与取舍.md`、`references/data/*.json`（判断题集、边界词与停止条件、策略词表、长度档、CSV 契约）
+- `examples/relationship_cases/`（示例走势 K 线与其清单）
+- `goutoujunshi/SKILL.md`（skill 载荷入口文档）
+
+`jev.spec` 的 `datas` 负责按原路径把它们随程序分发。读不到会直接报错，不回退到内联副本。

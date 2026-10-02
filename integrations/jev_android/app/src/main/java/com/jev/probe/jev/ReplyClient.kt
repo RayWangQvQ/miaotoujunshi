@@ -15,6 +15,9 @@ import org.json.JSONObject
  */
 class ReplyClient(private val prefs: Prefs) {
 
+    /** Candidate length cap: the shared 简短 tier, in characters (docs/adr/0005). */
+    private val lengthCap: Int get() = GoutouGuidance.lengthCap("简短")
+
     /**
      * Exactly 3 varied candidate replies in Chinese.
      *
@@ -28,9 +31,10 @@ class ReplyClient(private val prefs: Prefs) {
         val convo = snapshot.messages.takeLast(10).joinToString("\n") {
             (if (it.side == "me") "我" else "对方") + "：" + it.text
         }
-        val sys = "你是喵头军师的即时通讯回复助手。" + GoutouGuidance.draftRules +
+        val sys = "你是喵头军师的即时通讯回复助手。\n\n口吻与取舍（应用层三端共用，照它写）：\n" +
+            GoutouGuidance.toneRules() + "\n\n技能说明：\n" + GoutouGuidance.skillDocument() +
             "只输出一个 JSON 数组，包含 1 到 3 条真正适合发送的候选；不为凑数编造承诺。" +
-            "每条不超过 40 字，口语、自然、像真人在聊天软件里发消息。不要解释，直接输出 JSON 数组。"
+            "每条不超过 $lengthCap 字，口语、自然、像真人在聊天软件里发消息。不要解释，直接输出 JSON 数组。"
         val mySamples = snapshot.messages.filter { it.side == "me" && it.text.length in 1..60 }
             .takeLast(8).joinToString("\n") { it.text }
         val guide = judgment?.let {
@@ -129,7 +133,7 @@ class ReplyClient(private val prefs: Prefs) {
         require(samples.isNotEmpty()) { "这一屏没有可靠的“我”的原话，先核对原文" }
         val system = "你是狗头军师的口吻改写。只改写给出的候选原文，不改变本轮策略，" +
             "不编造事实、时间、经历或承诺，不学对方口吻。只输出 JSON 字符串数组，" +
-            "每条不超过 40 字；口语、简短、像用户自己会发的话。"
+            "每条不超过 $lengthCap 字；口语、简短、像用户自己会发的话。"
         val user = JSONObject().put("strategy", judgment.strategy ?: judgment.bestAction?.choice)
             .put("my_samples", JSONArray(samples)).put("candidates", JSONArray(candidates)).toString()
         val result = parseThree(chat(system, user, temperature = 0.6))

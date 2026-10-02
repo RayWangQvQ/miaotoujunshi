@@ -6,16 +6,18 @@
 from __future__ import annotations
 
 try:
+    from . import shared
     from .draft import draft_candidates
     from .jev_client import JevError, ask
     from .goutou import brief, explicit_boundary
-    from .questions import JUDGE_QUESTIONS, build_rank_question, build_state, guidance_text
+    from .questions import build_rank_question, build_state, guidance_text, judge_questions
     from .deepseek_strategy import decide as deepseek_decide, rank as deepseek_rank
 except ImportError:
+    import shared
     from draft import draft_candidates
     from jev_client import JevError, ask
     from goutou import brief, explicit_boundary
-    from questions import JUDGE_QUESTIONS, build_rank_question, build_state, guidance_text
+    from questions import build_rank_question, build_state, guidance_text, judge_questions
     from deepseek_strategy import decide as deepseek_decide, rank as deepseek_rank
 
 _REPLY_IDX = {"reply_a": 0, "reply_b": 1, "reply_c": 2}
@@ -76,7 +78,7 @@ def analyze(messages: list, relationship: str, model: str | None = None,
             "action": f"本轮主策略：{decision['strategy']}",
             "unknown": "；".join(decision["unknowns"]) or "完整上下文和对方内心仍未知",
             "next_step": "先核对原文，再按主策略选择候选；必要时先不回复。",
-            "stop_condition": "对方明确拒绝或要求停止联系时停止推进。",
+            "stop_condition": shared.data("boundaries.json")["stop_condition"],
             "evidence_note": ("DeepSeek 三次标签轮换的首 token 权重只用于策略相对选择；"
                               "判断把握不是对方真实意图概率，候选权重不是回复成功率。")}
         return {"candidates": candidates, "best_index": best_index,
@@ -84,36 +86,32 @@ def analyze(messages: list, relationship: str, model: str | None = None,
                 "scores": scores, "answers": {}, "usage": {}, "reply_to": reply_to,
                 "goutou": reading, "strategy_decision": decision}
     usage: dict = {}
-    answers: dict = {}
-    judged = False
-    first = ask(state, dict(JUDGE_QUESTIONS), timeout=timeout,
+    judge_set = judge_questions()
+    first = ask(state, dict(judge_set), timeout=timeout,
                 provider=jev_provider, model=jev_model)
     answers = first.get("answers") or {}
     if not isinstance(answers, dict) or any(
-            not isinstance(answers.get(name), dict) for name in JUDGE_QUESTIONS):
+            not isinstance(answers.get(name), dict) for name in judge_set):
         raise JevError("Jev 判断结果不完整，已停止生成回复；请重试")
     _add_usage(usage, first.get("usage"))
-    judged = True
 
     candidates = draft_candidates(messages, relationship, provider=provider, model=model,
                                   base_url=base_url, timeout=timeout, keep=context,
                                   reply_to=reply_to, style=style, thinking=thinking,
-                                  guidance=guidance_text(answers) if judged else None)
+                                  guidance=guidance_text(answers))
     if not candidates:
         return {"candidates": [], "best_index": None, "best_reply": None,
                 "scores": [], "answers": answers, "usage": usage,
                 "reply_to": reply_to, "goutou": brief(messages, answers)}
 
-    questions = {} if judged else dict(JUDGE_QUESTIONS)
-    if len(candidates) >= 2:  # 起草只给了 1 条就没什么可排的，判断题照问
-        questions.update(build_rank_question(candidates))
-    if questions:
+    ranking: dict = {}
+    if len(candidates) >= 2:  # 起草只给了 1 条就没什么可排的
+        ranking.update(build_rank_question(candidates))
+    if ranking:
         try:
-            second = ask(state, questions, timeout=timeout,
+            second = ask(state, ranking, timeout=timeout,
                          provider=jev_provider, model=jev_model)
         except JevError:
-            if not judged:  # 老路只有这一次调用，挂了就是挂了
-                raise
             second = {}  # 判断还在，只是没排上序：下面按第一条推荐
         answers = {**answers, **(second.get("answers") or {})}
         _add_usage(usage, second.get("usage"))

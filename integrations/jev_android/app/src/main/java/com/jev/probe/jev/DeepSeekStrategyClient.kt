@@ -5,14 +5,24 @@ import com.jev.probe.core.ChatSnapshot
 import com.jev.probe.core.Choice
 import com.jev.probe.core.Prefs
 import com.jev.probe.core.RankedReply
+import com.jev.probe.core.SharedMaterial
 import org.json.JSONArray
 import org.json.JSONObject
 import kotlin.math.exp
 
 /** Independent DeepSeek route. Token weights are optional evidence, never success odds. */
 class DeepSeekStrategyClient(private val prefs: Prefs) {
-    private val strategies = listOf("承接", "降压", "调侃", "轻推", "约见", "澄清", "收线")
-    private val labels = "ABCDEFG"
+    // The strategy vocabulary and its Chinese definitions are shared by all three
+    // ports (references/data/strategy-criteria.json, see docs/adr/0005).
+    private val vocabulary = SharedMaterial.data("strategy-criteria.json")
+    private val strategies: List<String> = vocabulary.getJSONArray("strategies").let { a ->
+        (0 until a.length()).map { a.getString(it) }
+    }
+    private val criteria = vocabulary.getJSONObject("deepseek_criteria")
+    private val labels = vocabulary.getString("choice_labels")
+    private val rotations: List<Int> = vocabulary.getJSONArray("rotations").let { a ->
+        (0 until a.length()).map { a.getInt(it) }
+    }
     private val endpoint = "${Prefs.DEEPSEEK_BASE}/chat/completions"
 
     fun judge(snapshot: ChatSnapshot, relationship: String): Analysis {
@@ -32,8 +42,8 @@ class DeepSeekStrategyClient(private val prefs: Prefs) {
             require(evidence != null) { "DeepSeek 策略判断格式不正确；未生成候选，请重试" }
             val distributions = ArrayList<Map<String, Double>>()
             try {
-                for (offset in listOf(0, 2, 4)) {
-                    val mapping = labels.mapIndexed { i, c -> c.toString() to strategies[(i + offset) % 7] }.toMap()
+                for (offset in rotations) {
+                    val mapping = labels.mapIndexed { i, c -> c.toString() to strategies[(i + offset) % strategies.size] }.toMap()
                     val options = mapping.entries.joinToString("；") { "${it.key}=${it.value}（${criterion(it.value)}）" }
                     val response = request("根据给定证据选下一轮主策略。只输出一个大写字母 A 到 G。$options",
                         JSONObject().put("transcript", transcript).put("relationship", relationship)
@@ -44,9 +54,9 @@ class DeepSeekStrategyClient(private val prefs: Prefs) {
             } catch (_: Exception) { /* Evidence judgment remains useful without token weights. */ }
             val fallback = evidence.getString("strategy")
             val winners = distributions.map { row -> row.maxByOrNull { it.value }?.key }
-            val stable = distributions.size == 3 && winners.distinct() == listOf(fallback)
+            val stable = distributions.size == rotations.size && winners.distinct() == listOf(fallback)
             val weights = if (stable) strategies.associateWith { name ->
-                distributions.sumOf { it[name] ?: 0.0 } / 3.0
+                distributions.sumOf { it[name] ?: 0.0 } / distributions.size
             } else emptyMap()
             val facts = strings(evidence.optJSONArray("facts"))
             val unknowns = strings(evidence.optJSONArray("unknowns"))
@@ -159,13 +169,5 @@ class DeepSeekStrategyClient(private val prefs: Prefs) {
             rows.optString(i).trim().take(200).takeIf { it.isNotBlank() }
         }
 
-    private fun criterion(name: String): String = when (name) {
-        "承接" -> "接住对方，不急着推进"
-        "降压" -> "忙、累或迟疑时减压"
-        "调侃" -> "双方互相开玩笑时轻松接话"
-        "轻推" -> "双方投入但停滞时推进一步"
-        "约见" -> "有可信契机时低压邀约"
-        "澄清" -> "只问一个关键未知"
-        else -> "明确拒绝或长期单向时停止推进"
-    }
+    private fun criterion(name: String): String = criteria.getString(name)
 }

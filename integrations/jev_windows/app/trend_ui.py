@@ -6,7 +6,7 @@ from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import (QComboBox, QFileDialog, QHBoxLayout, QLabel,
                                QPushButton, QVBoxLayout, QWidget)
 
-from core.trend import DEMO, demo, load_csv
+from core.trend import demo, demo_cases, load_csv
 
 
 class CandleCanvas(QWidget):
@@ -63,9 +63,12 @@ class TrendWindow(QWidget):
         root.addWidget(heading)
         root.addWidget(QLabel("选择示例走势，或导入带 timestamp,sender,message 列的聊天 CSV。"))
         row = QHBoxLayout()
+        # (case id, title): the titles come from the shared case manifest, the
+        # candles for each id from demo_kline.json in the same bundle.
+        self.cases = demo_cases()
         self.case = QComboBox()
-        self.case.addItems(list(DEMO))
-        self.case.currentTextChanged.connect(self.load_demo)
+        self.case.addItems([title for _, title in self.cases])
+        self.case.currentIndexChanged.connect(self.load_demo)
         row.addWidget(self.case)
         button = QPushButton("导入聊天 CSV")
         button.clicked.connect(self.import_csv)
@@ -77,12 +80,14 @@ class TrendWindow(QWidget):
         self.status.setWordWrap(True)
         root.addWidget(self.status)
         root.addWidget(QLabel("导入数据只按每日消息方向净差计算；图形不代表爱意、回复率或关系成功率。"))
-        self.load_demo(self.case.currentText())
+        self.load_demo(0)
 
-    def load_demo(self, name):
-        if name:
-            self.canvas.set_candles(demo(name))
-            self.status.setText(f"{name} · 示例走势；转折仍需结合实际聊天事件判断。")
+    def load_demo(self, index):
+        if not 0 <= index < len(self.cases):
+            return
+        case_id, title = self.cases[index]
+        self.canvas.set_candles(demo(case_id))
+        self.status.setText(f"{title} · 示例走势；转折仍需结合实际聊天事件判断。")
 
     def import_csv(self):
         path, _ = QFileDialog.getOpenFileName(self, "导入聊天 CSV", "", "CSV (*.csv)")

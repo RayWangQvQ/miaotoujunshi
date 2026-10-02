@@ -4,12 +4,17 @@ import time
 import uuid
 from dataclasses import dataclass
 
-STAGES = ('未填写', '初识', '了解中', '暧昧', '约会中', '伴侣', '关系结束')
-GOALS = {'自然接话': '日常回复', '主动邀约': '邀约推进', '澄清关系': '日常回复',
-         '修复冲突': '冲突修复', '减少投入': '投入与退出', '结束联系': '投入与退出'}
-TONES = ('稳健', '会撩', '直接')
-LENGTHS = {'简短': 40, '适中': 70, '详细': 100}
-PROFILE_FIELDS = ('stage', 'goal', 'background', 'my_mbti', 'their_mbti', 'my_score', 'their_score', 'notes')
+from core import shared_data
+
+# Vocabulary and tiers shared with the other two ports (docs/adr/0005): the root
+# files are the single source, so these are read rather than written out again.
+_ENUMS = shared_data("relationship-enums.json")
+_PREFERENCES = shared_data("reply-preferences.json")
+STAGES = tuple(_ENUMS["stages"])
+GOALS = dict(_ENUMS["goals"])
+TONES = tuple(_PREFERENCES["tones"])
+LENGTHS = dict(_PREFERENCES["lengths"])
+PROFILE_FIELDS = tuple(_ENUMS["profile_fields"])
 
 
 @dataclass(frozen=True)
