@@ -14,6 +14,7 @@ import com.jev.probe.capture.ocr.OcrLine
 import com.jev.probe.capture.ocr.ScreenCapture
 import com.jev.probe.core.BubbleRect
 import com.jev.probe.core.ChatSnapshot
+import com.jev.probe.core.ConversationRef
 import com.jev.probe.core.Msg
 import com.jev.probe.core.Prefs
 import com.jev.probe.core.kb.ContextBuilder
@@ -116,6 +117,9 @@ open class ChatCaptureService : AccessibilityService() {
                 reviewSnapshot(it, activePkg ?: foregroundPkg ?: "")
             }
         }
+        // Only reachable from the read-only body. [currentSnapshot] is the wrong
+        // snapshot there by construction, so this re-captures the live window.
+        overlay?.onAnalyzeCurrent = { analyzeCurrent() }
         overlay?.onDetails = {
             val snapshot = lastAnalyzedSnapshot
             val analysis = lastAnalysis
@@ -231,7 +235,14 @@ open class ChatCaptureService : AccessibilityService() {
                     fg.contains("launcher", ignoreCase = true) ||
                     fg == "com.miui.home" ||
                     fg == "com.android.systemui"
-                main.post { if (drop) overlay?.hide() else overlay?.showIdle(null) }
+                val ref = refOf(fg, null)
+                main.post {
+                    // Report where the user went even when the bubble is about to
+                    // be torn down, so a later re-show cannot restore another
+                    // conversation's candidates as if they were current.
+                    overlay?.setLiveConversation(ref)
+                    if (drop) overlay?.hide() else overlay?.showIdle(ref)
+                }
                 return
             }
         }
@@ -243,36 +254,68 @@ open class ChatCaptureService : AccessibilityService() {
         }
     }
 
-    private fun maybeCapture() {
-        if (reviewPending) return
-        val root = rootInActiveWindow ?: return
-        val pkg = root.packageName?.toString()
+    /**
+     * Read the conversation in front of the user and, when it is one we may act
+     * on, hand it to review.
+     *
+     * @param manual the user tapped "分析当前会话". Overrides two gates that exist
+     *   to keep the *automatic* path quiet — the "newest message is from the other
+     *   person" rule and the auto-analyze switch — and turns the silent early
+     *   returns into a toast, because a tap that does nothing is indistinguishable
+     *   from a broken button.
+     */
+    private fun maybeCapture(manual: Boolean = false) {
+        if (reviewPending) {
+            if (manual) overlay?.toast("正在核对原文，先确认或取消")
+            return
+        }
+        if (analyzing && manual) {
+            overlay?.toast("正在分析，稍等一下")
+            return
+        }
+        val root = rootInActiveWindow
+        val pkg = root?.packageName?.toString()
         // Apps with no adapter are never handled automatically (v1.3 revision):
         // the only way in for them is the bubble menu's "截屏识别一次".
-        val adapter = adapters[pkg] ?: return
-        // Only act inside a chat window (the adapter returns null elsewhere).
-        val rawSnapshot = adapter.extract(root, resources) ?: return
+        val adapter = adapters[pkg]
+        // Only act inside a chat window (the adapter returns null elsewhere) — but
+        // "in QQ, not in any thread" is still what the user is looking at, so the
+        // overlay must be told either way. A ref with a null title says exactly
+        // that: right app, no thread. Without this the panel would keep claiming
+        // its candidates belong to the chat in front of the user.
+        val rawSnapshot = if (root != null && adapter != null) adapter.extract(root, resources) else null
         // Stabilize the title BEFORE anything below reads it: some apps (X) show
         // a transient "连接中…" title for a moment right after opening a thread.
-        val snapshot = stabilizeTitle(pkg ?: "", rawSnapshot)
-        if (!prefs.isAllowed(snapshot.title)) { main.post { overlay?.hide() }; return }
+        val snapshot = rawSnapshot?.let { stabilizeTitle(pkg ?: "", it) }
+        overlay?.setLiveConversation(refOf(pkg, snapshot?.title))
+        if (snapshot == null) {
+            if (manual) overlay?.toast(NOT_A_CHAT_WINDOW)
+            return
+        }
+        if (!prefs.isAllowed(snapshot.title)) {
+            if (manual) overlay?.toast("这个会话不在白名单里，先到设置里放行")
+            else main.post { overlay?.hide() }
+            return
+        }
         // In a chat window but the tree holds no text (Feishu draws its bodies,
         // WeChat hides them when the disguise fails) → screenshot + OCR, subject
         // to ScreenCapture's own >=1s throttle and failure backoff.
         if (snapshot.messages.isEmpty()) {
-            if (prefs.ocrFallback) {
-                // Gate BEFORE the shot, not after the OCR. Feishu's tree is empty
-                // on every content-changed event, and a successful shot resets the
-                // failure backoff — so without this the caret blinking or an
-                // "online" badge flipping keeps a screenshot going out every
-                // second forever. The picture can only differ if the bubbles moved
-                // or the conversation changed, and that is exactly what the
-                // signature measures.
-                val sig = ocrSignature(pkg ?: "", snapshot.title, snapshot.bubbleRects)
-                if (sig == lastOcrSignature && overlay?.isShowing() == true) return
-                lastOcrSignature = sig
-                ocrCapture(snapshot.title, snapshot.bubbleRects, pkg ?: "", manual = false)
+            if (!prefs.ocrFallback) {
+                if (manual) overlay?.toast("这个会话要截屏识别，但它在设置里被关掉了")
+                return
             }
+            // Gate BEFORE the shot, not after the OCR. Feishu's tree is empty
+            // on every content-changed event, and a successful shot resets the
+            // failure backoff — so without this the caret blinking or an
+            // "online" badge flipping keeps a screenshot going out every
+            // second forever. The picture can only differ if the bubbles moved
+            // or the conversation changed, and that is exactly what the
+            // signature measures.
+            val sig = ocrSignature(pkg ?: "", snapshot.title, snapshot.bubbleRects)
+            if (!manual && sig == lastOcrSignature && overlay?.isShowing() == true) return
+            lastOcrSignature = sig
+            ocrCapture(snapshot.title, snapshot.bubbleRects, pkg ?: "", manual = manual)
             return
         }
 
@@ -283,29 +326,58 @@ open class ChatCaptureService : AccessibilityService() {
         val sig = snapshot.signature()
         val showing = overlay?.isShowing() == true
         // Same content and the bubble is already up → nothing to do.
-        if (sig == lastSignature && showing) return
+        if (!manual && sig == lastSignature && showing) return
         // Same content but the bubble is gone (killed by MIUI, or we left and came
         // back) → just put the bubble back, do NOT re-analyze (saves tokens/time).
-        if (sig == lastSignature && !showing) { main.post { overlay?.showIdle(snapshot.title) }; return }
+        if (!manual && sig == lastSignature && !showing) {
+            main.post { overlay?.showIdle(refOf(pkg, snapshot.title)) }; return
+        }
         currentSnapshot = snapshot
         // Anything else reaching here is a genuinely different conversation (new
         // app, or new content in this one) — a leftover judgment/candidates from
-        // whatever was shown before must not leak into it.
-        main.post { overlay?.resetForNewConversation() }
+        // whatever was shown before must not leak into it. A manual tap lands here
+        // too, which is what drops the read-only state it came from.
+        //
+        // Called directly rather than posted: the manual path calls
+        // reviewSnapshot() synchronously on the next line, and a deferred reset
+        // would then wipe the review editor it had just put on screen. Every
+        // caller of maybeCapture() is already on the main thread.
+        overlay?.resetForNewConversation()
         lastSignature = sig
         Log.d(TAG, "snapshot[$pkg] title=${snapshot.title} n=${snapshot.messages.size} " +
             snapshot.messages.takeLast(6).joinToString(" | ") { "${it.side}:${it.text.length}" }) // sides + lengths only, never content
 
         // Trigger only when the newest message is from the other person, and only
         // if auto-analyze is on. Otherwise show the idle bubble (tap to analyze).
-        if (snapshot.latestFrom != "other" || !prefs.autoAnalyze) {
-            main.post { overlay?.showIdle(snapshot.title) }; return
+        if (!manual && (snapshot.latestFrom != "other" || !prefs.autoAnalyze)) {
+            main.post { overlay?.showIdle(refOf(pkg, snapshot.title)) }; return
         }
 
         pendingSnapshot = snapshot
         main.removeCallbacks(debounce)
-        main.postDelayed(debounce, 800) // debounce bursts of content-changed events
+        if (manual) reviewSnapshot(snapshot, pkg ?: "")
+        else main.postDelayed(debounce, 800) // debounce bursts of content-changed events
     }
+
+    /**
+     * "分析当前会话" — re-capture whatever the user is looking at and review it.
+     *
+     * Deliberately does not reuse [currentSnapshot]: the button only exists in
+     * read-only mode, where the stored snapshot belongs to a different
+     * conversation by definition. Clearing both dedupe signatures walks the
+     * capture paths past their "same content, nothing to do" early-returns.
+     */
+    private fun analyzeCurrent() {
+        if (reviewPending || analyzing) return
+        lastSignature = ""
+        lastOcrSignature = ""
+        maybeCapture(manual = true)
+    }
+
+    /** The conversation the user is in front of, as far as the platform can say.
+     *  Never invents a title from a package or the reverse — see [ConversationRef]. */
+    private fun refOf(pkg: String?, title: String?): ConversationRef =
+        ConversationRef(pkg ?: "", title)
 
     /** A placeholder title an app shows only for a moment (e.g. X's "连接中…"
      *  right after opening a DM thread) — never a real conversation title.
@@ -608,10 +680,11 @@ open class ChatCaptureService : AccessibilityService() {
 
         if (pkg.isNotEmpty() && pkg != activePkg) { activePkg = pkg; lastSignature = "" }
         currentSnapshot = snapshot
+        overlay?.setLiveConversation(refOf(pkg, snapshot.title))
         val sig = snapshot.signature()
         // Manual taps always re-run; the automatic path dedupes like the tree path.
         if (!manual && sig == lastSignature) {
-            if (overlay?.isShowing() != true) overlay?.showIdle(snapshot.title)
+            if (overlay?.isShowing() != true) overlay?.showIdle(refOf(pkg, snapshot.title))
             return
         }
         // Same rule as the tree path: past this point the conversation is either
@@ -626,6 +699,9 @@ open class ChatCaptureService : AccessibilityService() {
     private fun reviewSnapshot(snapshot: ChatSnapshot, pkg: String) {
         if (reviewPending || analyzing || !snapshotIsCurrent(snapshot, pkg)) return
         reviewPending = true
+        // Everything shown from here belongs to this conversation — the header has
+        // to name it, and a later switch away from it is what read-only means.
+        overlay?.bindConversation(refOf(pkg, snapshot.title))
         overlay?.showReview(snapshot, onConfirm = { confirmed ->
             overlay?.showLoading()
             completeReviewConfirmation(confirmed, pkg)
@@ -633,7 +709,7 @@ open class ChatCaptureService : AccessibilityService() {
             reviewPending = false
             pendingSnapshot = null
             overlay?.resetForNewConversation()
-            overlay?.showIdle(snapshot.title)
+            overlay?.showIdle(refOf(pkg, snapshot.title))
         })
     }
 
@@ -767,6 +843,7 @@ open class ChatCaptureService : AccessibilityService() {
         // Tear the overlay down and cut its callback so a stale button tap can
         // never call back into this dead instance.
         overlay?.onManualAnalyze = null
+        overlay?.onAnalyzeCurrent = null
         overlay?.onSaveContact = null
         overlay?.onOcrCapture = null
         overlay?.hide()
@@ -786,6 +863,9 @@ open class ChatCaptureService : AccessibilityService() {
 
         /** Said on the panel whenever a snapshot came from flat-screen OCR. */
         private const val OCR_NOTE = "OCR 未分边，把全部消息当作对方所说"
+
+        /** Said when a manual "分析当前会话" finds nothing it can capture. */
+        private const val NOT_A_CHAT_WINDOW = "当前界面不是可分析的聊天窗口"
 
         private val PURE_TIME = Regex("""\d{1,2}[:：]\d{2}""")
         private val TAIL_TIME = Regex("""\d{1,2}[:：]\d{2}$""")

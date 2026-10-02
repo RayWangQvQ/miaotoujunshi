@@ -37,6 +37,47 @@ data class ChatSnapshot(
         messages.takeLast(6).joinToString("|") { "${it.side}:${it.text}" }
 }
 
+/**
+ * Which conversation something belongs to: the chat app's package plus the
+ * thread title.
+ *
+ * Either field may be unknown, and unknown is a legitimate value rather than an
+ * error: an OCR capture has no title to read, an app can be showing a transient
+ * placeholder title, and there may be no chat window in front of the user at all
+ * (see [NONE]). Never infer one field from the other, and never treat "unknown"
+ * as "the same as last time" — [displayLabel] exists so the UI can say so out
+ * loud instead of guessing.
+ */
+data class ConversationRef(val pkg: String, val title: String?) {
+
+    /** Enough identity to name the thread to the user and to guard a fill with. */
+    val isIdentified: Boolean get() = pkg.isNotBlank() && !title.isNullOrBlank()
+
+    /**
+     * Short label for the overlay header, e.g. `QQ · 张三`.
+     *
+     * Falls back through "we know the app but not the thread" to "we know
+     * neither" without ever printing a raw package name.
+     */
+    fun displayLabel(): String {
+        val app = ChatApps.displayName(pkg)
+        val thread = title?.takeIf { it.isNotBlank() }
+        return when {
+            app != null && thread != null -> "$app · $thread"
+            thread != null -> thread
+            app != null -> "$app · 未识别会话"
+            else -> UNKNOWN_LABEL
+        }
+    }
+
+    companion object {
+        /** No chat window is in front of the user. */
+        val NONE = ConversationRef("", null)
+
+        const val UNKNOWN_LABEL = "未识别会话"
+    }
+}
+
 /** Jev's judgment result for one snapshot, plus the ranked candidate replies. */
 data class Analysis(
     val trueIntent: Choice?,

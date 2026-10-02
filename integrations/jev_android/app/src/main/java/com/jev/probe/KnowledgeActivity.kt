@@ -16,6 +16,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import com.jev.probe.core.ChatApps
 import com.jev.probe.core.kb.Contact
 import com.jev.probe.core.kb.KbStore
 import com.jev.probe.core.kb.Note
@@ -315,13 +316,9 @@ class KnowledgeActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun appLabel(pkg: String): String = when (pkg) {
-        "com.tencent.mm" -> "微信"
-        "com.tencent.mobileqq" -> "QQ"
-        "com.ss.android.lark" -> "飞书"
-        "com.twitter.android" -> "X"
-        else -> pkg
-    }
+    /** Never blank: this list tells the user which app a contact came from, so an
+     *  unrecognised package is more informative than a neutral label. */
+    private fun appLabel(pkg: String): String = ChatApps.displayName(pkg) ?: pkg
 
     // ----------------------------------------------------------------- atoms
 

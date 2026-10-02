@@ -7,6 +7,7 @@ import android.graphics.PixelFormat
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.provider.Settings
+import android.text.TextUtils
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
@@ -22,6 +23,7 @@ import android.widget.TextView
 import android.widget.Toast
 import com.jev.probe.core.Analysis
 import com.jev.probe.core.ChatSnapshot
+import com.jev.probe.core.ConversationRef
 import com.jev.probe.core.Msg
 import com.jev.probe.core.GoutouGuidance
 import com.jev.probe.core.Prefs
@@ -57,6 +59,10 @@ class OverlayController(private val ctx: Context) {
     var onExplain: ((String) -> Unit)? = null
     var onRewrite: (() -> Unit)? = null
 
+    /** Shown instead of "重新分析" while [readOnly]: re-capture whatever the user
+     *  is looking at now and review it, rather than reusing a stale snapshot. */
+    var onAnalyzeCurrent: (() -> Unit)? = null
+
     /** Bubble menu → file the open conversation as a knowledge-base contact. */
     var onSaveContact: (() -> Unit)? = null
 
@@ -70,6 +76,34 @@ class OverlayController(private val ctx: Context) {
     /** A caveat about how the current snapshot was captured (OCR mode). */
     private var noteText: String? = null
     private var evidenceSnapshot: ChatSnapshot? = null
+
+    /** The conversation the panel's current judgment / candidates belong to.
+     *  Null until something has been committed for review or analysis. */
+    private var shownConv: ConversationRef? = null
+
+    /** The conversation in front of the user right now, as reported by the
+     *  capture service. Null means "no chat window at all". */
+    private var liveConv: ConversationRef? = null
+
+    /**
+     * True when the panel holds a judgment that does not belong to the chat the
+     * user is looking at. Filling from it would land the reply in the wrong
+     * input box, so every fill affordance degrades to copy instead. Visible on
+     * purpose: the header names the conversation and the banner says why.
+     */
+    private val readOnly: Boolean get() = shownConv != null && shownConv != liveConv
+
+    /**
+     * The analysis whose candidate cards are on screen, or null while the body
+     * shows something else (idle / review / loading / details). Lets a
+     * read-only flip repaint the same candidates with degraded buttons, without
+     * having to guess at what the panel is currently displaying.
+     */
+    private var candidateView: Analysis? = null
+
+    private var convLine: TextView? = null
+    private var convStatus: TextView? = null
+    private var banner: TextView? = null
 
     /** Whether the overlay window is currently on screen. */
     fun isShowing(): Boolean = root != null
@@ -182,6 +216,39 @@ class OverlayController(private val ctx: Context) {
         header.addView(iconBtn("⚙") { openSettings() })
         header.addView(iconBtn("✕") { toggle() })
         p.addView(header)
+
+        // Which conversation this panel is about, plus whether the user is still
+        // looking at it. Kept as its own row so a long thread title can ellipsize
+        // without shoving the gear/close buttons around.
+        val convRow = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+        }
+        convRow.addView(TextView(ctx).apply {
+            textSize = 11f
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        }.also { convLine = it })
+        convRow.addView(TextView(ctx).apply {
+            textSize = 11f
+            setTypeface(typeface, Typeface.BOLD)
+            setPadding(dp(8), 0, 0, 0)
+        }.also { convStatus = it })
+        p.addView(convRow)
+
+        // Read-only explanation. A child of the panel rather than of the scrolling
+        // body, so it survives setContent() and stays put across re-renders.
+        p.addView(TextView(ctx).apply {
+            text = READ_ONLY_NOTICE
+            textSize = 11f
+            setTextColor(Color.parseColor("#B45309"))
+            setPadding(dp(9), dp(6), dp(9), dp(6))
+            background = card(10, Color.parseColor("#FEF3C7"))
+            visibility = View.GONE
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(4) }
+        }.also { banner = it })
 
         val scroll = ScrollView(ctx).apply {
             isVerticalScrollBarEnabled = false
@@ -303,16 +370,81 @@ class OverlayController(private val ctx: Context) {
 
     // ------------------------------------------------------------ public API
 
-    fun showIdle(title: String?) {
+    /**
+     * The bubble is up but holds no result. [ref] is the conversation in front of
+     * the user, which is what the header names while idle.
+     *
+     * A leftover [lastJudgment] from another conversation deliberately stays
+     * visible — it can still be copied — but [readOnly] makes the header, the
+     * banner and the candidate buttons say that it is not this conversation.
+     */
+    fun showIdle(ref: ConversationRef?) {
         ensureRoot(); bubble?.alpha = 0.55f
+        setLiveConversation(ref)
         // Either there is genuinely nothing to show yet, or the panel is empty
         // for some other reason (root got rebuilt after hide(), leaving
         // contentBox with zero children while lastJudgment still points at a
         // stale conversation) — either way an empty panel must never stay
         // literally blank.
         if (lastJudgment == null || contentBox?.childCount == 0) {
+            candidateView = null
             setContent(listOf(bigButton("分析当前对话") { onManualAnalyze?.invoke() }))
         }
+    }
+
+    /**
+     * The conversation in front of the user changed — including the case where
+     * there is no chat window at all (pass null). Called by the capture service
+     * on every foreground change.
+     *
+     * Repaints the candidate cards only when this flips [readOnly], since that is
+     * the only thing their buttons depend on. Never expands the panel: this fires
+     * while the user is elsewhere, and a panel that opens by itself is worse than
+     * one that is merely out of date.
+     */
+    fun setLiveConversation(ref: ConversationRef?) {
+        val before = readOnly
+        liveConv = ref
+        val cards = candidateView
+        if (before != readOnly && cards != null) renderContent(cards, generating = false)
+        else refreshConversation()
+    }
+
+    /**
+     * Everything the panel shows from now on belongs to [ref]. Called by the
+     * capture service at the moment it commits a snapshot for review or
+     * analysis — before any judgment for it is displayed.
+     */
+    fun bindConversation(ref: ConversationRef) {
+        shownConv = ref
+        candidateView = null
+        refreshConversation()
+    }
+
+    /**
+     * Repaint the conversation row and the read-only banner. Safe to call before
+     * the window exists, when every view reference is still null.
+     *
+     * The label names [shownConv] as soon as there is one: the header must
+     * describe what the panel is showing, not what happens to be on screen.
+     * Before the first analysis it names the live conversation instead, so the
+     * row is not dead weight while idle.
+     */
+    private fun refreshConversation() {
+        val shown = shownConv
+        val label = (shown ?: liveConv)?.displayLabel() ?: ConversationRef.UNKNOWN_LABEL
+        val warn = readOnly
+        val status = when {
+            shown == null -> "尚未分析"
+            warn -> "浏览中 · 只读"
+            else -> "正在看"
+        }
+        val color = Color.parseColor(if (warn) "#B45309" else "#6B7280")
+        convLine?.text = label
+        convLine?.setTextColor(color)
+        convStatus?.text = status
+        convStatus?.setTextColor(color)
+        banner?.visibility = if (warn) View.VISIBLE else View.GONE
     }
 
     /** OCR text is editable because both wording and speaker attribution can be wrong. */
@@ -320,6 +452,7 @@ class OverlayController(private val ctx: Context) {
                    onCancel: () -> Unit) {
         ensureRoot()
         reviewCancel = onCancel
+        candidateView = null
         val editor = EditText(ctx).apply {
             setText(snapshot.messages.joinToString("\n") {
                 (if (it.side == "me") "我：" else "对方：") + it.text
@@ -370,6 +503,9 @@ class OverlayController(private val ctx: Context) {
      * leftover [lastJudgment] from a prior conversation can keep [showIdle]
      * from putting the "分析当前对话" button back, and a leftover [lastFill]
      * could fill the wrong chat's input box.
+     *
+     * Also unbinds [shownConv]: after this the panel claims no conversation
+     * again, which is what the header's "尚未分析" state means.
      */
     fun resetForNewConversation() {
         lastJudgment = null
@@ -377,7 +513,10 @@ class OverlayController(private val ctx: Context) {
         noteText = null
         evidenceSnapshot = null
         replyError = null
+        shownConv = null
+        candidateView = null
         contentBox?.removeAllViews()
+        refreshConversation()
     }
 
     private fun bigButton(label: String, onClick: () -> Unit) = TextView(ctx).apply {
@@ -394,6 +533,7 @@ class OverlayController(private val ctx: Context) {
         ensureRoot(); bubble?.alpha = 1f
         ctxNotes = 0; ctxHistory = 0   // counts for the round that is starting
         replyError = null              // this round has not failed (yet)
+        candidateView = null           // the body is "分析中…", not candidate cards
         setContent(listOf(hint("分析中…")))
         if (!expanded) toggle()
     }
@@ -422,6 +562,7 @@ class OverlayController(private val ctx: Context) {
 
     fun showError(msg: String) {
         ensureRoot(); bubble?.alpha = 1f
+        candidateView = null
         setContent(listOf(
             line("出错了", "#DC2626", 14f, true),
             hint(msg)))
@@ -442,6 +583,7 @@ class OverlayController(private val ctx: Context) {
 
     fun showDetails(text: String, heading: String = "详细分析") {
         ensureRoot()
+        candidateView = null
         setContent(listOf(line(heading, "#24382d", 17f, true),
             hint("分析来自当前已核对的原文；推测与事实分开看。"),
             line(text, "#374151", 13f),
@@ -454,7 +596,13 @@ class OverlayController(private val ctx: Context) {
     fun hide() {
         val r = root ?: return
         runCatching { wm.removeView(r) }
-        root = null; bubble = null; panel = null; contentBox = null; dangerDot = null; expanded = false
+        root = null; bubble = null; panel = null; contentBox = null; dangerDot = null
+        convLine = null; convStatus = null; banner = null
+        // Nothing is on screen any more, so candidateView would describe a body
+        // that no longer exists — and setLiveConversation() would repaint from it
+        // into a freshly rebuilt, still-empty panel.
+        candidateView = null
+        expanded = false
     }
 
     // --------------------------------------------------------------- rendering
@@ -465,8 +613,23 @@ class OverlayController(private val ctx: Context) {
     }
 
     private fun render(a: Analysis, generating: Boolean) {
-        ensureRoot(); bubble?.alpha = 1f
+        ensureRoot()
+        renderContent(a, generating)
+        if (!expanded) toggle()
+    }
+
+    /**
+     * Build the panel body and put it on screen — without touching expansion.
+     *
+     * Split out of [render] because [render]'s trailing toggle() must fire only
+     * for a change the user asked for. A read-only flip happens while the user is
+     * in another app, and expanding the panel from under them there would be a
+     * hijack; it repaints through this instead.
+     */
+    private fun renderContent(a: Analysis, generating: Boolean) {
+        bubble?.alpha = 1f
         panel?.background = card(18, panelBg(), stroke = true) // re-apply in case opacity changed
+        refreshConversation()
         val views = ArrayList<View>()
 
         // What context this read was based on (knowledge base / remembered history).
@@ -548,7 +711,9 @@ class OverlayController(private val ctx: Context) {
         }
 
         setContent(views)
-        if (!expanded) toggle()
+        // Remember what the body is, so setLiveConversation() can repaint these
+        // exact candidates when the read-only state flips.
+        candidateView = if (generating) null else a
     }
 
     private fun dangerBadge(lvl: Int, max: Int): View {
@@ -591,9 +756,16 @@ class OverlayController(private val ctx: Context) {
             setPadding(0, dp(3), 0, dp(7)); setLineSpacing(dp(2).toFloat(), 1f)
         })
         val btns = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
-        btns.addView(pill("复制", false) { copy(text) })
-        // Fill, then collapse so the input box + keyboard are visible to review/send.
-        btns.addView(pill("填入", true) { android.util.Log.d("JEVASSIST", "overlay: fill tapped"); onFill(text); if (expanded) toggle() })
+        if (readOnly) {
+            // Copy only. Rendering a second "复制" where "填入" would have been
+            // would leave two identical buttons in the row, so the row simply
+            // gets one — the banner above explains why filling is unavailable.
+            btns.addView(pill("复制", false) { copy(text) })
+        } else {
+            btns.addView(pill("复制", false) { copy(text) })
+            // Fill, then collapse so the input box + keyboard are visible to review/send.
+            btns.addView(pill("填入", true) { android.util.Log.d("JEVASSIST", "overlay: fill tapped"); onFill(text); if (expanded) toggle() })
+        }
         c.addView(btns)
         c.addView(pill("为什么这样回", false) { onExplain?.invoke(text) })
         return c
@@ -611,11 +783,24 @@ class OverlayController(private val ctx: Context) {
         setOnClickListener { onClick() }
     }
 
-    private fun reAnalyzeBtn() = TextView(ctx).apply {
-        text = "重新分析"; textSize = 13f; gravity = Gravity.CENTER
-        setTextColor(Color.parseColor("#6B7280"))
-        setPadding(dp(10), dp(10), dp(10), dp(4))
-        setOnClickListener { onManualAnalyze?.invoke() }
+    /**
+     * Re-run analysis for the panel's conversation.
+     *
+     * In read-only mode the stored snapshot belongs to a different conversation
+     * by definition, so "重新分析" would be a button that cannot succeed — the
+     * capture service refuses it and the tap used to do nothing visible at all.
+     * It becomes an explicit "分析当前会话" instead, which re-captures the live
+     * window and therefore also clears the read-only state.
+     */
+    private fun reAnalyzeBtn(): View = if (readOnly) {
+        pill("分析当前会话", true) { onAnalyzeCurrent?.invoke() }
+    } else {
+        TextView(ctx).apply {
+            text = "重新分析"; textSize = 13f; gravity = Gravity.CENTER
+            setTextColor(Color.parseColor("#6B7280"))
+            setPadding(dp(10), dp(10), dp(10), dp(4))
+            setOnClickListener { onManualAnalyze?.invoke() }
+        }
     }
 
     private fun tintBubbleDanger(score: Double) {
@@ -663,6 +848,10 @@ class OverlayController(private val ctx: Context) {
     }
 
     companion object {
+        /** Why the fill affordances are gone while [readOnly]. Says what to do,
+         *  not just what is wrong. */
+        private const val READ_ONLY_NOTICE = "当前在浏览其他会话，只能复制"
+
         private val INTENT = mapOf(
             "confirm_you_care" to "确认你在不在乎", "vent_anger" to "在发泄情绪",
             "request_action" to "要你办事", "seek_explanation" to "要个解释",
