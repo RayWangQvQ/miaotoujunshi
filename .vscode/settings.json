@@ -1,0 +1,33 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/integrations/jev_mac/.venv/bin/python",
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/integrations/jev_mac"
+  ],
+  "python.analysis.exclude": [
+    "**/.venv"
+  ],
+  "python.testing.unittestEnabled": true,
+  "python.testing.pytestEnabled": false,
+  "python.testing.cwd": "${workspaceFolder}",
+  "python.testing.unittestArgs": [
+    "-v",
+    "-s",
+    "tests",
+    "-p",
+    "test_*.py"
+  ],
+  "java.jdt.ls.java.home": "/Users/raywang/dev/jdk/Contents/Home",
+  "java.configuration.runtimes": [
+    {
+      "name": "JavaSE-17",
+      "path": "/Users/raywang/dev/jdk/Contents/Home",
+      "default": true
+    }
+  ],
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/.venv": true,
+    "**/.gradle": true,
+    "**/build": true
+  }
+}
