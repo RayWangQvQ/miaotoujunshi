@@ -48,7 +48,7 @@ class BubbleView(A.NSView):
         A.NSBezierPath.bezierPathWithOvalInRect_(NSMakeRect(3, 3, 60, 60)).fill()
         attrs = {A.NSFontAttributeName: A.NSFont.boldSystemFontOfSize_(17),
                  A.NSForegroundColorAttributeName: A.NSColor.whiteColor()}
-        A.NSString.stringWithString_("军师").drawInRect_withAttributes_(NSMakeRect(15, 22, 43, 23), attrs)
+        A.NSString.stringWithString_("喵球").drawInRect_withAttributes_(NSMakeRect(15, 22, 43, 23), attrs)
         A.NSColor.whiteColor().setFill()
         A.NSBezierPath.bezierPathWithOvalInRect_(NSMakeRect(48, 48, 17, 17)).fill()
         color(0xEAA345 if self.owner.busy else 0x28AA68).setFill()
@@ -167,12 +167,12 @@ class ReplyOverlay:
         button(surface, owner, "详细分析", "details:", (278, 37, 120, 34))
         self.status = label(surface, "", (24, 9, 372, 23), 10, tint=MUTED)
         self.bubble = window(68, 68)
-        self.bubble.setTitle_("喵头军师悬浮球")
+        self.bubble.setTitle_("喵球")
         self.bubble_view = BubbleView.alloc().initWithFrame_(NSMakeRect(0, 0, 68, 68))
         self.bubble_view.owner = owner
         self.bubble_view.setAccessibilityElement_(True)
         self.bubble_view.setAccessibilityRole_(A.NSAccessibilityButtonRole)
-        self.bubble_view.setAccessibilityLabel_("喵头军师，点击展开，拖动移动，右键设置或退出")
+        self.bubble_view.setAccessibilityLabel_("喵球，点击展开，拖动移动，右键设置或退出")
         self.bubble.setContentView_(self.bubble_view)
         frame = A.NSScreen.mainScreen().visibleFrame()
         self.bubble.setFrameOrigin_((A.NSMaxX(frame) - 500, A.NSMaxY(frame) - 160))

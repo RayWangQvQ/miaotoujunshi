@@ -136,7 +136,8 @@ class OverlayController(private val ctx: Context) {
             layoutParams = FrameLayout.LayoutParams(dp(52), dp(52))
         }
         val b = TextView(ctx).apply {
-            text = "军师"
+            text = "喵球"
+            contentDescription = "喵球，点击展开或收起，拖动移动，长按打开菜单"
             setTextColor(Color.WHITE)
             gravity = Gravity.CENTER
             textSize = 13f

@@ -203,7 +203,7 @@ class Overlay:
         title = QHBoxLayout(header)
         title.setContentsMargins(18, 12, 10, 10)
         title.setSpacing(8)
-        name = _label("军师", 20, "#233c2f", True)
+        name = _label("喵球", 20, "#233c2f", True)
         name.setFixedWidth(52)
         name.setAttribute(Qt.WA_TransparentForMouseEvents)
         title.addWidget(name)
