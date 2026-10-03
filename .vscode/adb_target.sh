@@ -74,8 +74,14 @@ ADB_BIN="$(resolve_adb)" || { log "adb not found - put it on PATH or set ADB / A
 
 # `adb devices` separates the serial from the state with a tab; the serial
 # itself may contain spaces ("... (2)._adb-tls-connect._tcp"), so split on tab.
+# Every adb call below is given stdin from /dev/null and the loops read their
+# candidate lists from fd 3, never from stdin. `adb shell` forwards its own
+# stdin to the device, so an unguarded call inside a `while ... read` loop
+# swallows the rest of the loop's heredoc: the loop then stops after its first
+# candidate, which is exactly the bug that made this script pick the " (N)"
+# transport without ever comparing it against the canonical one.
 attached_serials() {
-  "$ADB_BIN" devices 2>/dev/null | awk -F'\t' 'NR > 1 && $2 ~ /^device$/ { print $1 }'
+  "$ADB_BIN" devices </dev/null 2>/dev/null | awk -F'\t' 'NR > 1 && $2 ~ /^device$/ { print $1 }'
 }
 
 is_mdns() {
@@ -117,13 +123,13 @@ rank_of() {
 }
 
 usable() {
-  [ "$("$ADB_BIN" -s "$1" get-state 2>/dev/null)" = "device" ]
+  [ "$("$ADB_BIN" -s "$1" get-state </dev/null 2>/dev/null)" = "device" ]
 }
 
 # The handset behind a transport. Two transports reporting the same ro.serialno
 # are the same device reached twice; distinct values mean distinct devices.
 hardware_identity() {
-  serialno="$("$ADB_BIN" -s "$1" shell getprop ro.serialno 2>/dev/null | tr -d '\r\n ')"
+  serialno="$("$ADB_BIN" -s "$1" shell getprop ro.serialno </dev/null 2>/dev/null | tr -d '\r\n ')"
   if [ -n "$serialno" ]; then printf '%s' "$serialno"; else identity_of "$1"; fi
 }
 
@@ -168,11 +174,11 @@ fi
 table="$(mktemp "${TMPDIR:-/tmp}/adb_target.XXXXXX")"
 trap 'rm -f "$table"' EXIT
 
-while IFS= read -r line; do
+while IFS= read -r line <&3; do
   [ -n "$line" ] || continue
   printf '%s\t%s\t%s\t%s\n' \
     "$(hardware_identity "$line")" "$(kind_of "$line")" "$(rank_of "$line")" "$line" >> "$table"
-done <<EOF
+done 3<<EOF
 $serials
 EOF
 
@@ -201,11 +207,11 @@ if [ -z "$target_id" ]; then
 fi
 
 chosen=""
-while IFS= read -r line; do
+while IFS= read -r line <&3; do
   serial="$(printf '%s' "$line" | cut -f4)"
   if usable "$serial"; then chosen="$serial"; break; fi
   log "skipping unusable transport: $serial"
-done <<EOF
+done 3<<EOF
 $(awk -F'\t' -v id="$target_id" '$1 == id' "$table" | sort -k3,3n)
 EOF
 
