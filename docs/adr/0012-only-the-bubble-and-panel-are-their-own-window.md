@@ -79,3 +79,44 @@ route in the main window.**
   survivable through the migration; its known failure mode is silent simplification
   in a Dart rewrite, and one owner per port is the cheapest way to make that
   visible.
+
+## Verified on macOS (2026-10-03, gate experiment B)
+
+The two properties this decision depends on were unproven when it was written, and Apple
+documents neither. Gate experiment B (issue #2) settled both on a real device, Flutter 3.47.6
+with Impeller:
+
+- **A real click gives the panel key focus without activating the app.** The panel became key
+  on click while the workspace kept naming the other application frontmost, with the activation
+  count at `0` across every sample. `NSPanel` with `.nonactivatingPanel`, `level = .floating`
+  and `canBecomeMain = false` is sufficient; no focus juggling is needed.
+- **A Chinese input method composes and commits inside that panel.** A live `composing` range
+  ran through a pinyin sequence and a picked candidate committed as Han characters, while
+  another application stayed frontmost. This is why the "compose in the main window, panel is
+  read-only" fallback is not needed.
+
+Two implementation facts carry forward, both learned from measuring rather than from reading:
+
+- **`NSApp.isActive` cannot judge this.** For a non-activating panel it reads `true` whenever
+  the panel holds key focus, whether or not the application is active. Judge on which
+  application the workspace calls frontmost, and on activation *transitions* — never on a
+  polled boolean.
+- **Launching the app activates it once**, before any click, so activation counts must be
+  differences from a baseline rather than totals, or the launch is indistinguishable from a
+  click stealing focus.
+
+Evidence and the full protocol: `.workbuddy/experiments/gate-b-macos-panel/NOTES.md`.
+
+## Consequences for the Windows panel
+
+The macOS shape does not transfer by itself. Windows has no `nonactivatingPanel` equivalent,
+so the equivalent property has to be established for the frameless always-on-top window before
+the panel may host a text field. The macOS finding is evidence that the *product* shape works,
+not that the Windows implementation is settled.
+
+## Consequences for the panel's own text field
+
+Because the panel can host its own text field and keep the chat's focus, the copy-in-place
+flow needs no separate mode: the user types into the panel while the chat keeps focus. This
+is the single largest piece of user-visible behaviour that the migration would otherwise have
+had to invent, and it is now known to be buildable on at least one desktop platform.
