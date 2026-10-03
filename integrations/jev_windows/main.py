@@ -23,7 +23,7 @@ from core.engine import analyze
 from core.experience import details as generate_details, explain as explain_candidate, rewrite as rewrite_candidates
 
 # {会话名: {history, result, rev, target, senders}}：每个会话各自的上下文、上次结果和版本号，互不串味
-# history 里是 [(who, text, name)]，engine 只认 her/me，name 是群里的发言人（单聊/自己说的是 None）；
+# history 里是 [(who, text, name)]，engine 只认 me/other，name 是群里的发言人（单聊/自己说的是 None）；
 # 只是缓冲区，实际喂模型几条由设置里的「参考上下文」决定
 # senders：这个群里发过言的人，去重、最近的排最前；target：用户挑的回复对象（None = 跟着最近那个走）
 chats = {}
@@ -225,7 +225,7 @@ def on_target_change(title, name):
     chat = chat_of(title)
     chat["target"] = name
     msgs = list(chat["history"])
-    if not any(m[0] == "her" for m in msgs):
+    if not any(m[0] == "other" for m in msgs):
         return
     if state["busy"]:
         state["rerun"] = (title, msgs)
@@ -287,12 +287,12 @@ def drain():
         for who, name, text in new:
             chat["history"].append((who, text, name))
             ov.log_message(who, text, name, chat=title)
-            if who == "her" and name:  # 群里发过言的人，去重后最近的排最前
+            if who == "other" and name:  # 群里发过言的人，去重后最近的排最前
                 if name in chat["senders"]:
                     chat["senders"].remove(name)
                 chat["senders"].insert(0, name)
         ov.set_targets(title, chat["senders"], target_of(title))  # 显不显示这一行由悬浮窗按开关决定
-        if new[-1][0] == "her":  # 只有对方最新说话才值得分析
+        if new[-1][0] == "other":  # 只有对方最新说话才值得分析
             msgs = list(chat["history"])
             if not settings.auto_analyze():
                 ov.set_status("已读取新消息，点“核对原文并分析”")

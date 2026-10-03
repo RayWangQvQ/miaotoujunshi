@@ -24,8 +24,13 @@ def advice():
 
 class ContractTests(unittest.TestCase):
     def test_capture_preserves_uncertainty_and_speakers(self):
+        # `from_capture` sits past the boundary, so it is fed the app's own vocabulary:
+        # `other` for a known counterparty, and `unknown` for a bubble that could not be
+        # anchored — which must survive as 说话人待确认 rather than be folded into a side
+        # (docs/adr/0015). The vendored `them` is translated in adapter._other, which needs
+        # PyObjC and so is device-verified rather than covered here.
         msgs = [SimpleNamespace(side="unknown", sender=None, text="周六？", conf=.5),
-                SimpleNamespace(side="them", sender="对象 A", text="有空", conf=.99)]
+                SimpleNamespace(side="other", sender="对象 A", text="有空", conf=.99)]
         snapshot = from_capture({"ok": True, "chat_title": "A", "window": {"wid": 9}, "messages": msgs})
         self.assertIn("说话人待确认：周六？ [OCR待核对]", snapshot.transcript)
         self.assertIn("对方（对象 A）：有空", snapshot.transcript)

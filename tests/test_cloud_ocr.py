@@ -51,7 +51,9 @@ class CloudOcrTests(unittest.TestCase):
         self.assertEqual(image['type'], 'image_url')
         self.assertTrue(image['image_url']['url'].startswith('data:image/png;base64,'))
         self.assertNotIn('fake cropped png', str(messages))
-        self.assertEqual(first['messages'][0].side, 'them')
+        # The prompt asks the model for `them`; the parsed result already speaks `other`
+        # (docs/adr/0015), so this pins the conversion rather than the wire format.
+        self.assertEqual(first['messages'][0].side, 'other')
 
     def test_switching_ocr_provider_invalidates_image_cache(self):
         answer = json.dumps({'chat_title': '小 A', 'messages': [

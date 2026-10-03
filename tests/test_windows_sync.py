@@ -15,7 +15,7 @@ class WindowsSyncTest(unittest.TestCase):
         lines = parse_transcription(json.dumps({"messages": [
             {"side": "them", "text": "明天见？"}, {"side": "me", "text": "好"}]}))
         reader = CloudReader("deepseek", "deepseek-flash", "dummy")
-        self.assertEqual(reader.new_lines(lines), [("her", None, "明天见？"), ("me", None, "好")])
+        self.assertEqual(reader.new_lines(lines), [("other", None, "明天见？"), ("me", None, "好")])
         self.assertEqual(reader.new_lines(lines), [])
         with self.assertRaisesRegex(ValueError, "说话人"):
             parse_transcription('{"messages":[{"side":"unknown","text":"你好"}]}')
@@ -32,7 +32,7 @@ class WindowsSyncTest(unittest.TestCase):
         self.assertGreater(weights["降压"], weights["承接"])
 
     def test_details_and_rewrite_use_verified_own_words(self):
-        messages = [("me", "行，周六见"), ("her", "好呀")]
+        messages = [("me", "行，周六见"), ("other", "好呀")]
         result = {"candidates": ["那周六见吧", "好的，周六见"], "goutou": {"action": "承接"}}
         responses = [json.dumps({"intent": "愿意继续聊", "facts": ["对方说好呀"],
                                  "hypotheses": [], "unknowns": ["具体时间"], "next_step": "确定时间"}),
@@ -50,7 +50,7 @@ class WindowsSyncTest(unittest.TestCase):
         result = {"candidates": ["好，周六见"], "goutou": {"action": "承接"}}
         with patch.object(experience, "_ask", return_value='{"reason":"接住邀约",'
                          '"tradeoff":"还需要确认时间"}'):
-            text = experience.explain([("her", "周六见吗")], "朋友", result, 0,
+            text = experience.explain([("other", "周六见吗")], "朋友", result, 0,
                                       provider="deepseek", model="m", key="dummy")
         self.assertIn("接住邀约", text)
         self.assertIn("还需要确认时间", text)

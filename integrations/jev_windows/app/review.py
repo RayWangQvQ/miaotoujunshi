@@ -36,7 +36,7 @@ class ReviewDialog(QDialog):
             if row.startswith("我："):
                 who, content = "me", row[2:].strip()
             elif row.startswith("对方："):
-                who, content = "her", row[3:].strip()
+                who, content = "other", row[3:].strip()
             else:
                 QMessageBox.warning(self, "请核对", "每行须以“我：”或“对方：”开头。")
                 return

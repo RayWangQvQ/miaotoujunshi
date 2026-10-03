@@ -26,7 +26,7 @@ def parse_transcription(raw: str) -> list[tuple]:
             body = row.get("text")
             if not isinstance(body, str) or not body.strip() or len(body) > 500:
                 raise ValueError()
-            parsed.append(("me" if row["side"] == "me" else "her", None, " ".join(body.split()), len(parsed)))
+            parsed.append(("me" if row["side"] == "me" else "other", None, " ".join(body.split()), len(parsed)))
         return parsed
     except (TypeError, KeyError, ValueError):
         raise ValueError("图片识别格式不正确或说话人不清楚；请改用本地 OCR") from None

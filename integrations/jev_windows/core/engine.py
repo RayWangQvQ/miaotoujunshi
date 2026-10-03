@@ -35,7 +35,7 @@ def analyze(messages: list, relationship: str, model: str | None = None,
             thinking: bool = False, jev_provider: str = "openrouter",
             jev_model: str | None = None, strategy_provider: str = "jev",
             strategy_model: str = "deepseek-flash", strategy_key: str = "") -> dict:
-    """messages: [(from, text)] from ∈ {her, me}，最新一条在最后；
+    """messages: [(from, text)] from ∈ {me, other}，最新一条在最后；
     群聊里可以带第三项 name（说这句话的人），单聊不带。
     context: 起草和判断各看最近多少条消息（用户设置里的「参考上下文」）。
     provider: 起草走哪家（core.providers.DRAFT_PROVIDERS），base_url 只有自定义来源要传。

@@ -71,7 +71,7 @@ def guidance_text(answers: dict) -> str:
 
 def build_state(messages: list, relationship: str, keep: int = 10,
                 reply_to: str | None = None) -> dict:
-    """messages: (from, text) / (from, text, name) / dict（name 可选）。from 只认 her/me。
+    """messages: (from, text) / (from, text, name) / dict（name 可选）。from 只认 me/other。
 
     name = 群里的发言人；有 name 就当群聊（chat.is_group）。reply_to = 群里指定的回复对象。
     """
@@ -82,14 +82,14 @@ def build_state(messages: list, relationship: str, keep: int = 10,
         else:
             who, text = item[0], item[1]
             name = item[2] if len(item) > 2 else None
-        if who not in ("her", "me"):
-            raise ValueError(f"message from must be 'her' or 'me', got {who!r}")
+        if who not in ("other", "me"):
+            raise ValueError(f"message from must be 'me' or 'other', got {who!r}")
         message = {"from": who, "text": str(text)}
         if name:
             message["name"] = str(name)
         cleaned.append(message)
     cleaned = cleaned[-keep:]
-    latest_from = cleaned[-1]["from"] if cleaned else "her"
+    latest_from = cleaned[-1]["from"] if cleaned else "other"
     chat = {
         "relationship": relationship,
         "messages": cleaned,

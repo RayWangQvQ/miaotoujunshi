@@ -36,7 +36,7 @@ def read_title(header):
 def who_said(chat, box):
     """按 OCR 框里的颜色分类，不看 x 坐标。返回 (谁, 底色, 墨高)：
     先看底色平不平：框里众数颜色占比 <45% 就是图片（头像/照片/表情包）里的字 → None 丢掉。
-    绿底 → me；非绿且文字对底色对比度 ≥150 → her；其余（引用块、群里的发言人名、时间戳、系统提示、
+    绿底 → me；非绿且文字对底色对比度 ≥150 → other；其余（引用块、群里的发言人名、时间戳、系统提示、
     链接卡片描述——都是灰字，对比度 80~95）→ "gray"。
     实测：气泡正文对比度 178~208，me 绿泡 142~150，灰字 ≤ 93。深浅主题都靠这套。
     墨高 = 框里最长一段连续有字的行数（OCR 框对小字有固定 padding、还会蹭到上下行，不能拿框高比大小）。"""
@@ -58,7 +58,7 @@ def who_said(chat, box):
         ink_h = max(ink_h, best)
     if bg[1] > bg[0] + 40 and bg[1] > bg[2] + 40:
         return "me", bg, ink_h
-    return ("her" if diff.max() >= 150 else "gray"), bg, ink_h
+    return ("other" if diff.max() >= 150 else "gray"), bg, ink_h
 
 
 def similar(a, b):
@@ -79,14 +79,14 @@ class Reader:
         self.last_ms = 0  # 上一帧 OCR 耗时
 
     def read(self, chat, pane_bg):
-        """→ [(who, name, text, y)]，同一气泡的多行已合并。who ∈ me/her；name 群聊里是发言人，单聊 None。
+        """→ [(who, name, text, y)]，同一气泡的多行已合并。who ∈ me/other；name 群聊里是发言人，单聊 None。
         顺带把每个框的分类记进 self.last_boxes（调试视图画框用，几十个 tuple，不开也不亏）。"""
         t0 = time.perf_counter()
         res, _ = self.ocr(chat, use_cls=False)
         self.last_ms = int((time.perf_counter() - t0) * 1000)
         self.last_boxes = []
         W = chat.shape[1]
-        # 群聊：每条 her 气泡上方一行灰色发言人名（靠左、短、不带冒号、印在面板底色上），从上往下扫，名字带给后面的气泡。
+        # 群聊：每条 other 气泡上方一行灰色发言人名（靠左、短、不带冒号、印在面板底色上），从上往下扫，名字带给后面的气泡。
         # 引用块/时间戳/公告带冒号，链接卡片灰字印在气泡底色上，都不会被当成名字。
         # ponytail: 名字行被 OCR 漏掉时会挂到上一个人头上。
         name, raw = None, []
@@ -107,7 +107,7 @@ class Reader:
                 self.last_boxes.append(rect + ("image" if kind is None else "tiny", text))
                 continue
             self.last_boxes.append(rect + (kind, text))
-            raw.append((kind, name if kind == "her" else None, text, box[0][1], box[2][1], h))
+            raw.append((kind, name if kind == "other" else None, text, box[0][1], box[2][1], h))
         if not self.lh and len(raw) >= 3:
             self.lh = float(np.median([r[5] for r in raw]))
         # 同一气泡的多行合并：同人、上一行底到这一行顶的间距不到半个字高（不同气泡之间至少隔一个字高）
@@ -133,5 +133,5 @@ class Reader:
         return new
 
     def _seen(self, who, name, text):
-        # 名字不参与判重：名字行滚出画面后同一条消息会从 her(LO) 变成 her，不能算新消息
+        # 名字不参与判重：名字行滚出画面后同一条消息会从 other(LO) 变成 other，不能算新消息
         return any(w == who and similar(t, text) for w, _, t in self.seen)

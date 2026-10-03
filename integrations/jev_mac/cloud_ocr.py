@@ -96,8 +96,12 @@ def parse_transcription(raw, window, max_messages=20, provider='DeepSeek'):
         uncertain = row.get('uncertain')
         if type(uncertain) is not bool:
             raise ValueError(f'{provider} 识图的不确定性标记缺失，请改用本地 OCR')
-        messages.append(SimpleNamespace(side=row['side'], sender=None, text=text,
-                                        conf=0.5 if uncertain or row['side'] == 'unknown' else 1.0))
+        # The prompt asks the model for `them`; this app speaks `other` (docs/adr/0015).
+        # `unknown` deliberately passes through: it is a real answer about a bubble that
+        # could not be anchored to one side, not another spelling of one.
+        side = 'other' if row['side'] == 'them' else row['side']
+        messages.append(SimpleNamespace(side=side, sender=None, text=text,
+                                        conf=0.5 if uncertain or side == 'unknown' else 1.0))
     return {'ok': True, 'chat_title': title, 'window': window, 'messages': messages}
 
 

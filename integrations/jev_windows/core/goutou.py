@@ -31,7 +31,7 @@ def explicit_boundary(messages: list) -> bool:
     if not messages:
         return False
     who, text = _message_parts(messages[-1])
-    if who != "her":
+    if who != "other":
         return False
     return any(term in text for term in _boundaries()["no_contact_terms"])
 
@@ -41,7 +41,7 @@ def brief(messages: list, answers: dict) -> dict:
     observed = []
     for message in messages[-8:]:
         who, text = _message_parts(message)
-        if who in ("me", "her") and text.strip():
+        if who in ("me", "other") and text.strip():
             observed.append(("我" if who == "me" else "对方") + "：「" + text.strip()[:100] + "」")
     intent_row = (answers.get("true_intent") or {})
     intent_key = intent_row.get("choice")

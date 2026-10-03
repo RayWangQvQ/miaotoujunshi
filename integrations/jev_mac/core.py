@@ -103,7 +103,7 @@ def from_capture(data, source='ocr'):
     messages = data.get("messages") or []
     lines = []
     for msg in messages:
-        side = {"me": "我", "them": "对方"}.get(msg.side, "说话人待确认")
+        side = {"me": "我", "other": "对方"}.get(msg.side, "说话人待确认")
         sender = f"（{msg.sender}）" if msg.sender else ""
         confidence = msg.conf if isinstance(msg.conf, (int, float)) else 0
         uncertain = " [OCR待核对]" if not math.isfinite(confidence) or confidence < .8 else ""

@@ -183,7 +183,7 @@ class Overlay:
         self._hintLabels = []
         self.feeds = {}  # {会话名: [排好版的记录]}
         self.counts = {}  # {会话名: 消息条数}
-        self.hers = {}  # {会话名: 对方最近一句}
+        self.others = {}  # {会话名: 对方最近一句}
         self.targets = {}  # {会话名: ([发言人], 当前回复对象)}
         self._chat = ""  # 微信当前开着的会话
         self._shown = ""  # 界面上正在看的会话（浏览时和上面不一样）
@@ -1093,19 +1093,19 @@ class Overlay:
     def log_message(self, who, text, name="", timestamp=None, chat=None):
         """按会话存一份；只有正在看的那个会往显示区里写。"""
         chat = chat or self._shown
-        speaker = (name or "对方") if who == "her" else "我"
+        speaker = (name or "对方") if who == "other" else "我"
         timestamp = timestamp or datetime.now().strftime("%H:%M")
         self.counts[chat] = self.counts.get(chat, 0) + 1
         lines = self.feeds.setdefault(chat, [])
         lines.append(f"{timestamp}  {speaker}\n{text}\n")
         del lines[:-_LOG_LINES]
-        if who == "her":
-            self.hers[chat] = text
+        if who == "other":
+            self.others[chat] = text
         self._add_chat(chat)
         if chat != self._shown:
             return
         self.log(lines[-1])
-        if who == "her":
+        if who == "other":
             self._show_latest(text)
         self._history_title()
 
@@ -1152,9 +1152,9 @@ class Overlay:
         self.feed.clear()
         for line in self.feeds.get(title, []):
             self.feed.appendPlainText(line)
-        her = self.hers.get(title)
-        if her:
-            self._show_latest(her)
+        latest = self.others.get(title)
+        if latest:
+            self._show_latest(latest)
         else:
             self.context.hide()
         self._history_title()

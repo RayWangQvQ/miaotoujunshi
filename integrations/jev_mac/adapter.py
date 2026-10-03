@@ -5,11 +5,25 @@ from core import assert_fill_target, from_capture
 from vendor import perception, fill
 
 
+def _other(result):
+    """Translate the vendored layer's `them` into this app's `other` (docs/adr/0015).
+
+    The translation belongs here rather than in `vendor/perception.py`, so that the
+    vendored directory keeps meaning "third-party code as received". `unknown` is
+    deliberately left alone: it is a real answer about a bubble that could not be
+    anchored to one side, not another spelling of one.
+    """
+    for message in result.get("messages") or ():
+        if message.side == "them":
+            message.side = "other"
+    return result
+
+
 def capture(method='vision', reuse_unchanged=False):
     if not perception.screen_capture_ok():
         raise ValueError("请在系统设置中给启动终端屏幕录制权限，退出并重新启动后再读取")
     if method == 'vision':
-        result = perception.read_conversation(max_messages=20)
+        result = _other(perception.read_conversation(max_messages=20))
         source = 'ocr'
     elif method == 'deepseek':
         from cloud_ocr import deepseek_config, read_conversation
