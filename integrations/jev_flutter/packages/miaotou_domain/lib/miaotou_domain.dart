@@ -17,7 +17,12 @@
 ///   [parseAdvice] / [parseRewrite], [applyScores] / [rankCandidates], and the
 ///   two entry points that put them in order: [analyzeSnapshot] and
 ///   [rewriteSnapshot].
-/// * **#8** — trend and K-line data, and CSV handling. Not yet.
+/// * **#8** — trend and K-line data, and CSV handling. Landed: [Candle] and
+///   [Trend] in macOS's superset shape, [TrendRules] read from the payload's own
+///   contract file, [readChatCsv] for the import every port had, [writeCandleCsv]
+///   and [readCandleCsv] for the export none of them had, the synthetic case
+///   bundle, and the RFC 4180 [parseCsvGrid] / [writeCsvGrid] the two directions
+///   share. Rendering strings are deliberately **not** here: #11 owns the copy.
 /// * **#9** — the knowledge base's logic and the memory store's used subset
 ///   (ADR-0010), including the profile diff that makes `MemoryStore.undo` revert
 ///   exactly this run's writes. Not yet.
@@ -43,6 +48,7 @@ library;
 
 export 'src/advice.dart';
 export 'src/analysis.dart';
+export 'src/csv.dart';
 export 'src/errors.dart';
 export 'src/judging.dart';
 export 'src/model_gateway.dart';
@@ -53,3 +59,4 @@ export 'src/scoring.dart';
 export 'src/shared_material.dart';
 export 'src/snapshot.dart';
 export 'src/strategy.dart';
+export 'src/trend.dart';
