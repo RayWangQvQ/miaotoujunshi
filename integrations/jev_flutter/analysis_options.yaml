@@ -1,0 +1,21 @@
+# One analysis configuration for the whole workspace.
+#
+# It sits at the workspace root rather than in each member so that a lint rule
+# cannot be relaxed in one package and left in force in another: the analyzer
+# walks up from each file and finds this file first, for the application and for
+# every package alike.
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - "apps/*/android/**"
+    - "apps/*/macos/**"
+    - "apps/*/windows/**"
+
+linter:
+  rules:
+    # The workspace root uses pub's own convention for a root that is not a
+    # package of its own: `name: _` with `publish_to: "none"`. This lint exists to
+    # keep a *published* package's name legible, and this one is never published —
+    # nothing imports it and nothing can.
+    package_names: false

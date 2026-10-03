@@ -1,0 +1,10 @@
+# Flutter and Dart build output, at any depth under the workspace.
+.dart_tool/
+build/
+coverage/
+*.iml
+.idea/
+
+# The macOS and Windows runners generate their plugin registrant at build time.
+apps/*/macos/Flutter/ephemeral/
+apps/*/windows/flutter/ephemeral/

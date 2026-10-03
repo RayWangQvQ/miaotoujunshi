@@ -1,0 +1,19 @@
+# The Gradle wrapper is committed rather than ignored.
+#
+# The Flutter template ignores `gradlew` and `gradle-wrapper.jar` on the
+# assumption that `flutter create` can put them back. This repository's other
+# Android port commits them, a fresh clone has to be buildable without a
+# `flutter create` step, and a build that needs a network round trip to Gradle's
+# distribution server before it can resolve anything is a build that fails for a
+# reason nobody can see. See integrations/jev_android, which does the same.
+/.gradle
+/captures/
+/local.properties
+GeneratedPluginRegistrant.java
+.cxx/
+
+# Remember to never publicly share your keystore.
+# See https://flutter.dev/to/reference-keystore
+key.properties
+**/*.keystore
+**/*.jks

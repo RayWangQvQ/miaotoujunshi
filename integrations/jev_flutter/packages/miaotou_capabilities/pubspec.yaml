@@ -1,0 +1,17 @@
+name: miaotou_capabilities
+description: >-
+  The ten capability interfaces that form the only boundary between the three
+  platform implementations and everything above them.
+publish_to: "none"
+
+environment:
+  sdk: ^3.13.0
+
+resolution: workspace
+
+dev_dependencies:
+  test: ^1.25.0
+  # Used by the shared-payload invariant test to read the workspace's pubspec
+  # files rather than to grep them: the invariant is about a declared asset list,
+  # and a text scan would pass on a commented-out one.
+  yaml: ^3.1.2

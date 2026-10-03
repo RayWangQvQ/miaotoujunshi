@@ -1,0 +1,49 @@
+name: miaotou_app
+description: >-
+  One Flutter application for Android, Windows and macOS, built from the single
+  pub workspace that contains it.
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.13.0
+
+resolution: workspace
+
+# The application depends on all three implementation packages, and that is
+# deliberate rather than a shortcut.
+#
+# ADR-0009 puts the contract in `miaotou_capabilities` and the answers in
+# `miaotou_capabilities_<platform>`, and it says the interface package is pure
+# Dart — so there is no federated-plugin mechanism to select an implementation per
+# target and no `default_package` for the tool to read. The selection therefore
+# happens once, at start-up, in `lib/src/capability_registry.dart`, and that file
+# is the only place in the application that asks what it is running on.
+#
+# Each implementation package stays compilable everywhere: it is Dart today, and
+# when #17 and #21 give theirs native code the plugin mechanism will simply not
+# register a plugin for a platform it does not declare.
+dependencies:
+  flutter:
+    sdk: flutter
+
+  miaotou_capabilities:
+    path: ../../packages/miaotou_capabilities
+  miaotou_capabilities_android:
+    path: ../../packages/miaotou_capabilities_android
+  miaotou_capabilities_macos:
+    path: ../../packages/miaotou_capabilities_macos
+  miaotou_capabilities_windows:
+    path: ../../packages/miaotou_capabilities_windows
+  # Not imported yet: the domain is a skeleton until #7. The edge is declared now
+  # so the layering is visible from the manifest rather than only from the plan.
+  miaotou_domain:
+    path: ../../packages/miaotou_domain
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

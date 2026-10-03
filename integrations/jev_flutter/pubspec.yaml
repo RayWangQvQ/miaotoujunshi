@@ -1,0 +1,28 @@
+# The pub workspace root of the migrated application.
+#
+# Members are declared here and nowhere else. Each of them carries
+# `resolution: workspace`, so a single `.dart_tool/package_config.json` and a
+# single `pubspec.lock` serve the whole tree, and every member resolves its
+# siblings by path rather than through a published version.
+#
+# The root package itself holds no Dart code: it exists to anchor the
+# workspace, the shared analysis options and (later) the build helper under
+# `tool/`. Its name is the pub convention for a workspace root that is not a
+# package of its own.
+#
+# See docs/adr/0007 (one Flutter codebase for all three ports),
+# docs/adr/0008 (the shared payload does not travel through Flutter assets) and
+# docs/adr/0009 (the capability contract is the only cross-port boundary).
+name: _
+publish_to: "none"
+
+environment:
+  sdk: ^3.13.0
+
+workspace:
+  - apps/miaotou_app
+  - packages/miaotou_capabilities
+  - packages/miaotou_capabilities_android
+  - packages/miaotou_capabilities_macos
+  - packages/miaotou_capabilities_windows
+  - packages/miaotou_domain

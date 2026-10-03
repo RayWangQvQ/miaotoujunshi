@@ -1,0 +1,17 @@
+name: miaotou_domain
+description: >-
+  The half of the application that decides, with no dependency on any platform.
+publish_to: "none"
+
+environment:
+  sdk: ^3.13.0
+
+resolution: workspace
+
+dependencies:
+  miaotou_capabilities:
+    path: ../miaotou_capabilities
+
+dev_dependencies:
+  test: ^1.25.0
+  yaml: ^3.1.2
