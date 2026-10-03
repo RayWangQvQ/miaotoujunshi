@@ -4,6 +4,7 @@ import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 
 import 'errors.dart';
 import 'preferences.dart';
+import 'relationship.dart';
 
 // The keys are repository-root-relative, exactly the convention `payload-map.json`
 // already uses and `SharedPayload.read` documents (ADR-0008). Spelling them once,
@@ -16,6 +17,10 @@ const String judgeQuestionsPath =
     'miaotoujunshi/references/data/judge-questions.json';
 const String replyPreferencesPath =
     'miaotoujunshi/references/data/reply-preferences.json';
+
+/// The stage/goal/scene vocabulary, declared in [relationship.dart] alongside
+/// the [Profile] model that owns its values. Re-listed here would only give
+/// the path two places to drift from, so the constant is re-exported below.
 
 /// The upstream skill document, which the reply prompt quotes whole.
 const String skillDocumentPath = 'goutoujunshi/SKILL.md';
@@ -126,6 +131,7 @@ final class SharedVocabulary {
     required this.rotations,
     required this.judge,
     required this.reply,
+    required this.relationship,
     required this.strategyGuidePath,
     required this.sharedToneDocumentPath,
     required this.sceneKnowledge,
@@ -157,6 +163,13 @@ final class SharedVocabulary {
   final JudgeSet judge;
   final ReplyVocabulary reply;
 
+  /// The stage/goal/scene vocabulary and the goal→scene derivation.
+  ///
+  /// Held here so that a [Profile] and the scene it analyses against come from
+  /// the same read of the payload — the two ports that kept their own copy of
+  /// the stages (Windows, Android) are the two that drifted from it.
+  final RelationshipVocabulary relationship;
+
   /// Repository-root-relative path of the strategy guide.
   final String strategyGuidePath;
 
@@ -175,11 +188,14 @@ final class SharedVocabulary {
     required String judge,
     required String preferences,
     required String payloadMap,
+    required String relationshipEnums,
   }) {
     final Map<String, Object?> criteriaJson = _asMap(jsonDecode(criteria));
     final Map<String, Object?> judgeJson = _asMap(jsonDecode(judge));
     final Map<String, Object?> preferencesJson = _asMap(jsonDecode(preferences));
     final Map<String, Object?> mapJson = _asMap(jsonDecode(payloadMap));
+    final RelationshipVocabulary relationship =
+        RelationshipVocabulary.parse(relationshipEnums);
 
     final Map<String, Object?> questionsJson =
         _asMap(judgeJson['questions'] ?? const <String, Object?>{});
@@ -216,6 +232,7 @@ final class SharedVocabulary {
         minCount: _asInt(candidateLimits['min']),
         maxCount: _asInt(candidateLimits['max']),
       ),
+      relationship: relationship,
       strategyGuidePath: _asString(mapJson['strategy_guide']),
       sharedToneDocumentPath: _asString(mapJson['shared_tone_document']),
       sceneKnowledge: _asStringMap(mapJson['scene_knowledge']),
@@ -279,6 +296,7 @@ final class SharedMaterial {
       judge: await _text(payload, judgeQuestionsPath),
       preferences: await _text(payload, replyPreferencesPath),
       payloadMap: await _text(payload, payloadMapPath),
+      relationshipEnums: await _text(payload, relationshipEnumsPath),
     );
     return SharedMaterial(vocabulary, payload: payload);
   }

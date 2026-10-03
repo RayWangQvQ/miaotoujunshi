@@ -23,9 +23,13 @@
 ///   and [readCandleCsv] for the export none of them had, the synthetic case
 ///   bundle, and the RFC 4180 [parseCsvGrid] / [writeCsvGrid] the two directions
 ///   share. Rendering strings are deliberately **not** here: #11 owns the copy.
-/// * **#9** — the knowledge base's logic and the memory store's used subset
-///   (ADR-0010), including the profile diff that makes `MemoryStore.undo` revert
-///   exactly this run's writes. Not yet.
+/// * **#9 — the knowledge base's logic and the memory store's used subset
+///   (ADR-0010).** Landed: [RelationshipVocabulary] and [Profile], the
+///   [validateProfile] / [profileContext] / [buildBackground] trio lifted from
+///   macOS's `experience.py`, and the [diffProfile] / [applySave] / [undoSave]
+///   loop that is the only part of the old `MemoryBridge` worth porting line
+///   for line. `Conversations` and `AutoGate` are not here: they are
+///   conversation identity, which #12 owns.
 /// * **#10** — the anti-injection filter, scenario selection and the update
 ///   check. Not yet.
 /// * **#12** — conversation identity and the read-only derivation, which ADR-0002
@@ -51,9 +55,11 @@ export 'src/analysis.dart';
 export 'src/csv.dart';
 export 'src/errors.dart';
 export 'src/judging.dart';
+export 'src/memory.dart';
 export 'src/model_gateway.dart';
 export 'src/preferences.dart';
 export 'src/prompts.dart';
+export 'src/relationship.dart';
 export 'src/rendering.dart';
 export 'src/scoring.dart';
 export 'src/shared_material.dart';
