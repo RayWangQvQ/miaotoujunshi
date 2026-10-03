@@ -164,6 +164,76 @@ void main() {
     });
   });
 
+  group('the evidence lists', () {
+    Map<String, Object?> withChange(Map<String, Object?> change) =>
+        <String, Object?>{...drafts(), ...change};
+
+    test('tolerate the shapes the model actually writes', () {
+      // Every one of these has been produced in practice. None of them changes
+      // what the words mean, so none of them is worth throwing away an otherwise
+      // valid round over — which is the whole reason this tolerance exists.
+      final Advice bare = parseAdvice(
+        encode(withChange(<String, Object?>{
+          'facts': '对方说这周忙',
+          'hypotheses': null,
+          'unknowns': <String>[for (int i = 0; i < 7; i++) '仍未知第$i项'],
+        })),
+        strategies: strategies,
+      );
+      expect(bare.facts, <String>['对方说这周忙']);
+      expect(bare.hypotheses, isEmpty);
+      expect(bare.unknowns, hasLength(7));
+
+      final Advice boxed = parseAdvice(
+        encode(withChange(<String, Object?>{
+          'facts': <Object?>[
+            <String, Object?>{'text': '对方说这周忙'},
+          ],
+        })),
+        strategies: strategies,
+      );
+      expect(boxed.facts, <String>['对方说这周忙']);
+    });
+
+    test('are refused when the shape is not one of them', () {
+      // A `{"text": …, "confidence": …}` object is *not* a benign variant: it is
+      // a different claim, and folding it to its text would drop the confidence
+      // the model attached to it.
+      for (final Object? value in <Object?>[
+        <String, Object?>{'text': '事实', 'confidence': .1},
+        <String>['过长' * 251],
+        <Object?>[<Object?>[]],
+      ]) {
+        expect(
+          () => parseAdvice(
+            encode(withChange(<String, Object?>{'facts': value})),
+            strategies: strategies,
+          ),
+          throwsA(isA<DomainException>()),
+          reason: 'accepted $value',
+        );
+      }
+    });
+
+    test('an empty fact list cannot carry a confidence', () {
+      expect(
+        () => parseAdvice(
+          encode(withChange(<String, Object?>{
+            'facts': null,
+            'intent': '可能暂缓安排',
+            'intent_confidence': .8,
+          })),
+          strategies: strategies,
+        ),
+        throwsA(isA<DomainException>().having(
+          (DomainException e) => e.message,
+          'message',
+          contains('可见事实'),
+        )),
+      );
+    });
+  });
+
   group('a rewrite', () {
     test('may change the drafts and nothing else', () {
       final List<Candidate> rewritten = parseRewrite(
