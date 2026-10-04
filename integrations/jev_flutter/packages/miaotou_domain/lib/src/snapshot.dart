@@ -108,10 +108,10 @@ final class Snapshot {
 
   /// The lines the transcript was rendered from, when it came from capture.
   ///
-  /// Empty for a pasted transcript. Carried so the filter ([sanitizeCandidates])
-  /// can read the other party's text directly, rather than parsing the rendered
-  /// transcript back into structure — which would couple the filter to the
-  /// renderer's exact format.
+  /// Empty for a pasted transcript. Carried so the filter
+  /// ([sanitizeCandidateTexts]) can read the other party's text directly,
+  /// rather than parsing the rendered transcript back into structure — which
+  /// would couple the filter to the renderer's exact format.
   final List<CapturedLine> capturedLines;
 }
 
