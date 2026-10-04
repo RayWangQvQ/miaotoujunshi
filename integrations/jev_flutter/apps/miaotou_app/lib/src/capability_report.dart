@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 
+import 'design/copy.dart';
+import 'design/spacing.dart';
+
 /// The members the shell asks about when it starts, and the only ones.
 ///
 /// An allow-list rather than "everything except the writers", because the failure
@@ -28,7 +31,6 @@ const List<String> startupProbeNames = <String>[
 /// may be added — so every member it has writes into another application's input
 /// field. That is a thing the user asks for, never a thing start-up does.
 const String unaskedMember = 'textInject.inject';
-const String unaskedReason = '未询问：调用它等于往聊天窗口里写入文本';
 
 /// One line of the report.
 final class CapabilityReportRow {
@@ -58,11 +60,17 @@ final class CapabilityReport {
       rows.where((CapabilityReportRow row) => row.answer == answer).length;
 
   /// The one line at the top: ten capabilities, and how each of them answered.
-  String get summary => '十项能力：已应答 ${count(SupportAnswer.answered)}，'
-      '永久不支持 ${count(SupportAnswer.unsupported)}，'
-      '尚未实现 ${count(SupportAnswer.notYetBuilt)}，'
-      '异常 ${count(SupportAnswer.failed)}，'
-      '未询问 ${count(null)}';
+  ///
+  /// Built from copy keys rather than written here, even though the row labels
+  /// below are the same words: a screen that spells a state two ways is how the
+  /// three ports came to disagree about what a refusal meant.
+  String summary(AppCopy copy) =>
+      '${copy.text(CopyKey.capabilitySummaryPrefix)}'
+      '${copy.text(CopyKey.supportAnswered)} ${count(SupportAnswer.answered)}，'
+      '${copy.text(CopyKey.supportUnsupported)} ${count(SupportAnswer.unsupported)}，'
+      '${copy.text(CopyKey.supportNotYetBuilt)} ${count(SupportAnswer.notYetBuilt)}，'
+      '${copy.text(CopyKey.supportFailed)} ${count(SupportAnswer.failed)}，'
+      '${copy.text(CopyKey.supportUnasked)} ${count(null)}';
 }
 
 /// Asks the safe members and records every answer, refusals included.
@@ -85,7 +93,7 @@ Future<CapabilityReport> buildCapabilityReport(CapabilitySet capabilities) async
     rows.add(
       CapabilityReportRow(
         member: member,
-        implementation: implementations[member.split('.').first] ?? '未知',
+        implementation: implementations[member.split('.').first] ?? '',
         answer: await askCapability(() => probe(capabilities)),
       ),
     );
@@ -94,7 +102,7 @@ Future<CapabilityReport> buildCapabilityReport(CapabilitySet capabilities) async
   rows.add(
     CapabilityReportRow(
       member: unaskedMember,
-      implementation: implementations[unaskedMember.split('.').first] ?? '未知',
+      implementation: implementations[unaskedMember.split('.').first] ?? '',
       answer: null,
     ),
   );
@@ -102,66 +110,107 @@ Future<CapabilityReport> buildCapabilityReport(CapabilitySet capabilities) async
   return CapabilityReport(rows);
 }
 
-/// Reads as one phrase, so the screen needs no logic of its own.
-String describeAnswer(SupportAnswer? answer) => switch (answer) {
-      null => unaskedReason,
-      SupportAnswer.answered => '已应答',
-      SupportAnswer.unsupported => '永久不支持',
-      SupportAnswer.notYetBuilt => '尚未实现',
-      SupportAnswer.failed => '异常',
+/// How one member answered, in words.
+///
+/// The unasked row is the interesting branch: it is not a refusal the platform
+/// made, it is a decision the start-up made not to ask, and the screen has to
+/// say which of the two it is looking at.
+String describeAnswer(AppCopy copy, SupportAnswer? answer) => switch (answer) {
+      null => copy.text(CopyKey.unaskedReason),
+      SupportAnswer.answered => copy.text(CopyKey.supportAnswered),
+      SupportAnswer.unsupported => copy.text(CopyKey.supportUnsupported),
+      SupportAnswer.notYetBuilt => copy.text(CopyKey.supportNotYetBuilt),
+      SupportAnswer.failed => copy.text(CopyKey.supportFailed),
     };
 
 /// What this build can do, asked rather than assumed.
 ///
-/// A placeholder screen in the sense that #11 will replace it, but not a
-/// throwaway: it is the migration's own answer to "which of the ten does this port
-/// answer for", and after promotion it is what tells a user why a button does
-/// nothing.
-class CapabilityReportPage extends StatefulWidget {
+/// A placeholder screen in the sense that #11 replaced the shell around it, but
+/// not a throwaway: it is the migration's own answer to "which of the ten does
+/// this port answer for", and after promotion it is what tells a user why a
+/// button does nothing.
+///
+/// It is a body and not a [Scaffold] on purpose: the shell gives it its app bar
+/// when it is the destination, and [CapabilityReportPage] gives it one when it
+/// is pushed. A scaffold inside a scaffold would give it two.
+class CapabilityReportView extends StatefulWidget {
+  const CapabilityReportView({super.key, required this.capabilities});
+
+  final CapabilitySet capabilities;
+
+  @override
+  State<CapabilityReportView> createState() => _CapabilityReportViewState();
+}
+
+class _CapabilityReportViewState extends State<CapabilityReportView> {
+  late final Future<CapabilityReport> _report =
+      buildCapabilityReport(widget.capabilities);
+
+  @override
+  Widget build(BuildContext context) {
+    final AppCopy copy = CopyScope.of(context);
+
+    return FutureBuilder<CapabilityReport>(
+      future: _report,
+      builder: (BuildContext context, AsyncSnapshot<CapabilityReport> snapshot) {
+        final CapabilityReport? report = snapshot.data;
+        if (snapshot.hasError) {
+          return Center(
+            child: Text('${copy.text(CopyKey.reportFailed)}${snapshot.error}'),
+          );
+        }
+        if (report == null) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        return ListView.builder(
+          padding: AppSpacing.page,
+          itemCount: report.rows.length + 2,
+          itemBuilder: (BuildContext context, int index) {
+            if (index == 0) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.m),
+                child: Text(copy.text(CopyKey.diagnosticsIntro)),
+              );
+            }
+            if (index == 1) {
+              return ListTile(
+                title: Text(report.summary(copy)),
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+              );
+            }
+            final CapabilityReportRow row = report.rows[index - 2];
+            return ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: Text(row.member),
+              subtitle: Text(
+                row.implementation.isEmpty
+                    ? copy.text(CopyKey.unknownImplementation)
+                    : row.implementation,
+              ),
+              trailing: Text(describeAnswer(copy, row.answer)),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+/// The report as a pushed route: a scaffold of its own, with its own way back.
+class CapabilityReportPage extends StatelessWidget {
   const CapabilityReportPage({super.key, required this.capabilities});
 
   final CapabilitySet capabilities;
 
   @override
-  State<CapabilityReportPage> createState() => _CapabilityReportPageState();
-}
+  Widget build(BuildContext context) {
+    final AppCopy copy = CopyScope.of(context);
 
-class _CapabilityReportPageState extends State<CapabilityReportPage> {
-  late final Future<CapabilityReport> _report =
-      buildCapabilityReport(widget.capabilities);
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('喵头军师 · 能力契约自检')),
-        body: FutureBuilder<CapabilityReport>(
-          future: _report,
-          builder: (BuildContext context, AsyncSnapshot<CapabilityReport> snapshot) {
-            final CapabilityReport? report = snapshot.data;
-            if (snapshot.hasError) {
-              return Center(child: Text('自检失败：${snapshot.error}'));
-            }
-            if (report == null) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            return ListView.builder(
-              itemCount: report.rows.length + 1,
-              itemBuilder: (BuildContext context, int index) {
-                if (index == 0) {
-                  return ListTile(
-                    title: Text(report.summary),
-                    dense: true,
-                  );
-                }
-                final CapabilityReportRow row = report.rows[index - 1];
-                return ListTile(
-                  dense: true,
-                  title: Text(row.member),
-                  subtitle: Text(row.implementation),
-                  trailing: Text(describeAnswer(row.answer)),
-                );
-              },
-            );
-          },
-        ),
-      );
+    return Scaffold(
+      appBar: AppBar(title: Text(copy.text(CopyKey.diagnosticsTitle))),
+      body: CapabilityReportView(capabilities: capabilities),
+    );
+  }
 }

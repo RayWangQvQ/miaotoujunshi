@@ -1,27 +1,25 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:miaotou_app/src/app.dart';
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 import 'package:miaotou_capabilities/testing.dart';
 import 'package:miaotou_capabilities_macos/miaotou_capabilities_macos.dart';
+
+import 'support/harness.dart';
 
 /// The point of ADR-0009 is that nothing above the contract can tell which port
 /// it is on. These tests are what makes that true rather than intended: they run
 /// **the whole application** — the same `MiaotouApp` that `main.dart` starts —
 /// against three different capability sets, with no device, no window server and
 /// no chat application anywhere.
+///
+/// They reach the report by navigating to it, which is also the first half of
+/// #11's routing criterion: settings is a destination in the main window and the
+/// report is a route pushed onto the same navigator, never a window of its own
+/// (ADR-0012).
 void main() {
-  Future<void> pumpApplication(
-    WidgetTester tester,
-    CapabilitySet capabilities,
-  ) async {
-    // A tall surface so every row of the report is laid out; a `ListView` only
-    // builds what it can show.
-    tester.view.physicalSize = const Size(1200, 2400);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
-
-    await tester.pumpWidget(MiaotouApp(capabilities: capabilities));
+  Future<void> openDiagnostics(WidgetTester tester) async {
+    await tester.tap(find.text('设置'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('能力自检'));
     await tester.pumpAndSettle();
   }
 
@@ -35,7 +33,9 @@ void main() {
     );
     addTearDown(capabilities.dispose);
 
-    await pumpApplication(tester, capabilities.toSet());
+    final AppHarness harness = AppHarness(capabilities: capabilities.toSet());
+    await pumpApplication(tester, harness);
+    await openDiagnostics(tester);
 
     expect(find.textContaining('已应答 11'), findsOneWidget);
     expect(find.textContaining('异常 0'), findsOneWidget);
@@ -53,7 +53,9 @@ void main() {
   testWidgets('a real platform package reports its refusals through the same shell', (
     WidgetTester tester,
   ) async {
-    await pumpApplication(tester, macosCapabilities());
+    final AppHarness harness = AppHarness(capabilities: macosCapabilities());
+    await pumpApplication(tester, harness);
+    await openDiagnostics(tester);
 
     expect(find.textContaining('已应答 0'), findsOneWidget);
     expect(find.textContaining('永久不支持 2'), findsOneWidget);
@@ -73,9 +75,8 @@ void main() {
     addTearDown(capabilities.dispose);
     final CapabilitySet healthy = capabilities.toSet();
 
-    await pumpApplication(
-      tester,
-      CapabilitySet(
+    final AppHarness harness = AppHarness(
+      capabilities: CapabilitySet(
         screenCapture: healthy.screenCapture,
         uiTreeReader: healthy.uiTreeReader,
         ocr: healthy.ocr,
@@ -88,6 +89,8 @@ void main() {
         memoryStore: const _BrokenMemoryStore(),
       ),
     );
+    await pumpApplication(tester, harness);
+    await openDiagnostics(tester);
 
     expect(find.textContaining('异常 1'), findsOneWidget);
     expect(find.textContaining('已应答 10'), findsOneWidget);
