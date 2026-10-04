@@ -94,9 +94,113 @@ public class MiaotouMacosPlugin: NSObject, FlutterPlugin {
                 "screenRecording": recording,
                 "accessibility": AccessibilityDraft.shared.hasAccessibility(),
             ])
+        case "storage.resourceRoot":
+            // Not `?? ""`: an empty root would turn every payload read into a read
+            // of a path that does not exist, and the resulting error would name
+            // the file rather than the bundle. The distinction is the whole
+            // difference between a packaging fault and a missing document.
+            guard let root = StoragePaths.resourceRoot() else {
+                result(FlutterError(
+                    code: "no_resource_root",
+                    message: StoragePathError.noResourceRoot.message,
+                    details: nil
+                ))
+                return
+            }
+            result(root)
+        case "storage.containerDirectory":
+            do {
+                result(try StoragePaths.containerDirectory())
+            } catch {
+                result(FlutterError(
+                    code: "no_container_directory",
+                    message: StoragePathError.noContainerDirectory("\(error)").message,
+                    details: nil
+                ))
+            }
+        // `result` is passed positionally and the body is the trailing closure.
+        // Written this way because a bare trailing closure binds to the *last*
+        // parameter only when the others are already supplied — and
+        // `keychain(_:_:_:)` takes the callback second and the work third, so
+        // `keychain(arguments) { … }` hands the work to `result` and leaves the
+        // body missing. That mistake gets past the parser and then fails the whole
+        // module at build time, which is how it was found: a per-file parse of
+        // this file cannot see it.
+        case "keychain.read":
+            keychain(arguments, result) { arguments in
+                try KeychainStore.read(try self.key(from: arguments))
+            }
+        case "keychain.write":
+            keychain(arguments, result) { arguments in
+                guard let value = arguments["value"] as? String else {
+                    throw KeychainError.unreadable("<missing value>")
+                }
+                try KeychainStore.write(try self.key(from: arguments), value: value)
+                return nil
+            }
+        case "keychain.delete":
+            keychain(arguments, result) { arguments in
+                try KeychainStore.delete(try self.key(from: arguments))
+                return nil
+            }
+        case "keychain.keys":
+            // No key: this one lists them. The absence of a `key` argument is
+            // therefore not a fault here, which is why the check lives in `key(from:)`
+            // rather than in the dispatcher.
+            keychain(arguments, result) { _ in try KeychainStore.keys() }
         default:
             result(FlutterMethodNotImplemented)
         }
+    }
+
+    // MARK: - Storage
+
+    /// The `SecretStore` key, refusing an absent or empty one.
+    ///
+    /// An empty `kSecAttrAccount` is a valid Keychain item that no `keys()` result
+    /// could ever name usefully, so it is rejected here rather than written.
+    private func key(from arguments: [String: Any]) throws -> String {
+        guard let key = arguments["key"] as? String, !key.isEmpty else {
+            throw KeychainError.unreadable("<missing key>")
+        }
+        return key
+    }
+
+    /// Runs one Keychain operation and reports a refusal as a `FlutterError`.
+    ///
+    /// Off the main thread on purpose: `SecItem*` is a synchronising IPC call to
+    /// `securityd`, and a sandboxed app's first access can block long enough to
+    /// trip the watchdog in `CapturePacing`. The result is hopped back to the main
+    /// thread because the channel expects to be written from there.
+    private func keychain(
+        _ arguments: [String: Any],
+        _ result: @escaping FlutterResult,
+        _ body: @escaping ([String: Any]) throws -> Any?
+    ) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let value = try body(arguments)
+                DispatchQueue.main.async { result(value) }
+            } catch let error as KeychainError {
+                DispatchQueue.main.async { result(MiaotouMacosPlugin.failure(error)) }
+            } catch {
+                DispatchQueue.main.async {
+                    result(FlutterError(
+                        code: "keychain_failed",
+                        message: "\(error)",
+                        details: nil
+                    ))
+                }
+            }
+        }
+    }
+
+    static func failure(_ error: KeychainError) -> FlutterError {
+        FlutterError(
+            code: "keychain_\(error.code)",
+            message: error.message,
+            details: nil
+        )
     }
 
     // MARK: - Capture

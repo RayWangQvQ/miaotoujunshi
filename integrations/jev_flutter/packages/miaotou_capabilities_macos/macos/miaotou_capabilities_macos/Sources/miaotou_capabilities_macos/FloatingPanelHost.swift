@@ -113,7 +113,13 @@ final class FloatingPanelHost: NSObject {
 
     /// Where the panel is, and how big the screen it is on is.
     func geometry() -> [String: Any] {
-        let screen = PanelDragStrip.screenRect(for: panel)
+        // `panel` is optional — a host that has not built one yet has no window to
+        // report — so the screen is asked of the panel only when there is one, and
+        // the two fallbacks below stand in for it otherwise. Written with
+        // `flatMap` for the same reason the next line uses `map`: passing the
+        // optional straight into `screenRect(for:)` does not compile, because that
+        // takes a non-optional `NSWindow`.
+        let screen = panel.flatMap { PanelDragStrip.screenRect(for: $0) }
             ?? NSScreen.main.map { PanelDragStrip.quartz($0.visibleFrame) }
             ?? .zero
         let window = panel.map { PanelDragStrip.quartz($0.frame) } ?? .zero

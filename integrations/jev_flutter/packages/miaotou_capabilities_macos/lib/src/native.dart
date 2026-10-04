@@ -11,6 +11,23 @@ import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 /// place the window and read the drag back. Splitting it across four plugin
 /// classes would mean four objects holding one window between them.
 ///
+/// #15 added six members to this interface and the rule that decided them is the
+/// one #14 established: **an error a test can catch belongs above this file, and
+/// only something that is knowable solely on the device belongs on it.** So:
+///
+/// * **The payload's location is here; the payload's reading is not.** A packaged
+///   `.app` has no idea what a repository-relative path means, and only
+///   `Bundle.main.resourcePath` knows where the tree landed. Everything after
+///   that — joining, reading bytes, refusing a missing file — is `dart:io` and is
+///   exercised on a fake in milliseconds.
+/// * **The container directory is here; the file formats are not.** Only the
+///   sandbox knows which directory this app may write, and the three stores that
+///   live there differ in what they write, not in where.
+/// * **The Keychain is here, entirely.** `SecItem*` is C API in
+///   `Security.framework`; there is no Dart expression of it, and a sandboxed
+///   app cannot reach `/usr/bin/security` as a subprocess the way the frozen
+///   Python port did. This is the only storage work with no pure-Dart half.
+///
 /// Everything above this file is pure Dart and testable without a device; this is
 /// the line where the tests stop.
 abstract interface class MacosNative {
@@ -53,6 +70,58 @@ abstract interface class MacosNative {
   /// the window's size to be snapped, and the contract's [PanelDragged] has no
   /// room for one.
   Stream<NativePanelEvent> get events;
+
+  // ---------------------------------------------------------------------------
+  // #15. The three answers below are all *locations or the Keychain*, and the
+  // file header says why each of them could not be answered in Dart.
+  // ---------------------------------------------------------------------------
+
+  /// Where the payload tree was synced: `.app/Contents/Resources`.
+  ///
+  /// **This has to be native.** A packaged application has no repository above
+  /// it and no compile-time idea where its own bundle is; the path only exists
+  /// once AppKit has laid the bundle out. It is also the *only* thing the
+  /// payload needs from the platform — the read itself is `dart:io`, and
+  /// `MacosSharedPayload` does that part with a fake root in a unit test.
+  ///
+  /// The build phase is what puts something there at all; see
+  /// `apps/miaotou_app/macos/Runner.xcodeproj` and ADR-0008.
+  Future<String> resourceRoot();
+
+  /// A directory this app may write, and the only one it should.
+  ///
+  /// **This has to be native.** Under the sandbox the home directory is not
+  /// writable, and `NSApplicationSupportDirectory` is the location the system
+  /// hands a sandboxed app for exactly this. A Dart implementation would have to
+  /// hard-code a path, and a hard-coded path is either wrong on somebody's
+  /// machine or a second place to change when it moves.
+  ///
+  /// The three stores below share this one directory and each owns a file in
+  /// it. They do not share a format.
+  Future<String> containerDirectory();
+
+  /// The value stored under [key] in the system Keychain, or null.
+  ///
+  /// **This has to be native.** `SecItemCopyMatching` is the only way in, and
+  /// the frozen Python port reached it by running `/usr/bin/security` as a
+  /// subprocess — which a sandboxed app cannot do, since the binary is not on
+  /// the allowed surface. See the honesty note on [MacosSecretStore].
+  Future<String?> keychainRead(String key);
+
+  /// Stores [value] under [key], replacing whatever was there.
+  Future<void> keychainWrite(String key, String value);
+
+  /// Removes [key]. Removing a key that is not set is not an error.
+  Future<void> keychainDelete(String key);
+
+  /// The **names** of the keys this app has stored — never their values.
+  ///
+  /// Named separately from [keychainRead] rather than folded into it because a
+  /// settings screen needs the first and must not be able to ask for the second
+  /// by accident: one returns names, the other returns a secret, and a caller
+  /// that wants "which routes are configured" should not have a method that
+  /// hands it the API key while deciding.
+  Future<List<String>> keychainKeys();
 }
 
 /// The panel's own rectangle and the screen it sits on.
@@ -233,6 +302,48 @@ final class MethodChannelMacosNative implements MacosNative {
   @override
   Future<void> setPanelFocusable(bool value) =>
       _channel.invokeMethod<void>('panel.focusable', <String, Object?>{'value': value});
+
+  @override
+  Future<String> resourceRoot() async {
+    // No `?? ''`. A missing answer becomes an empty string, and every caller
+    // joins a path onto it — which yields `/…`, an absolute path out of the
+    // filesystem root, rather than a path inside the bundle. The failure then
+    // arrives as "no such file" from somewhere else entirely, naming a path the
+    // application never intended to read. Answering the question wrongly is worse
+    // than refusing it: the caller is a prompt, and this is a location the
+    // platform is the only thing that knows.
+    final String? root = await _channel.invokeMethod<String>('storage.resourceRoot');
+    if (root == null || root.isEmpty) {
+      throw StateError(
+        'the platform gave no resource root, so there is nowhere to read the '
+        'shared payload from; the build phase that copies it into the bundle is '
+        'the thing to check (see ADR-0008)',
+      );
+    }
+    return root;
+  }
+
+  @override
+  Future<String> containerDirectory() async =>
+      await _channel.invokeMethod<String>('storage.containerDirectory') ?? '';
+
+  @override
+  Future<String?> keychainRead(String key) =>
+      _channel.invokeMethod<String>('keychain.read', <String, Object?>{'key': key});
+
+  @override
+  Future<void> keychainWrite(String key, String value) => _channel.invokeMethod<void>(
+        'keychain.write',
+        <String, Object?>{'key': key, 'value': value},
+      );
+
+  @override
+  Future<void> keychainDelete(String key) =>
+      _channel.invokeMethod<void>('keychain.delete', <String, Object?>{'key': key});
+
+  @override
+  Future<List<String>> keychainKeys() async =>
+      await _channel.invokeListMethod<String>('keychain.keys') ?? const <String>[];
 
   @override
   Stream<NativePanelEvent> get events {

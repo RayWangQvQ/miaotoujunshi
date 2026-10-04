@@ -57,23 +57,41 @@ void main() {
     // Over the scripted Mac rather than a live channel: this file is about the
     // report, and a member that reached a method channel here would be answering
     // "no plugin registered" instead of saying anything about the port.
+    // The storage half needs real temporary directories, and the payload half
+    // needs a payload to read: the fake refuses to invent either, so that a test
+    // cannot quietly read the developer's own container. #15 is why this is no
+    // longer a bare `FakeMacosNative()`.
+    final FakeMacosNative native =
+        fakeMacosWithTemporaryStorage(withPayload: true);
+    addTearDown(() async {
+      await native.close();
+      deleteTemporaryStorage(native);
+    });
+
     final AppHarness harness = AppHarness(
-      capabilities: macosCapabilities(native: FakeMacosNative()),
+      capabilities: macosCapabilities(native: native),
     );
     await pumpApplication(tester, harness);
     await openDiagnostics(tester);
 
-    // What start-up is allowed to ask, on this port, after #14:
-    //   answered     — the target window, the recogniser, the panel's event stream
+    // What start-up is allowed to ask, on this port, after #15 — which is to say
+    // every member except the one that writes into somebody else's window:
+    //   answered     — the target window, the recogniser, the panel's event
+    //                  stream, and all six storage probes: the payload listing,
+    //                  the preferences and secret key sets, the knowledge notes
+    //                  and contacts, and the memory store's status
     //   unsupported  — the accessibility tree, permanently (ADR-0009 decision 2)
-    //   not yet built— one member of each of #15's six storage capabilities
+    //   not yet built— nothing; #15 was the last ticket to own a refusal here
     //   unasked      — `textInject.inject`: start-up never writes into somebody
     //                  else's window, so asking would be the defect
-    expect(find.textContaining('已应答 3'), findsOneWidget);
+    //
+    // The 3/2/6/1 of #14 became 9/2/0/1. The six that used to be "not yet built"
+    // now answer, which is the whole of this ticket.
+    expect(find.textContaining('已应答 9'), findsOneWidget);
     expect(find.textContaining('永久不支持 2'), findsOneWidget);
-    expect(find.textContaining('尚未实现 6'), findsOneWidget);
+    expect(find.textContaining('尚未实现 0'), findsOneWidget);
     expect(find.textContaining('异常 0'), findsOneWidget);
-    expect(find.text('已应答'), findsNWidgets(3));
+    expect(find.text('已应答'), findsNWidgets(9));
     expect(find.text('textInject.inject'), findsOneWidget);
     expect(find.textContaining('未询问 1'), findsOneWidget);
 

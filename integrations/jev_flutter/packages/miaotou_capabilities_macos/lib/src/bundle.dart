@@ -1,8 +1,13 @@
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 
 import 'capabilities.dart';
+import 'knowledge.dart';
+import 'memory.dart';
 import 'native.dart';
 import 'pacing.dart';
+import 'payload.dart';
+import 'preferences.dart';
+import 'secrets.dart';
 
 /// Every capability this port answers for, together.
 ///
@@ -19,6 +24,13 @@ import 'pacing.dart';
 /// take the panel out of its own shot, so the two cannot be independent objects,
 /// and a bundle that let a caller pass one of each would be a way to wire a
 /// capture that photographs the panel.
+///
+/// The five storage members are all built over the one seam and share nothing but
+/// its container directory. Each owns its own file in it — `preferences.json`,
+/// `knowledge.json`, `memory.json` — and the Keychain, which owns nothing on disk
+/// at all. They are separate objects rather than one "storage" object because the
+/// contract has five capabilities and a bundle that merged them would be a place
+/// where answering for one means being asked about all five.
 CapabilitySet macosCapabilities({
   MacosNative? native,
   CapturePacing? pacing,
@@ -31,10 +43,10 @@ CapabilitySet macosCapabilities({
     ocr: MacosOcr(seam),
     textInject: MacosTextInject(seam),
     floatingPanel: panel,
-    sharedPayload: const MacosSharedPayload(),
-    preferences: const MacosPreferences(),
-    secretStore: const MacosSecretStore(),
-    knowledgeStore: const MacosKnowledgeStore(),
-    memoryStore: const MacosMemoryStore(),
+    sharedPayload: MacosSharedPayload(seam),
+    preferences: MacosPreferences.inContainer(seam),
+    secretStore: MacosSecretStore(seam),
+    knowledgeStore: MacosKnowledgeStore.inContainer(seam),
+    memoryStore: MacosMemoryStore.inContainer(seam),
   );
 }
