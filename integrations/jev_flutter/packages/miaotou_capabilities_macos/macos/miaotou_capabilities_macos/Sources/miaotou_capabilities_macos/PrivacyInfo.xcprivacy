@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Nothing is collected and nothing leaves the device. The manifest says so
+	  because a screenshot of somebody's conversation is about as sensitive as a
+	  frame gets, and PRIVACY.md promises the pixels never reach disk: they are
+	  read off the window, handed to the recogniser in memory, and dropped.
+	-->
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyTracking</key>
+	<false/>
+</dict>
+</plist>

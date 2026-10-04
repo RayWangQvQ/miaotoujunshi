@@ -1,30 +1,50 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
+
+import 'native.dart';
+import 'pacing.dart';
+import 'placement.dart';
 
 /// macOS's answer for screen capture.
 ///
 /// Owned by #14. The mechanism this port keeps is ScreenCaptureKit: Quartz's
 /// `CGWindowListCreateImage` was obsoleted in macOS 15, so that rewrite is
-/// required whether or not the port migrates at all (ADR-0007 decision 7).
+/// required whether or not the port migrates at all (ADR-0007 decision 7). It is
+/// also the only mechanism that answers the question the product is built on —
+/// **a window can be captured while something else is in front of it**, which is
+/// the whole reason the panel may float above the chat.
 final class MacosScreenCapture implements ScreenCapture {
-  const MacosScreenCapture();
+  MacosScreenCapture(this._native, this._panel, {CapturePacing? pacing})
+      : pacing = pacing ?? CapturePacing();
 
-  static const String _platform = 'macOS';
+  final MacosNative _native;
+
+  /// The panel this capture has to get out of its own way for.
+  final MacosFloatingPanel _panel;
+
+  /// The rate limit, the backoff and the watchdog. Exposed because they are the
+  /// three numbers a support question is actually about.
+  final CapturePacing pacing;
 
   @override
-  Future<String?> findTargetWindow() async => notYetBuilt(
-        platform: _platform,
-        member: 'ScreenCapture.findTargetWindow',
-        ticket: '#14',
-      );
+  Future<String?> findTargetWindow() => _native.findTargetWindow();
 
   @override
-  Future<CaptureOutcome> capture({String? targetWindowId}) async => notYetBuilt(
-        platform: _platform,
-        member: 'ScreenCapture.capture',
-        ticket: '#14',
-      );
+  Future<CaptureOutcome> capture({String? targetWindowId}) => pacing.run(() async {
+        // The panel is hidden for the duration of the shot, not merely for the
+        // pixels: a window captured with the panel on top of it returns the panel,
+        // and the conversation underneath is then analysed as if the user had said
+        // it. The restore is in a `finally` because a capture that fails, hangs or
+        // trips the watchdog must still give the panel back.
+        await _panel.hideForCapture();
+        try {
+          return await _native.capture(targetWindowId: targetWindowId);
+        } finally {
+          await _panel.restoreAfterCapture();
+        }
+      });
 }
 
 /// macOS's answer for reading another application's view of itself.
@@ -59,76 +79,136 @@ final class MacosUiTreeReader implements UiTreeReader {
 /// macOS's answer for OCR.
 ///
 /// Owned by #14. Backed by Apple Vision.
+///
+/// **Recognition only.** Deciding who said a line is geometry, and geometry is
+/// calibrated per window, so it lives in `perception.dart` beside the numbers it
+/// was measured against rather than here beside the engine. The two are ported
+/// together and tested together; splitting them would leave the thresholds with
+/// no way to be exercised.
 final class MacosOcr implements Ocr {
-  const MacosOcr();
+  const MacosOcr(this._native);
 
-  static const String _platform = 'macOS';
+  final MacosNative _native;
 
   @override
   Future<List<OcrLine>> recognize(
     CaptureFrame frame, {
     required List<String> languages,
-  }) async =>
-      notYetBuilt(
-        platform: _platform,
-        member: 'Ocr.recognize',
-        ticket: '#14',
-      );
+  }) =>
+      _native.recognize(frame, languages: languages);
 }
 
 /// macOS's answer for injecting text.
 ///
-/// Owned by #14. Verifies the landing by reading `AXValue` back.
+/// Owned by #14. Writes into the target's accessibility text control and reads
+/// `AXValue` back before reporting success, because the contract's whole point is
+/// that "I wrote it" is not an answer (ADR-0009 decision 5).
+///
+/// **There is no send path, and there is no member that could become one.** No
+/// keystroke is synthesised, no `AXPress` is performed, and the return key is
+/// never posted — the guard test in the application scans the Swift for all three
+/// so that adding one is a red test rather than a code review's memory.
 final class MacosTextInject implements TextInject {
-  const MacosTextInject();
+  const MacosTextInject(this._native);
 
-  static const String _platform = 'macOS';
+  final MacosNative _native;
 
   @override
-  Future<InjectResult> inject(String text, {required InjectTarget target}) async =>
-      notYetBuilt(
-        platform: _platform,
-        member: 'TextInject.inject',
-        ticket: '#14',
-      );
+  Future<InjectResult> inject(String text, {required InjectTarget target}) =>
+      _native.inject(text, target: target);
 }
 
 /// macOS's answer for the floating window.
 ///
-/// Owned by #14. The panel is an `NSPanel` with `.nonactivatingPanel`, which is
-/// what the gate-B experiment on a real device established (ADR-0007 milestone
-/// M0).
+/// Owned by #14. The window is an `NSPanel` with `.nonactivatingPanel` at
+/// `.floating`, which is what gate experiment B established on a real device
+/// (ADR-0007 milestone M0): the panel can be clicked and can host a Chinese input
+/// method while the chat stays the frontmost application.
+///
+/// What lives here and what lives natively is a split with a reason. **The window
+/// is native** — AppKit owns its level, its style mask and whether it may become
+/// key, and none of those are things Dart can express. **The arithmetic is Dart** —
+/// which edge a drag landed nearest to, and where the panel was last put, are
+/// decisions that can be wrong in ways a device is the only way to observe, so
+/// they are made where a test can reach them.
 final class MacosFloatingPanel implements FloatingPanel {
-  const MacosFloatingPanel();
+  MacosFloatingPanel(this._native, {PanelPositionMemory? memory})
+      : _memory = memory ?? PanelPositionMemory();
 
-  static const String _platform = 'macOS';
+  final MacosNative _native;
+  final PanelPositionMemory _memory;
 
-  Never _refuse(String member) => notYetBuilt(
-        platform: _platform,
-        member: member,
-        ticket: '#14',
+  /// Whether the panel was on screen when the capture asked it to leave, and so
+  /// whether it has to be given back. Restoring a panel the user had closed would
+  /// be a window that reappears by itself.
+  bool _upBeforeCapture = false;
+
+  @override
+  Future<void> show({required PanelPlacement placement}) async {
+    ScreenRect? at;
+    if (placement.anchor == PanelAnchor.free) {
+      final PanelGeometry geometry = await _native.panelGeometry();
+      at = _memory.resolve(
+        placement: placement,
+        screen: geometry.screen,
+        size: geometry.window,
       );
+    }
+    await _native.showPanel(placement: placement, at: at);
+  }
 
   @override
-  Future<void> show({required PanelPlacement placement}) async =>
-      _refuse('FloatingPanel.show');
+  Future<void> hide() async {
+    await _native.hidePanel();
+  }
 
   @override
-  Future<void> hide() async => _refuse('FloatingPanel.hide');
+  Future<void> hideForCapture() async {
+    _upBeforeCapture = await _native.hidePanel();
+  }
 
   @override
-  Future<void> hideForCapture() async => _refuse('FloatingPanel.hideForCapture');
+  Future<void> restoreAfterCapture() async {
+    if (!_upBeforeCapture) {
+      return;
+    }
+    _upBeforeCapture = false;
+    await _native.restorePanel();
+  }
 
   @override
-  Future<void> restoreAfterCapture() async =>
-      _refuse('FloatingPanel.restoreAfterCapture');
+  Future<void> setFocusable(bool value) => _native.setPanelFocusable(value);
 
   @override
-  Future<void> setFocusable(bool value) async =>
-      _refuse('FloatingPanel.setFocusable');
+  late final Stream<PanelEvent> events = _reduce();
 
-  @override
-  Stream<PanelEvent> get events => _refuse('FloatingPanel.events');
+  Stream<PanelEvent> _reduce() {
+    final StreamController<PanelEvent> out = StreamController<PanelEvent>();
+    _native.events.listen(
+      (NativePanelEvent event) async {
+        switch (event) {
+          case NativePanelDragged(:final ScreenRect window, :final ScreenRect screen):
+            final ScreenRect landed = EdgeSnap.snap(window, screen);
+            _memory.remember(landed);
+            // The snap is applied by asking for the window again rather than by
+            // telling Dart where it went: the window is the only thing that knows
+            // where it actually is, and a report of where it *should* be is not
+            // what the contract publishes.
+            await _native.showPanel(
+              placement: const PanelPlacement(anchor: PanelAnchor.free),
+              at: landed,
+            );
+            out.add(PanelDragged(x: landed.left, y: landed.top));
+          case NativePanelTapped(:final String action):
+            out.add(PanelTapped(action: action));
+          case NativePanelReadOnly(:final bool readOnly):
+            out.add(PanelReadOnlyChanged(readOnly: readOnly));
+        }
+      },
+      onError: out.addError,
+    );
+    return out.stream;
+  }
 }
 
 /// macOS's answer for the shared payload.

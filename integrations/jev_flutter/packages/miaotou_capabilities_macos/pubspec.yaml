@@ -9,8 +9,29 @@ environment:
 resolution: workspace
 
 dependencies:
+  # The seam is a method channel, so this package is a Flutter package now rather
+  # than a pure Dart one. What that costs is the cheapest test story in the tree
+  # (`dart test` with no Flutter binding), and what it buys is a real macOS
+  # implementation at all. The pure-Dart work — the pacing schedule, the edge
+  # snapping, the perception pipeline — is still exercised by `flutter test`,
+  # which runs the same Dart VM with a binding attached and nothing else.
+  flutter:
+    sdk: flutter
   miaotou_capabilities:
     path: ../miaotou_capabilities
 
 dev_dependencies:
+  flutter_test:
+    sdk: flutter
   test: ^1.25.0
+
+# The native half of this port (#14) is a plugin rather than code in the
+# application's shell. ADR-0009 makes this package *the* answer for macOS, and an
+# answer living in `apps/miaotou_app/macos/` could not be read, tested or reused
+# on its own. It registers for macOS only, so the Android and Windows builds of
+# the same application never compile it.
+flutter:
+  plugin:
+    platforms:
+      macos:
+        pluginClass: MiaotouMacosPlugin

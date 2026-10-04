@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 import 'package:miaotou_capabilities/testing.dart';
 import 'package:miaotou_capabilities_macos/miaotou_capabilities_macos.dart';
+import 'package:miaotou_capabilities_macos/testing.dart';
 
 import 'support/harness.dart';
 
@@ -53,14 +54,28 @@ void main() {
   testWidgets('a real platform package reports its refusals through the same shell', (
     WidgetTester tester,
   ) async {
-    final AppHarness harness = AppHarness(capabilities: macosCapabilities());
+    // Over the scripted Mac rather than a live channel: this file is about the
+    // report, and a member that reached a method channel here would be answering
+    // "no plugin registered" instead of saying anything about the port.
+    final AppHarness harness = AppHarness(
+      capabilities: macosCapabilities(native: FakeMacosNative()),
+    );
     await pumpApplication(tester, harness);
     await openDiagnostics(tester);
 
-    expect(find.textContaining('已应答 0'), findsOneWidget);
+    // What start-up is allowed to ask, on this port, after #14:
+    //   answered     — the target window, the recogniser, the panel's event stream
+    //   unsupported  — the accessibility tree, permanently (ADR-0009 decision 2)
+    //   not yet built— one member of each of #15's six storage capabilities
+    //   unasked      — `textInject.inject`: start-up never writes into somebody
+    //                  else's window, so asking would be the defect
+    expect(find.textContaining('已应答 3'), findsOneWidget);
     expect(find.textContaining('永久不支持 2'), findsOneWidget);
-    expect(find.textContaining('尚未实现 9'), findsOneWidget);
-    expect(find.text('尚未实现'), findsNWidgets(9));
+    expect(find.textContaining('尚未实现 6'), findsOneWidget);
+    expect(find.textContaining('异常 0'), findsOneWidget);
+    expect(find.text('已应答'), findsNWidgets(3));
+    expect(find.text('textInject.inject'), findsOneWidget);
+    expect(find.textContaining('未询问 1'), findsOneWidget);
 
     // The two permanent refusals are the accessibility tree, exactly as ADR-0009
     // decision 2 describes it.

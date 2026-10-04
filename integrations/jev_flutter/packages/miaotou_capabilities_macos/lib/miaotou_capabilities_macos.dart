@@ -1,8 +1,10 @@
 /// The macOS answer to every member of the capability contract.
 ///
-/// The package declares all ten capabilities, and every member of each. Most of
-/// them refuse for now — the work is in #14 and #15 — and one of them refuses
-/// permanently: a desktop port has no accessibility node tree to read, so
+/// The package declares all ten capabilities, and every member of each. Six of
+/// them are built (#14): capture, OCR, injection and the floating panel, with
+/// their timing, their edge snapping and their perception pipeline. Four refuse
+/// as work in flight (#15 — the storage quartet and the payload read), and one
+/// refuses permanently: a desktop port has no accessibility node tree to read, so
 /// `UiTreeReader` throws `UnsupportedError` here and in the Windows package alike
 /// (ADR-0009 decision 2).
 ///
@@ -13,3 +15,7 @@ library;
 
 export 'src/bundle.dart';
 export 'src/capabilities.dart';
+export 'src/native.dart';
+export 'src/pacing.dart';
+export 'src/perception.dart';
+export 'src/placement.dart';

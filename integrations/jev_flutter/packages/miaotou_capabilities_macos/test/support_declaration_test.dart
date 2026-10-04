@@ -1,7 +1,10 @@
+import 'package:flutter_test/flutter_test.dart';
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 import 'package:miaotou_capabilities/testing.dart';
 import 'package:miaotou_capabilities_macos/miaotou_capabilities_macos.dart';
-import 'package:test/test.dart';
+import 'package:miaotou_capabilities_macos/testing.dart';
+
+
 
 /// What the macOS implementation package promises.
 ///
@@ -13,7 +16,11 @@ import 'package:test/test.dart';
 /// does not build while a member is missing — and these tests are what make the
 /// second half observable.
 void main() {
-  final CapabilitySet capabilities = macosCapabilities();
+  // The scripted Mac, not a real one: this file is about what the port *answers*,
+  // and a member that reached a method channel here would fail for want of a
+  // plugin rather than for want of an implementation. `native_channel_test.dart`
+  // is where the channel itself is exercised.
+  final CapabilitySet capabilities = macosCapabilities(native: FakeMacosNative());
 
   test('every member of the contract answers for itself', () async {
     final List<String> defects = <String>[];

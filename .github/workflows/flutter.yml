@@ -67,6 +67,13 @@ jobs:
       # loop over every package is the guard: a new package that ships without
       # tests would otherwise be silently untested, and a test directory that
       # disappears would be silently ignored.
+      #
+      # **Which tool runs a package's tests is read from its pubspec, not listed
+      # here.** A package that depends on the Flutter SDK is a Flutter package:
+      # `dart test` runs on a VM with no `dart:ui`, so a seam that reaches a
+      # method channel cannot even be *loaded* there. Hard-coding the list would
+      # mean the next package to grow native code silently stopped being tested —
+      # and "it was skipped" is the failure mode this job exists to prevent.
       - name: Test every package
         run: |
           set -euo pipefail
@@ -78,7 +85,11 @@ jobs:
           done
           for package in packages/*/; do
             echo "::group::${package}"
-            (cd "${package}" && dart test)
+            if grep -qE '^[[:space:]]+sdk:[[:space:]]*flutter[[:space:]]*$' "${package}pubspec.yaml"; then
+              (cd "${package}" && flutter test)
+            else
+              (cd "${package}" && dart test)
+            fi
             echo "::endgroup::"
           done
 
