@@ -132,11 +132,25 @@ final class MacosTextInject implements TextInject {
 /// decisions that can be wrong in ways a device is the only way to observe, so
 /// they are made where a test can reach them.
 final class MacosFloatingPanel implements FloatingPanel {
-  MacosFloatingPanel(this._native, {PanelPositionMemory? memory})
-      : _memory = memory ?? PanelPositionMemory();
+  MacosFloatingPanel(
+    this._native, {
+    PanelPositionMemory? memory,
+    this.hideSettle = const Duration(milliseconds: 120),
+  }) : _memory = memory ?? PanelPositionMemory();
 
   final MacosNative _native;
   final PanelPositionMemory _memory;
+
+  /// How long the compositor is given to actually drop the panel's frame.
+  ///
+  /// Ordering a window out is a request, not an event: a capture fired in the same
+  /// tick photographs a panel that is on its way off the screen, and the
+  /// conversation underneath is then read with the panel's own header in it. The
+  /// value is the Android port's measured 120 ms **carried over, not measured
+  /// here** — this machine has no window server to measure on, and guessing a
+  /// smaller number would be a claim nobody checked. It is a constructor argument
+  /// so #16 can replace it with a measurement instead of an inheritance.
+  final Duration hideSettle;
 
   /// Whether the panel was on screen when the capture asked it to leave, and so
   /// whether it has to be given back. Restoring a panel the user had closed would
@@ -165,6 +179,9 @@ final class MacosFloatingPanel implements FloatingPanel {
   @override
   Future<void> hideForCapture() async {
     _upBeforeCapture = await _native.hidePanel();
+    if (_upBeforeCapture) {
+      await Future<void>.delayed(hideSettle);
+    }
   }
 
   @override

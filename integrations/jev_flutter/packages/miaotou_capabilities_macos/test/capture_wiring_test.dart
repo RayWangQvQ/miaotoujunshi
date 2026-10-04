@@ -52,6 +52,23 @@ void main() {
     expect(native.panelUp, isTrue);
   });
 
+  test('the compositor is given time to actually drop the panel\'s frame', () async {
+    native.panelUp = true;
+    final Stopwatch watch = Stopwatch()..start();
+    int capturedAt = -1;
+
+    await capture.capture(targetWindowId: '77');
+    capturedAt = watch.elapsedMilliseconds;
+
+    expect(
+      capturedAt,
+      greaterThanOrEqualTo(100),
+      reason: 'ordering a window out is a request. A capture fired in the same '
+          'tick photographs a panel that is on its way off the screen, and the '
+          'conversation is then read with the panel\'s own header in it',
+    );
+  }, timeout: const Timeout(Duration(seconds: 5)));
+
   test('a panel that was already down is not brought back', () async {
     native.panelUp = false;
 
