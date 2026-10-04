@@ -28,12 +28,6 @@ PACKAGE = HERE.parents[1]  # tool/double_run → tool → miaotou_app
 SOURCES = {
     'injection': ('#10', 'suspectInjectionTexts / otherRecentTexts / sanitizeCandidateTexts',
                   'jev_windows/core/draft.py: _suspects / _her_recent / _sanitize'),
-    'advice': ('#7', 'parseAdvice', 'jev_mac/core.py: parse_advice'),
-    'rewrite': ('#7', 'parseRewrite', 'jev_mac/core.py: parse_rewrite'),
-    'scoring': ('#7', 'applyScores', 'jev_mac/ranking.py: apply_scores'),
-    'chat_csv': ('#8', 'readChatCsv', 'jev_mac/trend.py: load_csv'),
-    'profile': ('#9', 'validateProfile / profileContext',
-                'jev_mac/experience.py: validate_profile / profile_context'),
     'update': ('#10', 'newerRelease', 'jev_windows/app/update.py: parse_version + check_latest'),
     'csv_grid': ('#8', 'writeCsvGrid / parseCsvGrid (round trip)', "Python's csv module"),
 }

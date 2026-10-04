@@ -10,8 +10,8 @@ in this repository — the Skill layer and the glue code of the integrations.
 The frozen Android and Windows ports under `integrations/` are derivative works
 of the upstream Jev Chat assistant and each carries its own LICENSE and
 attribution files. They are **not** covered by the root LICENSE. The promoted
-Flutter macOS implementation is repository-authored code covered by the root
-LICENSE.
+Flutter implementation translates derived logic from all three upstream ports;
+those attribution obligations move into this NOTICE rather than lapsing.
 
 Written in this repository: the repository tooling under `scripts/`, the ports
 under `integrations/`, `tests/`, the root governance files (`README.md`, `NOTICE`,
@@ -40,6 +40,7 @@ repository is app-layer material, not upstream's documentation directory.
 | --- | --- | --- | --- |
 | `integrations/jev_android` | [jev-chat/jev-chat-jarvis](https://github.com/jev-chat/jev-chat-jarvis) | Finderchangchang and the jev-chat contributors | `integrations/jev_android/NOTICE`, `integrations/jev_android/LICENSE` |
 | `integrations/jev_windows` | [jev-chat/jev-chat-windows](https://github.com/jev-chat/jev-chat-windows) | rezoch340 and the jev-chat contributors; the Jev judging kernel and its prompt wording remain Copyright (c) Finderchangchang and the jev-chat contributors | `integrations/jev_windows/NOTICE`, `integrations/jev_windows/LICENSE` |
+| `integrations/jev_flutter` | The three upstream ports named in this table, including [jev-chat/jev-chat-jarvis-mac](https://github.com/jev-chat/jev-chat-jarvis-mac) at `afb58cf53d098e314a1368d15e13ab5330015688` | Finderchangchang, rezoch340, eatmoreduck and the jev-chat contributors | This `NOTICE` and the root `LICENSE` |
 
 Distributing any of these ports requires shipping that port's LICENSE and NOTICE
 alongside it, and stating the origin — the wording each NOTICE already recommends
@@ -49,7 +50,8 @@ is the wording to use.
 
 The root is MIT, but **the applicable licence differs per release artifact**:
 
-- `integrations/jev_android` and the promoted Flutter macOS application: MIT.
+- `integrations/jev_android` and the promoted Flutter macOS application: MIT,
+  with the upstream notices above retained for their derivative logic.
 - The `integrations/jev_windows` release package (the zip built by PyInstaller):
   **GPLv3 as a whole**. It bundles PySide6-Fluent-Widgets (GPLv3 — free for
   non-commercial use; commercial use requires a separate licence purchased from

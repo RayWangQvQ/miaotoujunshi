@@ -3,7 +3,7 @@
 //
 // It reads the shared fixtures, runs every one of them through the Dart domain
 // and prints one canonical conclusion per area as JSON on stdout, for
-// `compare.py` to set against the Python ports' own conclusions.
+// `compare.py` to set against the remaining Python port's conclusions.
 //
 // "Canonical" is the whole design: the two sides must not be compared on their
 // own data structures but on the decision each one reached — which candidates

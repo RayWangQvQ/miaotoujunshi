@@ -28,10 +28,11 @@ UI element is 「喵球」. **They are layered on purpose — do not mix them.**
 
 ## Origin, attribution and licensing
 
-The frozen Android and Windows ports are derivative works of the upstream Jev
-Chat assistant and ship their own LICENSE and attribution files. The promoted
-Flutter macOS implementation is repository-authored; the root `LICENSE` covers
-it and the other code written in this repository.
+All three application implementations contain derivative logic from the
+upstream Jev Chat assistants. The frozen Android and Windows ports ship their
+own LICENSE and attribution files; the promoted Flutter macOS implementation's
+translated attribution is retained in the root `NOTICE`. See that file for the
+MIT/GPL split that applies to each artifact.
 
 **Mind the licence split**: the root is MIT, but the `integrations/jev_windows`
 release package is **GPLv3 as a whole**, because it bundles

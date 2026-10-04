@@ -2,10 +2,14 @@
 
 **Migration instrument. Delete this directory with the ports it compares.**
 
-It exists for one question: before a Python port is deleted, is there any
+It exists for one question: before a remaining Python port is deleted, is there any
 fixture on which the Dart domain reaches a different conclusion than the code
 that is about to be deleted? It answers that by running one fixture set through
 both and comparing the conclusions, area by area.
+
+The macOS comparisons finished before `archive/jev-mac-python-final` and were
+removed with that port. The instrument now retains only the comparisons against
+the frozen Windows Python port.
 
 It is not a test suite and it is not a permanent guard. It has no place in CI:
 it compares against code that is scheduled for deletion, so it can only be run
@@ -41,11 +45,6 @@ is the mutation the instrument is given before it is trusted.
 | Area | Ticket | Dart | Python |
 | --- | --- | --- | --- |
 | `injection` | #10 | `suspectInjectionTexts` / `otherRecentTexts` / `sanitizeCandidateTexts` | `jev_windows/core/draft.py`: `_suspects` / `_her_recent` / `_sanitize` |
-| `advice` | #7 | `parseAdvice` | `jev_mac/core.py`: `parse_advice` |
-| `rewrite` | #7 | `parseRewrite` | `jev_mac/core.py`: `parse_rewrite` |
-| `scoring` | #7 | `applyScores` | `jev_mac/ranking.py`: `apply_scores` |
-| `chat_csv` | #8 | `readChatCsv` | `jev_mac/trend.py`: `load_csv` |
-| `profile` | #9 | `validateProfile` / `profileContext` | `jev_mac/experience.py`: `validate_profile` / `profile_context` |
 | `update` | #10 | `newerRelease` | `jev_windows/app/update.py`: `parse_version` |
 | `csv_grid` | #8 | `writeCsvGrid` / `parseCsvGrid` | the `csv` module's round trip |
 
@@ -68,7 +67,7 @@ accept/reject and the values that follow from it travel between the two sides.
 
 ## When it is deleted
 
-With the Python ports, in the tickets that retire them (#16, #20, #24). Nothing
-else in the repository imports this directory; deleting it cannot break a build,
-which is why the check that it still runs is a person running the command above
-rather than a job that would fail when the ports go.
+With the Windows Python port in its retirement ticket (#20). Nothing else in the
+repository imports this directory; deleting it cannot break a build, which is
+why the check that it still runs is a person running the command above rather
+than a job that would fail when the port goes.
