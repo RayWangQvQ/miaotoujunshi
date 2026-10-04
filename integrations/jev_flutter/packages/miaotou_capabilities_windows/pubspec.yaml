@@ -9,6 +9,7 @@ environment:
 resolution: workspace
 
 dependencies:
+  ffi: ^2.1.4
   miaotou_capabilities:
     path: ../miaotou_capabilities
 

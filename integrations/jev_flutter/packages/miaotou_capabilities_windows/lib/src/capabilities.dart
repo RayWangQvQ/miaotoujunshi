@@ -2,29 +2,38 @@ import 'dart:typed_data';
 
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 
+import 'native.dart';
+import 'pacing.dart';
+
 /// Windows's answer for screen capture.
 ///
 /// Owned by #17. Capture runs inside the out-of-process native bridge around
 /// Windows Graphics Capture (ADR-0013). It is the largest hand-written surface
 /// in the migration and the port most likely to overrun.
 final class WindowsScreenCapture implements ScreenCapture {
-  const WindowsScreenCapture();
+  WindowsScreenCapture(this._native, {WindowsCapturePacing? pacing})
+    : pacing = pacing ?? WindowsCapturePacing();
 
-  static const String _platform = 'Windows';
+  final WindowsNative _native;
+  final WindowsCapturePacing pacing;
 
-  @override
-  Future<String?> findTargetWindow() async => notYetBuilt(
-        platform: _platform,
-        member: 'ScreenCapture.findTargetWindow',
-        ticket: '#17',
-      );
+  static const int bridgeUnavailableCode = -3;
 
   @override
-  Future<CaptureOutcome> capture({String? targetWindowId}) async => notYetBuilt(
-        platform: _platform,
-        member: 'ScreenCapture.capture',
-        ticket: '#17',
-      );
+  Future<String?> findTargetWindow() => _native.findTargetWindow();
+
+  @override
+  Future<CaptureOutcome> capture({String? targetWindowId}) =>
+      pacing.run(() async {
+        try {
+          return await _native.capture(targetWindowId: targetWindowId);
+        } on WindowsBridgeUnavailable catch (error) {
+          return CaptureFailed(
+            code: bridgeUnavailableCode,
+            message: 'Windows 原生桥已停止：${error.message}',
+          );
+        }
+      });
 }
 
 /// Windows's answer for reading another application's view of itself.
@@ -43,17 +52,17 @@ final class WindowsUiTreeReader implements UiTreeReader {
 
   @override
   Future<ChatUiSnapshot?> readActiveChat() async => unsupportedOnThisPlatform(
-        platform: _platform,
-        member: 'UiTreeReader.readActiveChat',
-        reason: _reason,
-      );
+    platform: _platform,
+    member: 'UiTreeReader.readActiveChat',
+    reason: _reason,
+  );
 
   @override
   Stream<ChatUiSnapshot> get snapshots => unsupportedOnThisPlatform(
-        platform: _platform,
-        member: 'UiTreeReader.snapshots',
-        reason: _reason,
-      );
+    platform: _platform,
+    member: 'UiTreeReader.snapshots',
+    reason: _reason,
+  );
 }
 
 /// Windows's answer for OCR.
@@ -63,20 +72,15 @@ final class WindowsUiTreeReader implements UiTreeReader {
 /// rather than in Dart (ADR-0009 decision 6). DBNet's post-processing needs
 /// contour detection and a perspective crop with no Dart equivalent.
 final class WindowsOcr implements Ocr {
-  const WindowsOcr();
+  const WindowsOcr(this._native);
 
-  static const String _platform = 'Windows';
+  final WindowsNative _native;
 
   @override
   Future<List<OcrLine>> recognize(
     CaptureFrame frame, {
     required List<String> languages,
-  }) async =>
-      notYetBuilt(
-        platform: _platform,
-        member: 'Ocr.recognize',
-        ticket: '#17',
-      );
+  }) => _native.recognize(frame, languages: languages);
 }
 
 /// Windows's answer for injecting text.
@@ -84,17 +88,13 @@ final class WindowsOcr implements Ocr {
 /// Owned by #17. Verifies the landing by reading the field's text back through
 /// the same native helper that injected it.
 final class WindowsTextInject implements TextInject {
-  const WindowsTextInject();
+  const WindowsTextInject(this._native);
 
-  static const String _platform = 'Windows';
+  final WindowsNative _native;
 
   @override
-  Future<InjectResult> inject(String text, {required InjectTarget target}) async =>
-      notYetBuilt(
-        platform: _platform,
-        member: 'TextInject.inject',
-        ticket: '#17',
-      );
+  Future<InjectResult> inject(String text, {required InjectTarget target}) =>
+      _native.inject(text, target: target);
 }
 
 /// Windows's answer for the floating window.
@@ -106,11 +106,8 @@ final class WindowsFloatingPanel implements FloatingPanel {
 
   static const String _platform = 'Windows';
 
-  Never _refuse(String member) => notYetBuilt(
-        platform: _platform,
-        member: member,
-        ticket: '#18',
-      );
+  Never _refuse(String member) =>
+      notYetBuilt(platform: _platform, member: member, ticket: '#18');
 
   @override
   Future<void> show({required PanelPlacement placement}) async =>
@@ -120,7 +117,8 @@ final class WindowsFloatingPanel implements FloatingPanel {
   Future<void> hide() async => _refuse('FloatingPanel.hide');
 
   @override
-  Future<void> hideForCapture() async => _refuse('FloatingPanel.hideForCapture');
+  Future<void> hideForCapture() async =>
+      _refuse('FloatingPanel.hideForCapture');
 
   @override
   Future<void> restoreAfterCapture() async =>
@@ -145,17 +143,17 @@ final class WindowsSharedPayload implements SharedPayload {
 
   @override
   Future<Uint8List> read(String repoRelativePath) async => notYetBuilt(
-        platform: _platform,
-        member: 'SharedPayload.read',
-        ticket: '#19',
-      );
+    platform: _platform,
+    member: 'SharedPayload.read',
+    ticket: '#19',
+  );
 
   @override
   Future<List<String>> list(String repoRelativeDir) async => notYetBuilt(
-        platform: _platform,
-        member: 'SharedPayload.list',
-        ticket: '#19',
-      );
+    platform: _platform,
+    member: 'SharedPayload.list',
+    ticket: '#19',
+  );
 }
 
 /// Windows's answer for small remembered values.
@@ -167,14 +165,12 @@ final class WindowsPreferences implements Preferences {
 
   static const String _platform = 'Windows';
 
-  Never _refuse(String member) => notYetBuilt(
-        platform: _platform,
-        member: member,
-        ticket: '#19',
-      );
+  Never _refuse(String member) =>
+      notYetBuilt(platform: _platform, member: member, ticket: '#19');
 
   @override
-  Future<String?> getString(String key) async => _refuse('Preferences.getString');
+  Future<String?> getString(String key) async =>
+      _refuse('Preferences.getString');
 
   @override
   Future<bool?> getBool(String key) async => _refuse('Preferences.getBool');
@@ -217,11 +213,8 @@ final class WindowsSecretStore implements SecretStore {
 
   static const String _platform = 'Windows';
 
-  Never _refuse(String member) => notYetBuilt(
-        platform: _platform,
-        member: member,
-        ticket: '#19',
-      );
+  Never _refuse(String member) =>
+      notYetBuilt(platform: _platform, member: member, ticket: '#19');
 
   @override
   Future<String?> read(String key) async => _refuse('SecretStore.read');
@@ -246,11 +239,8 @@ final class WindowsKnowledgeStore implements KnowledgeStore {
 
   static const String _platform = 'Windows';
 
-  Never _refuse(String member) => notYetBuilt(
-        platform: _platform,
-        member: member,
-        ticket: '#19',
-      );
+  Never _refuse(String member) =>
+      notYetBuilt(platform: _platform, member: member, ticket: '#19');
 
   @override
   Future<List<KnowledgeNote>> notes() async => _refuse('KnowledgeStore.notes');
@@ -271,8 +261,7 @@ final class WindowsKnowledgeStore implements KnowledgeStore {
   Future<KnowledgeContact?> findContact({
     required String title,
     required String packageName,
-  }) async =>
-      _refuse('KnowledgeStore.findContact');
+  }) async => _refuse('KnowledgeStore.findContact');
 
   @override
   Future<void> saveContact(KnowledgeContact contact) async =>
@@ -283,15 +272,16 @@ final class WindowsKnowledgeStore implements KnowledgeStore {
       _refuse('KnowledgeStore.deleteContact');
 
   @override
-  Future<void> appendLog(String contactId, List<KnowledgeLogEntry> entries) async =>
-      _refuse('KnowledgeStore.appendLog');
+  Future<void> appendLog(
+    String contactId,
+    List<KnowledgeLogEntry> entries,
+  ) async => _refuse('KnowledgeStore.appendLog');
 
   @override
   Future<List<KnowledgeLogEntry>> recentLog(
     String contactId, {
     required int limit,
-  }) async =>
-      _refuse('KnowledgeStore.recentLog');
+  }) async => _refuse('KnowledgeStore.recentLog');
 
   @override
   Future<void> clearAll() async => _refuse('KnowledgeStore.clearAll');
@@ -306,11 +296,8 @@ final class WindowsMemoryStore implements MemoryStore {
 
   static const String _platform = 'Windows';
 
-  Never _refuse(String member) => notYetBuilt(
-        platform: _platform,
-        member: member,
-        ticket: '#19',
-      );
+  Never _refuse(String member) =>
+      notYetBuilt(platform: _platform, member: member, ticket: '#19');
 
   @override
   Future<MemoryStatus> status() async => _refuse('MemoryStore.status');
@@ -324,8 +311,7 @@ final class WindowsMemoryStore implements MemoryStore {
     required String subjectId,
     required String field,
     required String value,
-  }) async =>
-      _refuse('MemoryStore.apply');
+  }) async => _refuse('MemoryStore.apply');
 
   @override
   Future<int> undo() async => _refuse('MemoryStore.undo');

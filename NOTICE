@@ -61,6 +61,24 @@ The root is MIT, but **the applicable licence differs per release artifact**:
 Do not read the root MIT notice as a licence promise covering every release
 artifact.
 
+## Third-party components in the Flutter implementation
+
+The Flutter implementation directly depends on the following components. Their
+licences remain with their respective copyright holders:
+
+| Component | Use | Licence |
+| --- | --- | --- |
+| Flutter SDK / Dart `ffi` package | Application framework and Windows shared-memory FFI | BSD-3-Clause |
+| `windows-capture` 2.0.1 | Windows Graphics Capture wrapper | MIT |
+| `windows` / windows-rs | Win32, WinRT and UI Automation bindings | MIT or Apache-2.0 |
+| `rapidocr-core` 0.2.2 | RapidOCR-compatible detection, recognition and post-processing | Apache-2.0 |
+| ONNX Runtime (`ort`) | Local inference runtime used by `rapidocr-core` | MIT |
+| PaddleOCR PP-OCRv5 Chinese mobile models | Offline Chinese detection and recognition | Apache-2.0 |
+
+The Windows bridge disables `rapidocr-core`'s model-download feature. Model
+files are release inputs and are never fetched while the application is
+running.
+
 ## Brand boundary
 
 This repository does not use the upstream names or domains — "Jev 聊天助手",

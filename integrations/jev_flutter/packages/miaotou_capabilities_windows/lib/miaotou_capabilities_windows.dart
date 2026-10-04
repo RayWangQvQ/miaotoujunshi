@@ -13,3 +13,7 @@ library;
 
 export 'src/bundle.dart';
 export 'src/capabilities.dart';
+export 'src/native.dart';
+export 'src/panel_exclusion.dart';
+export 'src/pacing.dart';
+export 'src/shared_memory.dart' show SharedFrameReader;

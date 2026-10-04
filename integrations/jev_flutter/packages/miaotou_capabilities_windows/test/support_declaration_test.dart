@@ -1,6 +1,7 @@
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 import 'package:miaotou_capabilities/testing.dart';
 import 'package:miaotou_capabilities_windows/miaotou_capabilities_windows.dart';
+import 'package:miaotou_capabilities_windows/testing.dart';
 import 'package:test/test.dart';
 
 /// What the Windows implementation package promises.
@@ -13,7 +14,9 @@ import 'package:test/test.dart';
 /// does not build while a member is missing — and these tests are what make the
 /// second half observable.
 void main() {
-  final CapabilitySet capabilities = windowsCapabilities();
+  final CapabilitySet capabilities = windowsCapabilities(
+    native: FakeWindowsNative(),
+  );
 
   test('every member of the contract answers for itself', () async {
     final List<String> defects = <String>[];
@@ -32,7 +35,8 @@ void main() {
     expect(
       defects,
       isEmpty,
-      reason: 'a member must either do the work or refuse it as one of the two '
+      reason:
+          'a member must either do the work or refuse it as one of the two '
           'refusals. Returning null, an empty collection or a default would pass '
           'the compiler and reach the user as a blank panel (ADR-0009)',
     );
@@ -44,7 +48,8 @@ void main() {
     for (final MapEntry<String, Future<Object?> Function(CapabilitySet)> entry
         in capabilityProbes.entries) {
       final Object outcome = await runProbe(() => entry.value(capabilities));
-      if (outcome is UnimplementedError && !'${outcome.message}'.contains('#')) {
+      if (outcome is UnimplementedError &&
+          !'${outcome.message}'.contains('#')) {
         silent.add('${entry.key}: ${outcome.message}');
       }
     }
@@ -52,7 +57,8 @@ void main() {
     expect(
       silent,
       isEmpty,
-      reason: 'a refusal that does not say who owns the work leaves the next '
+      reason:
+          'a refusal that does not say who owns the work leaves the next '
           'reader unable to tell a permanent statement from an open to-do',
     );
   });
@@ -62,13 +68,15 @@ void main() {
       'uiTreeReader.readActiveChat',
       'uiTreeReader.snapshots',
     ]) {
-      final Object outcome =
-          await runProbe(() => capabilityProbes[member]!(capabilities));
+      final Object outcome = await runProbe(
+        () => capabilityProbes[member]!(capabilities),
+      );
       expect(outcome, isA<UnsupportedError>());
       expect(
         outcome,
         isNot(isA<UnimplementedError>()),
-        reason: 'Windows reads pixels, not accessibility nodes. This port will '
+        reason:
+            'Windows reads pixels, not accessibility nodes. This port will '
             'never implement UiTreeReader: the refusal is the design. A not-yet '
             'is also an UnsupportedError, so the narrower assertion is the one '
             'that says which refusal this is',
@@ -82,7 +90,8 @@ void main() {
     expect(
       report.values,
       everyElement(startsWith('Windows')),
-      reason: 'an implementation package that silently wires another platform '
+      reason:
+          'an implementation package that silently wires another platform '
           'would still compile',
     );
   });

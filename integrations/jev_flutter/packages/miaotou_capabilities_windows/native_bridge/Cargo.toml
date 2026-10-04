@@ -1,0 +1,30 @@
+[package]
+name = "miaotou_bridge"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[dependencies]
+anyhow = "1.0"
+image = { version = "0.25", default-features = false }
+parking_lot = "0.12"
+rapidocr-core = { version = "0.2.2", default-features = false }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+windows = { version = "0.62.2", features = [
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_System_Com",
+  "Win32_System_Memory",
+  "Win32_System_Ole",
+  "Win32_System_Threading",
+  "Win32_System_Variant",
+  "Win32_UI_Accessibility",
+  "Win32_UI_HiDpi",
+] }
+windows-capture = "=2.0.1"
+
+[profile.release]
+lto = true
+strip = true
