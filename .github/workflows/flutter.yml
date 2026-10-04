@@ -1,0 +1,89 @@
+name: Flutter
+
+# Builds nothing and checks everything. See #27.
+#
+# The paths below are a list and not a wildcard, which is how
+# platform-build.yml already does it: a push that only touches the old ports
+# should not pay for a Flutter SDK download.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "integrations/jev_flutter/**"
+      # The payload belongs in the trigger. The domain's tests load the **real**
+      # payload off disk — packages/miaotou_domain/test/support/repo_payload.dart
+      # walks up to a directory holding both goutoujunshi/ and miaotoujunshi/ —
+      # so editing the payload can turn the Dart suite red without a single Dart
+      # file changing. Filtering on the tree alone would hide exactly the drift
+      # that suite exists to catch.
+      - "miaotoujunshi/**"
+      - "goutoujunshi/**"
+      - ".github/workflows/flutter.yml"
+  pull_request:
+    paths:
+      - "integrations/jev_flutter/**"
+      - "miaotoujunshi/**"
+      - "goutoujunshi/**"
+      - ".github/workflows/flutter.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: analyze and test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: integrations/jev_flutter
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pinned rather than `channel: stable` on its own. Every pubspec in the
+      # workspace declares `sdk: ^3.13.0`, and 3.47.6 (Dart 3.13.5) is what the
+      # migration targets. A floating channel would make a red build mean
+      # "something moved somewhere else", which is not a signal anyone can act
+      # on; a pin means red is this tree's fault, and bumping it is a decision.
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.6"
+          channel: stable
+
+      - name: Report the toolchain
+        run: flutter --version
+
+      # One resolution for the whole workspace, then one analysis of it.
+      # `flutter analyze` from the root covers every package in the workspace,
+      # the application included.
+      - name: Resolve and analyze
+        run: |
+          flutter pub get
+          flutter analyze
+
+      # There is no `dart test` at the workspace root — the root is a workspace
+      # holder, not a package — so each package is tested where it lives.
+      #
+      # A package with no `test/` directory fails rather than being skipped. The
+      # loop over every package is the guard: a new package that ships without
+      # tests would otherwise be silently untested, and a test directory that
+      # disappears would be silently ignored.
+      - name: Test every package
+        run: |
+          set -euo pipefail
+          for package in packages/*/ apps/*/; do
+            if [ ! -d "${package}test" ]; then
+              echo "::error file=${package}::no test directory; every package carries its own tests"
+              exit 1
+            fi
+          done
+          for package in packages/*/; do
+            echo "::group::${package}"
+            (cd "${package}" && dart test)
+            echo "::endgroup::"
+          done
+
+      # The application is a Flutter package — its tests are widget tests — so
+      # it needs the flutter tool rather than `dart test`.
+      - name: Test the application
+        working-directory: integrations/jev_flutter/apps/miaotou_app
+        run: flutter test
