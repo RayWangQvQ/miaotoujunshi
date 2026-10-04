@@ -48,10 +48,13 @@ final class CapturedLine {
 /// empty or oversized transcript must fail here, before a network call, rather
 /// than reach a provider.
 ///
-/// **No `identity` field yet.** The old ports hash the transcript to reject a
-/// stale response; that hash is conversation identity, and #12 owns it — see the
-/// package doc. Adding it here would put a `sha256` dependency in the domain for
-/// the sake of a field nothing in this milestone reads.
+/// **Identity is [signature], not a hash.** #7 deferred this on the assumption
+/// that the old ports hashed the transcript; none of them does. Android is the
+/// only port that names the idea, and it compares the title and the last six
+/// messages (`ChatSnapshot.signature()`, read by `verifiedInput` before a fill).
+/// That is the whole of the identity the ports actually use, so it is what
+/// #12 ports — see [conversationSignature]. A hash would have added a crypto
+/// dependency to the domain to compute a value nothing compares.
 final class Snapshot {
   Snapshot({
     required this.title,
@@ -113,6 +116,13 @@ final class Snapshot {
   /// rather than parsing the rendered transcript back into structure — which
   /// would couple the filter to the renderer's exact format.
   final List<CapturedLine> capturedLines;
+
+  /// A stable signature of the last few lines — this conversation's identity.
+  ///
+  /// Empty for a pasted transcript, which has no captured lines and therefore no
+  /// signature: identity is a property of what was read, and a signature
+  /// invented from pasted text would compare equal to nothing.
+  String get signature => conversationSignature(capturedLines);
 }
 
 /// The label a speaker is written as in a transcript.
@@ -148,6 +158,24 @@ String renderTranscript(List<CapturedLine> lines) => lines.map((CapturedLine lin
           (!confidence.isFinite || confidence < ocrConfidenceThreshold);
       return '$side$sender：${line.text}${uncertain ? ' [OCR待核对]' : ''}';
     }).join('\n');
+
+/// A stable signature of the last few lines, to tell two conversations apart.
+///
+/// Ported from `ChatSnapshot.signature()`, which Android's fill guard compares
+/// alongside the title (`verifiedInput`): the last six messages, each as
+/// `speaker:text`, joined.
+///
+/// **The speaker is written as its wire token, not as [speakerLabel].** A
+/// signature is compared across captures, and `speakerLabel` is display copy
+/// that a redesign could legitimately reword — a signature that changes when
+/// somebody rewords 对方 is not a signature. Six lines is a judgement, not a
+/// constant: short enough that one new message moves it, long enough that two
+/// threads do not collide by accident.
+String conversationSignature(List<CapturedLine> lines) {
+  final Iterable<CapturedLine> tail =
+      lines.length <= 6 ? lines : lines.sublist(lines.length - 6);
+  return tail.map((CapturedLine line) => '${line.speaker.name}:${line.text}').join('|');
+}
 
 /// True when this one transcript line is marked as not trustworthy.
 bool isUnconfirmedLine(String line) =>

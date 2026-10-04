@@ -40,6 +40,7 @@ final class AppColors extends ThemeExtension<AppColors> {
     required this.toneNeutral,
     required this.tonePositive,
     required this.toneCaution,
+    required this.toneCautionBackground,
     required this.toneAlert,
   });
 
@@ -89,6 +90,11 @@ final class AppColors extends ThemeExtension<AppColors> {
   /// A badge that states a caveat, such as "排序暂不可用". Nothing is broken.
   final Color toneCaution;
 
+  /// [toneCaution] as a background, for the read-only banner on the panel
+  /// (ADR-0002 decision 3 asks for a banner, and a banner needs a field to sit
+  /// on rather than a border).
+  final Color toneCautionBackground;
+
   /// A badge that states a failure. Something is broken.
   final Color toneAlert;
 
@@ -112,6 +118,7 @@ final class AppColors extends ThemeExtension<AppColors> {
         toneNeutral: Color(0xFF8A817A),
         tonePositive: Color(0xFF2E6F62),
         toneCaution: Color(0xFFB7791F),
+        toneCautionBackground: Color(0xFFFBF1DE),
         toneAlert: Color(0xFF8E2F2F),
       );
 
@@ -163,6 +170,7 @@ final class AppColors extends ThemeExtension<AppColors> {
         'toneNeutral' => toneNeutral,
         'tonePositive' => tonePositive,
         'toneCaution' => toneCaution,
+        'toneCautionBackground' => toneCautionBackground,
         'toneAlert' => toneAlert,
         _ => throw ArgumentError('no colour named $name'),
       };

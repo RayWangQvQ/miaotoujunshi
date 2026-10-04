@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 import 'package:miaotou_domain/miaotou_domain.dart';
 
 import '../design/copy.dart';
 import '../design/spacing.dart';
+import '../panel/panel_page.dart';
+import '../panel/protocol.dart';
 import '../widgets/candidate_card.dart';
 import '../widgets/status_badge.dart';
 import '../widgets/trend_chart.dart';
@@ -23,6 +26,8 @@ final class GallerySamples {
     required this.candidate,
     required this.trend,
     required this.metricNote,
+    required this.currentFrame,
+    required this.browsingFrame,
   });
 
   final Candidate candidate;
@@ -31,28 +36,76 @@ final class GallerySamples {
   /// Stands in for `TrendRules.metricNote`, which a real trend view is handed.
   final String metricNote;
 
-  factory GallerySamples.synthetic(AppCopy copy) => GallerySamples(
-        candidate: Candidate(
-          text: copy.text(CopyKey.gallerySampleReply),
-          reason: copy.text(CopyKey.gallerySampleReason),
-          tradeoff: copy.text(CopyKey.gallerySampleTradeoff),
-          weight: 62,
-        ),
-        trend: Trend(
-          title: copy.text(CopyKey.gallerySampleTitle),
-          candles: <Candle>[
-            const Candle(date: 'D1', open: 0, high: 2, low: -1, close: 2, mine: 3, other: 5),
-            const Candle(date: 'D2', open: 2, high: 4, low: 1, close: 1, mine: 6, other: 7),
-            const Candle(date: 'D3', open: 1, high: 1, low: -3, close: -3, mine: 8, other: 5),
-            const Candle(date: 'D4', open: -3, high: -1, low: -4, close: -1, mine: 4, other: 3),
-            const Candle(date: 'D5', open: -1, high: 3, low: -2, close: 3, mine: 2, other: 5),
-            const Candle(date: 'D6', open: 3, high: 5, low: 2, close: 4, mine: 1, other: 5),
-          ],
-          source: copy.text(CopyKey.gallerySampleTitle),
-          metric: messageBalanceMetric,
-        ),
-        metricNote: copy.text(CopyKey.gallerySampleNote),
-      );
+  /// The panel as it looks when the analysed conversation is the one in front
+  /// of the user.
+  final PanelFrame currentFrame;
+
+  /// The same analysis once the user has moved on: same drafts, no 「填入」.
+  ///
+  /// Both come from copy keys, so the audit that renders this page with a
+  /// sentinel copy still sees only the marker.
+  final PanelFrame browsingFrame;
+
+  factory GallerySamples.synthetic(AppCopy copy) {
+    final Candidate candidate = Candidate(
+      text: copy.text(CopyKey.gallerySampleReply),
+      reason: copy.text(CopyKey.gallerySampleReason),
+      tradeoff: copy.text(CopyKey.gallerySampleTradeoff),
+      weight: 62,
+    );
+    final Advice advice = Advice(
+      support: copy.text(CopyKey.gallerySampleReason),
+      facts: <String>[copy.text(CopyKey.gallerySampleTitle)],
+      hypotheses: const <String>[],
+      unknowns: const <String>[],
+      intent: null,
+      intentConfidence: null,
+      strategy: copy.text(CopyKey.gallerySampleTitle),
+      recommendation: copy.text(CopyKey.gallerySampleReason),
+      nextStep: copy.text(CopyKey.gallerySampleTradeoff),
+      stopCondition: copy.text(CopyKey.gallerySampleTradeoff),
+      question: '',
+      candidates: <Candidate>[candidate],
+      rankingStatus: RankingStatus.ranked,
+    );
+    final String app = copy.text(CopyKey.gallerySampleApp);
+    final String appOther = copy.text(CopyKey.gallerySampleAppOther);
+    final String thread = copy.text(CopyKey.gallerySampleThread);
+    final String threadOther = copy.text(CopyKey.gallerySampleThreadOther);
+
+    return GallerySamples(
+      candidate: candidate,
+      trend: Trend(
+        title: copy.text(CopyKey.gallerySampleTitle),
+        candles: <Candle>[
+          const Candle(date: 'D1', open: 0, high: 2, low: -1, close: 2, mine: 3, other: 5),
+          const Candle(date: 'D2', open: 2, high: 4, low: 1, close: 1, mine: 6, other: 7),
+          const Candle(date: 'D3', open: 1, high: 1, low: -3, close: -3, mine: 8, other: 5),
+          const Candle(date: 'D4', open: -3, high: -1, low: -4, close: -1, mine: 4, other: 3),
+          const Candle(date: 'D5', open: -1, high: 3, low: -2, close: 3, mine: 2, other: 5),
+          const Candle(date: 'D6', open: 3, high: 5, low: 2, close: 4, mine: 1, other: 5),
+        ],
+        source: copy.text(CopyKey.gallerySampleTitle),
+        metric: messageBalanceMetric,
+      ),
+      metricNote: copy.text(CopyKey.gallerySampleNote),
+      currentFrame: PanelFrame(
+        analysed: ConversationRef(packageName: 'com.tencent.mm', title: thread),
+        live: ConversationRef(packageName: 'com.tencent.mm', title: thread),
+        advice: advice,
+        appNames: <String, String>{'com.tencent.mm': app},
+      ),
+      browsingFrame: PanelFrame(
+        analysed: ConversationRef(packageName: 'com.tencent.mm', title: thread),
+        live: ConversationRef(packageName: 'com.tencent.mobileqq', title: threadOther),
+        advice: advice,
+        appNames: <String, String>{
+          'com.tencent.mm': app,
+          'com.tencent.mobileqq': appOther,
+        },
+      ),
+    );
+  }
 }
 
 /// The gallery as a route: a scaffold of its own, because it is pushed onto the
@@ -122,8 +175,35 @@ class GalleryPage extends StatelessWidget {
             trend: samples.trend,
             metricNote: samples.metricNote,
           ),
+          AppSpacing.gapL,
+          Text(
+            copy.text(CopyKey.panelPreviewCurrent),
+            style: theme.textTheme.titleSmall,
+          ),
+          AppSpacing.gapS,
+          PanelPage(
+            frame: samples.currentFrame,
+            onCommand: _noCommand,
+          ),
+          AppSpacing.gapL,
+          Text(
+            copy.text(CopyKey.panelPreviewBrowsing),
+            style: theme.textTheme.titleSmall,
+          ),
+          AppSpacing.gapS,
+          PanelPage(
+            frame: samples.browsingFrame,
+            onCommand: _noCommand,
+          ),
         ],
       ),
     );
   }
 }
+
+/// The gallery has nowhere to send a command to.
+///
+/// The panel is a pure renderer — it is handed a frame and a callback — so it
+/// renders in a gallery unchanged, and the one thing a real host would do with
+/// the command is the only thing missing.
+void _noCommand(PanelCommand command) {}

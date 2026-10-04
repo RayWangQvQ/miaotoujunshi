@@ -32,7 +32,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(GalleryPage), findsOneWidget);
-    expect(find.byType(CandidateCard), findsOneWidget);
+    expect(
+      find.byType(CandidateCard),
+      findsNWidgets(3),
+      reason: 'one standing alone and one inside each panel preview: #12 put the '
+          'panel in the gallery, and the same card class three times over is '
+          '"shared" rather than "extracted"',
+    );
     expect(find.byType(TrendChart), findsOneWidget);
 
     final List<StatusTone> tones = tester

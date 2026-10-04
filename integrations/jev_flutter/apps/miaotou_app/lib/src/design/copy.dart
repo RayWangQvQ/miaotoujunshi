@@ -86,6 +86,14 @@ enum CopyKey {
   gallerySampleReason,
   gallerySampleTradeoff,
   gallerySampleNote,
+  // The panel preview needs names for two conversations. They are copy keys and
+  // not literals in `gallery_page.dart` for the same reason everything else
+  // there is: a literal would be a second source of truth, and the audit that
+  // renders the gallery with a sentinel copy would have to let it through.
+  gallerySampleApp,
+  gallerySampleAppOther,
+  gallerySampleThread,
+  gallerySampleThreadOther,
 
   diagnosticsTitle,
   diagnosticsIntro,
@@ -98,6 +106,25 @@ enum CopyKey {
   unaskedReason,
   reportFailed,
   unknownImplementation,
+
+  // The floating panel (#12). The header's four fallbacks are one decision each,
+  // and the placeholders are how the separator stays here instead of being
+  // punctuation typed into a widget.
+  panelLabelPair,
+  panelLabelTitleOnly,
+  panelLabelUnrecognised,
+  panelStatusNotAnalysed,
+  panelStatusViewing,
+  panelStatusBrowsing,
+  panelReadOnlyBanner,
+  panelEmpty,
+  panelActionFill,
+  panelActionDetails,
+  panelActionReanalyse,
+  panelActionAnalyseCurrent,
+  panelActionClose,
+  panelPreviewCurrent,
+  panelPreviewBrowsing,
 
   noValue,
 }
@@ -210,6 +237,10 @@ final class AppCopy {
     CopyKey.gallerySampleReason: '给对方留出时间，同时把下一次开口留在自己这边。',
     CopyKey.gallerySampleTradeoff: '这一轮里你主动开口的机会会晚一点。',
     CopyKey.gallerySampleNote: '示例数据的口径说明；真实走势图下方的这句话来自共享载荷的 metric_note。',
+    CopyKey.gallerySampleApp: '微信',
+    CopyKey.gallerySampleAppOther: 'QQ',
+    CopyKey.gallerySampleThread: '示例会话',
+    CopyKey.gallerySampleThreadOther: '另一个会话',
 
     CopyKey.diagnosticsTitle: '能力自检',
     CopyKey.diagnosticsIntro: '这一版在所在端能做什么，是问出来的，不是猜出来的。',
@@ -222,6 +253,22 @@ final class AppCopy {
     CopyKey.unaskedReason: '未询问：调用它等于往聊天窗口里写入文本',
     CopyKey.reportFailed: '自检失败：',
     CopyKey.unknownImplementation: '未知',
+
+    CopyKey.panelLabelPair: '{app} · {title}',
+    CopyKey.panelLabelTitleOnly: '{title}',
+    CopyKey.panelLabelUnrecognised: '未识别会话',
+    CopyKey.panelStatusNotAnalysed: '尚未分析',
+    CopyKey.panelStatusViewing: '正在看',
+    CopyKey.panelStatusBrowsing: '浏览中 · 只读',
+    CopyKey.panelReadOnlyBanner: '你现在看的不是这次分析的会话，所以「填入」停用了；复制和详情仍然可用。',
+    CopyKey.panelEmpty: '先读取对话，再让军师帮你想下一句。',
+    CopyKey.panelActionFill: '填入',
+    CopyKey.panelActionDetails: '详情',
+    CopyKey.panelActionReanalyse: '重新分析',
+    CopyKey.panelActionAnalyseCurrent: '分析当前会话',
+    CopyKey.panelActionClose: '关闭',
+    CopyKey.panelPreviewCurrent: '悬浮面板 · 正在看',
+    CopyKey.panelPreviewBrowsing: '悬浮面板 · 浏览中（只读）',
 
     CopyKey.noValue: '未填写',
   };

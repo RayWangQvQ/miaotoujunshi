@@ -29,7 +29,7 @@
 ///   macOS's `experience.py`, and the [diffProfile] / [applySave] / [undoSave]
 ///   loop that is the only part of the old `MemoryBridge` worth porting line
 ///   for line. `Conversations` and `AutoGate` are not here: they are
-///   conversation identity, which #12 owns.
+///   conversation identity, which #12 now owns below.
 /// * **#10 — the anti-injection filter, scenario selection and the update
 ///   check.** Landed: [sanitizeCandidateTexts] and its [suspectInjectionTexts]
 ///   / [otherRecentTexts] helpers (the backstop that drops candidates which
@@ -38,8 +38,13 @@
 ///   (see [SharedMaterial.scene]); #10 confirms the wire and locks the
 ///   different-scene-different-prompt property with a test.
 /// * **#12** — conversation identity and the read-only derivation, which ADR-0002
-///   puts on the domain side of the panel rather than inside it. Not yet, and it
-///   is where [Snapshot]'s identity hash belongs.
+///   puts on the domain side of the panel rather than inside it. Landed:
+///   [ConversationLabel] (which has no package field, so a header cannot print
+///   one), [derivePanel] — read-only is `analyzed != live`, it withdraws
+///   [PanelAction.fill] and nothing else — and [conversationSignature], the
+///   last-six-lines identity. [Snapshot]'s `identity` hash is **not** here: no
+///   port ever hashed anything, and [Snapshot.signature] is the identity they
+///   compare.
 ///
 /// ## The one thing worth knowing before adding to it
 ///
@@ -57,6 +62,7 @@ library;
 
 export 'src/advice.dart';
 export 'src/analysis.dart';
+export 'src/conversation.dart';
 export 'src/csv.dart';
 export 'src/errors.dart';
 export 'src/injection_filter.dart';
