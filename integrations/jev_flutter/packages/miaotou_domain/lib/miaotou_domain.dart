@@ -30,8 +30,13 @@
 ///   loop that is the only part of the old `MemoryBridge` worth porting line
 ///   for line. `Conversations` and `AutoGate` are not here: they are
 ///   conversation identity, which #12 owns.
-/// * **#10** — the anti-injection filter, scenario selection and the update
-///   check. Not yet.
+/// * **#10 — the anti-injection filter, scenario selection and the update
+///   check.** Landed: [sanitizeCandidateTexts] and its [suspectInjectionTexts]
+///   / [otherRecentTexts] helpers (the backstop that drops candidates which
+///   obeyed an injection), and [newerRelease] / [Version] for the
+///   one-implementation update check. Scenario selection was already in
+///   (see [SharedMaterial.scene]); #10 confirms the wire and locks the
+///   different-scene-different-prompt property with a test.
 /// * **#12** — conversation identity and the read-only derivation, which ADR-0002
 ///   puts on the domain side of the panel rather than inside it. Not yet, and it
 ///   is where [Snapshot]'s identity hash belongs.
@@ -54,6 +59,7 @@ export 'src/advice.dart';
 export 'src/analysis.dart';
 export 'src/csv.dart';
 export 'src/errors.dart';
+export 'src/injection_filter.dart';
 export 'src/judging.dart';
 export 'src/memory.dart';
 export 'src/model_gateway.dart';
@@ -66,3 +72,4 @@ export 'src/shared_material.dart';
 export 'src/snapshot.dart';
 export 'src/strategy.dart';
 export 'src/trend.dart';
+export 'src/update_check.dart';

@@ -58,6 +58,7 @@ final class Snapshot {
     required this.transcript,
     this.windowId = 0,
     this.source = 'manual',
+    this.capturedLines = const <CapturedLine>[],
   }) {
     if (transcript.trim().isEmpty) {
       throw const DomainException('请先读取或粘贴对话');
@@ -74,6 +75,11 @@ final class Snapshot {
   /// — and it is answered at the contract, not by handing the domain an empty
   /// snapshot. What this does own is the shape of every line, which must be one
   /// implementation because the model reads the result.
+  ///
+  /// The captured lines are kept alongside the rendered transcript so the
+  /// anti-injection filter can see which lines came from the other party without
+  /// re-parsing the rendered form. They are empty for a pasted transcript, and
+  /// an empty list is the filter's no-op signal (#10, AC1).
   factory Snapshot.fromCaptured({
     required String? title,
     required List<CapturedLine> lines,
@@ -85,6 +91,7 @@ final class Snapshot {
         transcript: renderTranscript(lines),
         windowId: windowId,
         source: source,
+        capturedLines: lines,
       );
 
   final String title;
@@ -98,6 +105,14 @@ final class Snapshot {
   /// How the transcript was obtained. It travels to the model, which is told to
   /// weigh a pasted transcript differently from a machine-read one.
   final String source;
+
+  /// The lines the transcript was rendered from, when it came from capture.
+  ///
+  /// Empty for a pasted transcript. Carried so the filter ([sanitizeCandidates])
+  /// can read the other party's text directly, rather than parsing the rendered
+  /// transcript back into structure — which would couple the filter to the
+  /// renderer's exact format.
+  final List<CapturedLine> capturedLines;
 }
 
 /// The label a speaker is written as in a transcript.

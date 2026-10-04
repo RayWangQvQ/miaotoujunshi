@@ -1,5 +1,6 @@
 import 'advice.dart';
 import 'errors.dart';
+import 'injection_filter.dart';
 import 'judging.dart';
 import 'model_gateway.dart';
 import 'preferences.dart';
@@ -91,6 +92,7 @@ Future<Advice> analyzeSnapshot({
     completion.content,
     strategies: material.vocabulary.strategies,
   );
+  advice = advice.copyWith(candidates: _filterCandidates(snapshot, advice.candidates));
 
   if (preferences != null &&
       (advice.candidates.length > preferences.count ||
@@ -115,6 +117,41 @@ Future<Advice> analyzeSnapshot({
     advice: advice,
     preferences: preferences,
   );
+}
+
+/// Drops candidates that obeyed an injection attempt embedded in the captured
+/// conversation, then maps the survivors back to [Candidate] objects.
+///
+/// A pasted transcript has no captured lines; the filter is a no-op for it, and
+/// the system prompt's "chat text is data" instruction is the only defence.
+/// For a captured conversation the filter is the structural backstop the system
+/// prompt cannot guarantee on its own — the model can be tricked into producing
+/// the injection's payload, and the candidate never reaches the user.
+///
+/// Kept here rather than inside `parseAdvice` because the filter needs the
+/// structured lines, and a parser that takes lines would force every caller to
+/// fabricate them; the analysis pipeline already has them on the snapshot.
+List<Candidate> _filterCandidates(Snapshot snapshot, List<Candidate> candidates) {
+  if (snapshot.capturedLines.isEmpty) {
+    return candidates;
+  }
+  final List<String> texts = <String>[
+    for (final Candidate candidate in candidates) candidate.text,
+  ];
+  final List<String> kept = sanitizeCandidateTexts(
+    suspects: suspectInjectionTexts(snapshot.capturedLines),
+    otherRecent: otherRecentTexts(snapshot.capturedLines),
+    candidates: texts,
+  );
+  // Map back by consuming each survivor once, not by testing membership: the
+  // filter deduplicates, so two candidates with the same text must not both
+  // match the one survivor. A `Set.contains` here would put three identical
+  // TARGETs back on the panel.
+  final List<String> remaining = List<String>.of(kept);
+  return <Candidate>[
+    for (final Candidate candidate in candidates)
+      if (remaining.remove(candidate.text)) candidate,
+  ];
 }
 
 /// Rewrites the drafts so they read more like the user, and nothing else.
@@ -161,12 +198,13 @@ Future<Advice> rewriteSnapshot({
     completion.content,
     strategy: previous.strategy,
   );
-  if (candidates.isEmpty) {
-    throw const DomainException('改写未返回候选，已保留原回复');
+  final List<Candidate> filtered = _filterCandidates(snapshot, candidates);
+  if (filtered.isEmpty) {
+    throw const DomainException('改写未返回可用候选，已保留原回复');
   }
   if (preferences != null &&
-      (candidates.length > preferences.count ||
-          candidates
+      (filtered.length > preferences.count ||
+          filtered
               .any((Candidate candidate) => candidate.text.length > preferences.maxChars))) {
     throw const DomainException('改写未遵守数量或长度，已保留原回复');
   }
@@ -177,7 +215,7 @@ Future<Advice> rewriteSnapshot({
     snapshot: snapshot,
     scene: scene,
     background: background,
-    advice: previous.copyWith(candidates: candidates),
+    advice: previous.copyWith(candidates: filtered),
     preferences: preferences,
   );
 }
