@@ -8,10 +8,10 @@ import 'native.dart';
 /// Owned by #15. **Pure Dart on all three ports, no Python runtime** (ADR-0010
 /// decision 5), so this is the whole implementation and
 /// `goutoujunshi/scripts/memory_store.py` is a semantic reference rather than
-/// the thing being called. The port that used to shell out to it
-/// (`integrations/jev_mac/memory_bridge.py`) loses its subprocess, its ten-second
-/// timeout and its generic "check local storage permission" error that hid which
-/// of several failures had happened.
+/// the thing being called. The archived Python port
+/// (`archive/jev-mac-python-final`) used to shell out to it; this implementation
+/// loses that subprocess, its ten-second timeout and its generic "check local
+/// storage permission" error that hid which of several failures had happened.
 ///
 /// ## What was kept and what was dropped
 ///

@@ -5,8 +5,6 @@ __pycache__/
 .venv/
 .env
 .env.*
-integrations/jev_mac/settings.local.json
-integrations/jev_mac/settings.local.tmp
 integrations/jev_windows/config.json
 integrations/jev_windows/build/
 integrations/jev_windows/dist/

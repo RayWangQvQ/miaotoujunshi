@@ -9,9 +9,9 @@ import 'native.dart';
 /// ## This is the only storage member with no pure-Dart half
 ///
 /// `SecItem*` is C API. The frozen Python port reached it by running
-/// `/usr/bin/security` as a subprocess with the secret on stdin
-/// (`integrations/jev_mac/credentials.py`), and that is not available here: the
-/// app is sandboxed (`apps/miaotou_app/macos/Runner/Release.entitlements` sets
+/// `/usr/bin/security` as a subprocess with the secret on stdin (the port is
+/// preserved by `archive/jev-mac-python-final`), and that is not available here:
+/// the app is sandboxed (`apps/miaotou_app/macos/Runner/Release.entitlements` sets
 /// `com.apple.security.app-sandbox`), `security` is not on a sandboxed app's
 /// allowed surface, and a subprocess could not be given the keychain access the
 /// framework grants in-process anyway. So the four members below are thin

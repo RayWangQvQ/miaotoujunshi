@@ -2,62 +2,15 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "① Jev Mac · 离线演示 (--demo)",
-      "type": "debugpy",
+      "name": "① Flutter · macOS",
+      "type": "dart",
       "request": "launch",
-      "program": "${workspaceFolder}/integrations/jev_mac/app.py",
-      "args": ["--demo"],
-      "cwd": "${workspaceFolder}/integrations/jev_mac",
-      "python": "${workspaceFolder}/integrations/jev_mac/.venv/bin/python",
-      "console": "integratedTerminal",
-      "justMyCode": true
+      "program": "${workspaceFolder}/integrations/jev_flutter/apps/miaotou_app/lib/main.dart",
+      "cwd": "${workspaceFolder}/integrations/jev_flutter/apps/miaotou_app",
+      "deviceId": "macos"
     },
     {
-      "name": "② Jev Mac · 完整启动（真实读屏 + 模型）",
-      "type": "debugpy",
-      "request": "launch",
-      "program": "${workspaceFolder}/integrations/jev_mac/app.py",
-      "args": [],
-      "cwd": "${workspaceFolder}/integrations/jev_mac",
-      "python": "${workspaceFolder}/integrations/jev_mac/.venv/bin/python",
-      "console": "integratedTerminal",
-      "justMyCode": true
-    },
-    {
-      "name": "③ Jev Mac · 直接打开设置",
-      "type": "debugpy",
-      "request": "launch",
-      "program": "${workspaceFolder}/integrations/jev_mac/app.py",
-      "args": ["--settings"],
-      "cwd": "${workspaceFolder}/integrations/jev_mac",
-      "python": "${workspaceFolder}/integrations/jev_mac/.venv/bin/python",
-      "console": "integratedTerminal",
-      "justMyCode": true
-    },
-    {
-      "name": "④ Jev Mac · 直接打开 K 线窗口",
-      "type": "debugpy",
-      "request": "launch",
-      "program": "${workspaceFolder}/integrations/jev_mac/app.py",
-      "args": ["--trend"],
-      "cwd": "${workspaceFolder}/integrations/jev_mac",
-      "python": "${workspaceFolder}/integrations/jev_mac/.venv/bin/python",
-      "console": "integratedTerminal",
-      "justMyCode": true
-    },
-    {
-      "name": "⑤ 跑全部单元测试 (tests/)",
-      "type": "debugpy",
-      "request": "launch",
-      "module": "unittest",
-      "args": ["discover", "-s", "tests", "-q"],
-      "cwd": "${workspaceFolder}",
-      "python": "${workspaceFolder}/integrations/jev_mac/.venv/bin/python",
-      "console": "integratedTerminal",
-      "justMyCode": true
-    },
-    {
-      "name": "⑥ Android · JVM 单元测试 (attach 5005)",
+      "name": "② Android · JVM 单元测试 (attach 5005)",
       "type": "java",
       "request": "attach",
       "hostName": "localhost",
@@ -66,7 +19,7 @@
       "preLaunchTask": "android: 单元测试挂起等待调试器"
     },
     {
-      "name": "⑦ Android · attach 真机进程 (8700)",
+      "name": "③ Android · attach 真机进程 (8700)",
       "type": "java",
       "request": "attach",
       "hostName": "localhost",

@@ -7,9 +7,11 @@ This file records the provenance and the licence layering of this repository.
 
 The root LICENSE (MIT, Copyright (c) 2026 powerycy) covers only the code written
 in this repository — the Skill layer and the glue code of the integrations.
-The ports under `integrations/` are derivative works of the upstream Jev Chat
-assistant and each carries its own LICENSE and attribution files. They are
-**not** covered by the root LICENSE.
+The frozen Android and Windows ports under `integrations/` are derivative works
+of the upstream Jev Chat assistant and each carries its own LICENSE and
+attribution files. They are **not** covered by the root LICENSE. The promoted
+Flutter macOS implementation is repository-authored code covered by the root
+LICENSE.
 
 Written in this repository: the repository tooling under `scripts/`, the ports
 under `integrations/`, `tests/`, the root governance files (`README.md`, `NOTICE`,
@@ -38,7 +40,6 @@ repository is app-layer material, not upstream's documentation directory.
 | --- | --- | --- | --- |
 | `integrations/jev_android` | [jev-chat/jev-chat-jarvis](https://github.com/jev-chat/jev-chat-jarvis) | Finderchangchang and the jev-chat contributors | `integrations/jev_android/NOTICE`, `integrations/jev_android/LICENSE` |
 | `integrations/jev_windows` | [jev-chat/jev-chat-windows](https://github.com/jev-chat/jev-chat-windows) | rezoch340 and the jev-chat contributors; the Jev judging kernel and its prompt wording remain Copyright (c) Finderchangchang and the jev-chat contributors | `integrations/jev_windows/NOTICE`, `integrations/jev_windows/LICENSE` |
-| `integrations/jev_mac` | [jev-chat/jev-chat-jarvis-mac](https://github.com/jev-chat/jev-chat-jarvis-mac), pinned at commit `afb58cf53d098e314a1368d15e13ab5330015688` | eatmoreduck | `integrations/jev_mac/vendor/LICENSE`, plus the 「上游与许可」 section of `integrations/jev_mac/README.md` |
 
 Distributing any of these ports requires shipping that port's LICENSE and NOTICE
 alongside it, and stating the origin — the wording each NOTICE already recommends
@@ -48,7 +49,7 @@ is the wording to use.
 
 The root is MIT, but **the applicable licence differs per release artifact**:
 
-- `integrations/jev_android`, `integrations/jev_mac`: MIT.
+- `integrations/jev_android` and the promoted Flutter macOS application: MIT.
 - The `integrations/jev_windows` release package (the zip built by PyInstaller):
   **GPLv3 as a whole**. It bundles PySide6-Fluent-Widgets (GPLv3 — free for
   non-commercial use; commercial use requires a separate licence purchased from

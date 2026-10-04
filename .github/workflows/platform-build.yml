@@ -11,10 +11,9 @@ on:
     paths:
       - "integrations/jev_android/**"
       - "integrations/jev_windows/**"
-      - "integrations/jev_mac/**"
+      - "integrations/jev_flutter/**"
       - "miaotoujunshi/**"
       - "goutoujunshi/**"
-      - "scripts/package_mac.py"
       - "PRIVACY.md"
       - "tests/test_platform_integrations.py"
       - ".github/workflows/platform-build.yml"
@@ -22,10 +21,9 @@ on:
     paths:
       - "integrations/jev_android/**"
       - "integrations/jev_windows/**"
-      - "integrations/jev_mac/**"
+      - "integrations/jev_flutter/**"
       - "miaotoujunshi/**"
       - "goutoujunshi/**"
-      - "scripts/package_mac.py"
       - "PRIVACY.md"
       - "tests/test_platform_integrations.py"
       - ".github/workflows/platform-build.yml"
@@ -85,19 +83,27 @@ jobs:
 
   mac:
     runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: integrations/jev_flutter/apps/miaotou_app
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: subosito/flutter-action@v2
         with:
-          python-version: "3.12"
-      - run: python -B scripts/validate_layout.py
-      - run: python -B goutoujunshi/scripts/validate_skill.py --runtime
-      - run: python -B -m unittest discover -s tests -v
-      - run: python -B scripts/package_mac.py
+          flutter-version: "3.47.6"
+          channel: stable
+      - run: flutter pub get
+      - run: flutter build macos --release
+      - name: Create macOS application ZIP
+        run: |
+          mkdir -p build/release
+          ditto -c -k --sequesterRsrc --keepParent \
+            build/macos/Build/Products/Release/miaotou_app.app \
+            build/release/miaotoujunshi-mac.zip
       - uses: actions/upload-artifact@v4
         with:
-          name: miaotoujunshi-mac-source
-          path: dist/miaotoujunshi-mac.zip
+          name: miaotoujunshi-mac
+          path: integrations/jev_flutter/apps/miaotou_app/build/release/miaotoujunshi-mac.zip
 
   release:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag != '' }}
@@ -117,7 +123,7 @@ jobs:
           set -euo pipefail
           [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-preview$ ]]
           mkdir -p publish
-          cp release-assets/miaotoujunshi-mac-source/miaotoujunshi-mac.zip publish/
+          cp release-assets/miaotoujunshi-mac/miaotoujunshi-mac.zip publish/
           cp release-assets/miaotoujunshi-android-debug/app-debug.apk publish/miaotoujunshi-android-debug.apk
           cp release-assets/miaotoujunshi-windows-preview/miaotoujunshi-windows-preview.zip publish/
           test -s publish/miaotoujunshi-mac.zip
@@ -131,7 +137,7 @@ jobs:
           cat > release-notes.md <<'EOF'
           ## Mac、Windows 与 Android 预览包 / Preview packages
 
-          - **macOS:** `miaotoujunshi-mac.zip` — source package. Install Python 3.12 and uv, then run `安装依赖.command` and `启动.command`. This is not a signed `.app`.
+          - **macOS:** `miaotoujunshi-mac.zip` — the accepted Flutter `.app` preview bundle. Extract it before launching.
           - **Windows:** `miaotoujunshi-windows-preview.zip` — extract the complete directory before launching the executable. Automated build passes; physical-device validation is pending.
           - **Android:** `miaotoujunshi-android-debug.apk` — Android 11+ debug preview. An older debug APK may have a different signing certificate; uninstall it first if Android rejects the update (this clears local app data). **WeChat is currently unsupported because this Android build cannot capture WeChat chat screenshots.** Other chat-app paths still need device-level validation.
 

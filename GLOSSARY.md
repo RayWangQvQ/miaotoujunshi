@@ -94,7 +94,7 @@
   给代码读的结构化数据放 `data/`）。跨端共用的材料一律放自有载荷，**不要放进某个单端目录**。
 - **跨端公用材料三端一律在运行期读文件**：不得在任一端内联副本，不得放在 `integrations/<port>/` 下。
   各端打包必须**按目录整体**纳入自有载荷（Windows `jev.spec` 的 `datas`、Android 的 `assets`、
-  mac 的 `package_mac.py` 都登记 `miaotoujunshi/` 本身，不逐文件列）；读不到即报错，不降级回内联副本。
+  macOS Flutter runner 的 `sync_shared_payload.sh` 都登记 `miaotoujunshi/` 本身，不逐文件列）；读不到即报错，不降级回内联副本。
   取舍与代价见 `docs/adr/0005`（读文件不内联）与 `docs/adr/0006`（材料放在哪）。
 - 上游载荷目录 `goutoujunshi/` 必须与上游**逐字节一致**：`check_upstream.py` 的 `drifted` 与
   `only this repo has` 两行都必须恒为 0。本仓对 skill 内容的任何意见一律落在自有载荷或应用层，

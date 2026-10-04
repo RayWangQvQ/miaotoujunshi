@@ -5,9 +5,9 @@ import Security
 ///
 /// **This is the only storage work in the port with no pure-Dart half.**
 /// `SecItem*` is C API, and the frozen Python port reached it by running
-/// `/usr/bin/security` as a subprocess (`integrations/jev_mac/credentials.py`).
-/// That route is closed here for two reasons, both structural rather than
-/// stylistic: the app is sandboxed
+/// `/usr/bin/security` as a subprocess (the port is preserved by
+/// `archive/jev-mac-python-final`). That route is closed here for two reasons,
+/// both structural rather than stylistic: the app is sandboxed
 /// (`apps/miaotou_app/macos/Runner/Release.entitlements` sets
 /// `com.apple.security.app-sandbox`), and `security` is not on a sandboxed app's
 /// allowed surface. So the framework is called in-process, and the secret is

@@ -72,9 +72,8 @@ void main() {
     });
 
     test('the keychain is not reached by running `security`', () {
-      // The frozen Python port's mechanism
-      // (`integrations/jev_mac/credentials.py`) shells out to
-      // /usr/bin/security. A sandboxed app cannot: the binary is not on the
+      // The Python port preserved by `archive/jev-mac-python-final` shells out
+      // to /usr/bin/security. A sandboxed app cannot: the binary is not on the
       // allowed surface, and a subprocess would not inherit the framework's
       // grant anyway.
       for (final String file in <String>[
@@ -279,18 +278,29 @@ void main() {
       );
     });
 
-    test('the podspec and Package.swift still declare the same platform floor', () {
+    test('the package and application declare the same platform floor', () {
       // Not #15's change, and asserted because the new files are compiled under
       // it: `kSecUseDataProtectionKeychain` needs 10.15 and the floor is 14.0 for
-      // `SCScreenshotManager`, so both declarations have to stay as they are.
+      // `SCScreenshotManager`, so every declaration has to stay aligned.
       final String podspec =
           File('macos/miaotou_capabilities_macos.podspec').readAsStringSync();
       final String package =
           File('macos/miaotou_capabilities_macos/Package.swift')
               .readAsStringSync();
+      final String runner = File(
+        '../../apps/miaotou_app/macos/Runner.xcodeproj/project.pbxproj',
+      ).readAsStringSync();
 
       expect(podspec, contains("s.platform = :osx, '14.0'"));
       expect(package, contains('.macOS("14.0")'));
+      expect(
+        RegExp(r'MACOSX_DEPLOYMENT_TARGET = 14\.0;')
+            .allMatches(runner)
+            .length,
+        3,
+        reason: 'Debug, Profile and Release must all build against the native '
+            'package floor',
+      );
     });
 
     test('the new sources are inside the podspec glob, or they will not compile',

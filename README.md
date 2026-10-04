@@ -12,8 +12,8 @@ candidate replies → **one-tap fill, never auto-send**.
 | --- | --- | --- |
 | Upstream payload | `goutoujunshi/` | The `goutoujunshi` / 狗头军师 payload — `SKILL.md`, `references/`, `agents/`, `assets/`, `scripts/`. A maintained fork of the upstream skill, kept byte-identical; `scripts/check_upstream.py` reports the drift |
 | Own payload | `miaotoujunshi/` | This repository's own payload: the shared tone rules (`references/knowledge/`), the structured data (`references/data/`) and the demo cases (`examples/`) all three ports read at runtime. See `docs/adr/0006` |
-| Apps | `integrations/jev_android`, `integrations/jev_windows`, `integrations/jev_mac` | Floating ball + screenshot/OCR + candidate replies |
-| Repo tooling | `scripts/` | `validate_layout.py` (root-entry allowlist), `check_upstream.py` (upstream drift), `package_mac.py` (macOS source zip) |
+| Apps | `integrations/jev_flutter`, `integrations/jev_android`, `integrations/jev_windows` | One Flutter app for the promoted macOS port and the two frozen ports still awaiting migration |
+| Repo tooling | `scripts/` | `validate_layout.py` (root-entry allowlist), `check_upstream.py` (upstream drift) |
 
 Every entry at the repository root is registered with the layer it belongs to in
 `scripts/validate_layout.py`; an unregistered entry fails the build. The app layer
@@ -28,9 +28,10 @@ UI element is 「喵球」. **They are layered on purpose — do not mix them.**
 
 ## Origin, attribution and licensing
 
-The three ports under `integrations/` are derivative works of the upstream Jev
-Chat assistant. Each ships its own LICENSE and attribution files; the root
-`LICENSE` covers only the code written in this repository.
+The frozen Android and Windows ports are derivative works of the upstream Jev
+Chat assistant and ship their own LICENSE and attribution files. The promoted
+Flutter macOS implementation is repository-authored; the root `LICENSE` covers
+it and the other code written in this repository.
 
 **Mind the licence split**: the root is MIT, but the `integrations/jev_windows`
 release package is **GPLv3 as a whole**, because it bundles

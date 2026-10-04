@@ -1,8 +1,4 @@
 {
-  "python.defaultInterpreterPath": "${workspaceFolder}/integrations/jev_mac/.venv/bin/python",
-  "python.analysis.extraPaths": [
-    "${workspaceFolder}/integrations/jev_mac"
-  ],
   "python.analysis.exclude": [
     "**/.venv"
   ],
