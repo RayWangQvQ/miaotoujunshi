@@ -129,8 +129,25 @@ final class ConversationRuntime {
   ///
   /// Composed from contract members rather than handed to the platform, which is
   /// what keeps ADR-0009's boundary intact and puts the grouping and the side
-  /// guess in pure Dart where a fixture can pin them. The panel comes off first:
-  /// it floats over the very pixels being captured (ADR-0012).
+  /// guess in pure Dart where a fixture can pin them.
+  ///
+  /// No window handle is passed, and the panel is not hidden here.
+  ///
+  /// `capture(null)` asks for the screen, which is the only question this command
+  /// can ask: it exists for applications the adapter registry does not know, so
+  /// there is no window to name. `findTargetWindow` answers a per-window question
+  /// and answers it with the window that is *active*, which while the panel is up
+  /// is liable to be the panel itself. Worse, a handle taken before the panel
+  /// comes off is stale by the time it arrives: Android's `capture` refuses a
+  /// handle that no longer matches the live window (-3, 「目标窗口已经切换」), and
+  /// hiding is exactly what changes it. The retired port's manual path passed no
+  /// handle either.
+  ///
+  /// Hiding the panel belongs to the implementation for the same reason the rate
+  /// limit does (ADR-0009): macOS hides and restores inside its own `capture`,
+  /// Android's native `ScreenCapture` does, and both restore in a `finally` that
+  /// a failure here cannot reach. Doing it at this level hid the panel twice and,
+  /// by invalidating the handle, was most of why this command failed.
   ///
   /// This is the only way in for an application with no adapter, so a failure
   /// here has to say why rather than leave the user with an unchanged panel.
@@ -141,56 +158,74 @@ final class ConversationRuntime {
     _recognising = true;
     _publish(note: copy.text(CopyKey.runtimeRecognising));
     try {
-      final String? target = await capabilities.screenCapture
-          .findTargetWindow();
-      final CaptureOutcome outcome;
-      await capabilities.floatingPanel.hideForCapture();
-      try {
-        outcome = await capabilities.screenCapture.capture(
-          targetWindowId: target,
-        );
-      } finally {
-        await capabilities.floatingPanel.restoreAfterCapture();
+      switch (await capabilities.screenCapture.capture()) {
+        case CaptureFailed(:final String message):
+          _publish(note: _refusal(message));
+        case CaptureOk(:final CaptureFrame frame):
+          await _readFrame(frame);
       }
-      if (outcome is! CaptureOk) {
-        _publish(note: copy.text(CopyKey.runtimeCaptureFailed));
-        return;
-      }
-      final List<OcrLine> recognised = await capabilities.ocr.recognize(
-        outcome.frame,
-        languages: const <String>['zh-Hans'],
-      );
-      final RecognisedCapture capture = groupRecognisedLines(
-        recognised,
-        frame: outcome.frame,
-      );
-      if (capture.lines.isEmpty) {
-        _publish(note: copy.text(CopyKey.runtimeNothingRecognised));
-        return;
-      }
-      final ChatUiSnapshot snapshot = ChatUiSnapshot(
-        conversation: _latest?.conversation ?? ConversationRef.none,
-        lines: capture.lines,
-        capturedAt: DateTime.now(),
-        note: copy.text(
-          capture.sidesSplit
-              ? CopyKey.panelNoteSidesGuessed
-              : CopyKey.panelNoteSidesNotSplit,
-        ),
-      );
-      _latest = snapshot;
-      _latestSource = 'ocr';
-      _publish(
-        analysed: snapshot.conversation,
-        live: snapshot.conversation,
-        note: snapshot.note,
-      );
     } on Object {
+      // The platform declining to answer at all — no accessibility service, a
+      // channel that is gone — rather than declining this particular frame.
       _publish(note: copy.text(CopyKey.runtimeCaptureFailed));
     } finally {
       _recognising = false;
     }
   }
+
+  /// The reading half of [_recogniseOnce], once a frame is in hand.
+  ///
+  /// Separate from the capture so the two failures stay distinguishable: a frame
+  /// we could not take and a frame we could not read both end in the panel, and
+  /// the panel is the only channel there is — nothing writes these to a log.
+  Future<void> _readFrame(CaptureFrame frame) async {
+    final List<OcrLine> recognised;
+    try {
+      recognised = await capabilities.ocr.recognize(
+        frame,
+        languages: const <String>['zh-Hans'],
+      );
+    } on Object {
+      _publish(note: copy.text(CopyKey.runtimeRecogniseFailed));
+      return;
+    }
+    final RecognisedCapture capture = groupRecognisedLines(
+      recognised,
+      frame: frame,
+    );
+    if (capture.lines.isEmpty) {
+      _publish(note: copy.text(CopyKey.runtimeNothingRecognised));
+      return;
+    }
+    final ChatUiSnapshot snapshot = ChatUiSnapshot(
+      conversation: _latest?.conversation ?? ConversationRef.none,
+      lines: capture.lines,
+      capturedAt: DateTime.now(),
+      note: copy.text(
+        capture.sidesSplit
+            ? CopyKey.panelNoteSidesGuessed
+            : CopyKey.panelNoteSidesNotSplit,
+      ),
+    );
+    _latest = snapshot;
+    _latestSource = 'ocr';
+    _publish(
+      analysed: snapshot.conversation,
+      live: snapshot.conversation,
+      note: snapshot.note,
+    );
+  }
+
+  /// The platform's own words for a frame that was refused.
+  ///
+  /// Android's `ScreenCapture` writes these to be shown unchanged — they name the
+  /// cause and, where there is one, the remedy — and [CaptureFailed.code] is
+  /// deliberately untranslated, so passing the sentence through keeps both the
+  /// taxonomy and the advice. A sentence of our own here would be the only thing
+  /// standing between the user and the reason.
+  String _refusal(String reason) => copy
+      .text(CopyKey.runtimeCaptureRefused)
+      .replaceAll('{reason}', reason);
 
   Future<void> _analyze({required bool manual}) async {
     if (_analysing) {

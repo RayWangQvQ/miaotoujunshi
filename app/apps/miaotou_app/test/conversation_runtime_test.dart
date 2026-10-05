@@ -202,6 +202,78 @@ void main() {
     expect(panel.current.analysed, ConversationRef.none);
     expect(panel.current.note, AppCopy.zh.text(CopyKey.runtimeNoConversation));
   });
+
+  test('recogniseOnce asks for the screen, not for a window handle', () async {
+    // It exists for applications the adapter registry does not know, so there is
+    // no window to name. Naming one is also actively wrong: the handle describes
+    // whichever window is active, which while the panel is up is liable to be the
+    // panel itself, and it is stale by the time the panel comes off — exactly the
+    // mismatch Android's capture refuses with -3 「目标窗口已经切换」.
+    final InMemoryCapabilities capabilities = InMemoryCapabilities(
+      targetWindow: '7',
+    );
+    addTearDown(capabilities.dispose);
+    final PanelSession panel = PanelSession();
+    addTearDown(panel.dispose);
+    final ConversationRuntime runtime = ConversationRuntime(
+      capabilities: capabilities.toSet(),
+      panel: panel,
+      copy: AppCopy.zh,
+      clipboardWrite: (_) {},
+      analyzer: (_, _) async => _advice('unused'),
+    );
+    addTearDown(runtime.dispose);
+    await runtime.start();
+
+    panel.receive(const PanelCommand(PanelCommandKind.recogniseOnce));
+    await _until(() => capabilities.screenCapture.captureCalls.isNotEmpty);
+
+    expect(capabilities.screenCapture.captureCalls, <String?>[null]);
+  });
+
+  test('a refused frame reaches the panel in the platform\'s own words', () async {
+    // The platform writes these sentences to be shown unchanged, and the panel is
+    // the only channel: a generic replacement would leave the user with a
+    // sentence that fits every failure and therefore diagnoses none. The
+    // accessibility-unavailable case keeps the generic one, because there the
+    // platform declined to answer at all.
+    final InMemoryCapabilities capabilities = InMemoryCapabilities();
+    addTearDown(capabilities.dispose);
+    capabilities.screenCapture.outcome = const CaptureFailed(
+      code: 6,
+      message: 'window is not visible or is protected',
+    );
+    final PanelSession panel = PanelSession();
+    addTearDown(panel.dispose);
+    final ConversationRuntime runtime = ConversationRuntime(
+      capabilities: capabilities.toSet(),
+      panel: panel,
+      copy: AppCopy.zh,
+      clipboardWrite: (_) {},
+      analyzer: (_, _) async => _advice('unused'),
+    );
+    addTearDown(runtime.dispose);
+    await runtime.start();
+
+    panel.receive(const PanelCommand(PanelCommandKind.recogniseOnce));
+    await _until(
+      () =>
+          panel.current.note != null &&
+          panel.current.note != AppCopy.zh.text(CopyKey.runtimeRecognising),
+    );
+
+    expect(panel.current.note, contains('window is not visible'));
+    expect(
+      panel.current.note,
+      isNot(AppCopy.zh.text(CopyKey.runtimeCaptureFailed)),
+      reason: 'the platform said why; repeating a generic sentence buries it',
+    );
+    expect(
+      capabilities.ocr.languageCalls,
+      isEmpty,
+      reason: 'nothing was read, so nothing should have been asked to read it',
+    );
+  });
 }
 
 Advice _advice(String text) => Advice(
