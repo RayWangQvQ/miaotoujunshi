@@ -1,5 +1,15 @@
 {
   "dart.flutterSdkPath": "/Users/raywang/dev/flutter-3.47.6",
+  // This machine's shell profile points PUB_HOSTED_URL at an employer-internal
+  // Artifactory that only resolves on that employer's network. Nothing in this
+  // repository comes from there, and off that network every launch aborts at
+  // "Resolving dependencies" before the app starts. Pin the public registry for
+  // this workspace so a debug session does not depend on which network the
+  // machine happens to be on. `dart.env` reaches every Dart/Flutter process the
+  // extensions spawn, including the pub get they run before launching.
+  "dart.env": {
+    "PUB_HOSTED_URL": "https://pub.dev"
+  },
   "python.analysis.exclude": [
     "**/.venv"
   ],
