@@ -58,6 +58,19 @@ of contract members that already exist.**
    Adding `UiTreeReader.captureOnce()` was the obvious shape and is the wrong one: it would
    have required a member on an interface whose own doc comment calls itself "Android only",
    a probe entry, a `42 → 43` count assertion, and two new permanent refusals.
+
+   **Amended (`c90dd46`):** the composition is `capture()` and `ocr.recognize()` and nothing
+   else. Two of the four members listed above were dropped from it after the first device run
+   refused every shot with 「拿不到画面」. `findTargetWindow()` answers with the window that is
+   *active* — which while the panel is up is liable to be the panel itself — and, because it
+   is taken before `hideForCapture()` and then passed as `targetWindowId`, Android's
+   `capture()` rejects it with `-3 目标窗口已经切换` the moment the panel comes off:
+   `AndroidOverlayHost.hide()` is `removeView`, so the handle is stale by construction.
+   `hideForCapture()`/`restoreAfterCapture()` went with it — `ScreenCapture`'s own doc puts
+   hiding the panel on the implementation alongside the rate limit and the watchdog, both
+   platforms already hide inside `capture()` and restore in a `finally`, and calling them here
+   hid the panel twice. The decision itself is unchanged, and so is its shape: still no
+   contract member added, and the retired port's manual path passed no window handle either.
 2. **It works on every application, and there is no allowlist.** An unadapted application is
    not an error state; it is the case the manual path exists for. The path is never
    automatic: the adapter registry stays the only thing that triggers a capture without the
