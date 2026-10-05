@@ -66,6 +66,15 @@ enum PanelCommandKind {
   reanalyse,
   analyseCurrent,
 
+  /// Photograph whatever is in front and read the whole frame, then treat the
+  /// result as the current conversation (ADR-0018).
+  ///
+  /// The one command that exists for applications the adapter registry does not
+  /// know: without an adapter there is no tree to read, so the panel is the only
+  /// way in and this is the door. It is never automatic — the registry stays the
+  /// only thing that captures without the user asking.
+  recogniseOnce,
+
   /// Closing the window is the window's business rather than the protocol's,
   /// and the OS gives the old ports no chrome to do it with — they draw their
   /// own close button. It is here so the panel has exactly one way to ask.

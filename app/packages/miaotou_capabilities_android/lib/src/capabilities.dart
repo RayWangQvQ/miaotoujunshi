@@ -67,9 +67,12 @@ final class AndroidUiTreeReader implements UiTreeReader {
 
 /// Android's answer for OCR.
 ///
-/// Owned by #22. Backed by ML Kit, and also by the cloud vision route the port
-/// already offers — the one endpoint that sends a screenshot anywhere, and the
-/// reason the visibility question in PRIVACY.md stays open.
+/// Owned by #22. Backed by ML Kit's bundled Chinese recogniser and by nothing
+/// else: the work runs on the device, in this process, with no network and no
+/// screenshot leaving the phone. The vision-model route the retired port once
+/// offered is deliberately not on this path (ADR-0018 §5), so the "one endpoint
+/// that sends a screenshot anywhere" no longer exists and
+/// `PRIVACY.md`'s visibility question is about the strategy service alone.
 final class AndroidOcr implements Ocr {
   AndroidOcr(this._native);
 

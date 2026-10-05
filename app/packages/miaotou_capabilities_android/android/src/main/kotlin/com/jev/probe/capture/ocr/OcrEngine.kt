@@ -14,8 +14,10 @@ data class OcrLine(val text: String, val bounds: Rect)
  * delivered on the main thread and always fires — an engine failure comes back
  * as an empty list, never as an exception on the caller's thread.
  *
- * v1.3 has exactly one implementation, [MlKitOcr]. The vision-model OCR is
- * deliberately NOT on this path (see docs/v1.3-plan.md, B stage revision).
+ * There is exactly one implementation, [MlKitOcr]. The vision-model OCR is
+ * deliberately NOT on this path — a decision the retired port took in its v1.3
+ * revision, and one this repository keeps (ADR-0018 §5). The plan document that
+ * recorded it is not carried here.
  */
 interface OcrEngine {
     fun recognize(bitmap: Bitmap, region: Rect?, cb: (List<OcrLine>) -> Unit)

@@ -430,7 +430,18 @@ class RetainedCaptureService : AccessibilityService() {
         const val MAX_NODES = 5000
         const val TOP_CROP = 0.12f
         const val BOTTOM_CROP = 0.84f
-        val PURE_TIME = Regex("""\d{1,2}[:：]\d{2}""")
+
+        /**
+         * A line that is nothing but a time stamp, dropped before grouping.
+         *
+         * Anchored, and deliberately identical to the Dart expression that the
+         * manual path uses (`manual_recognition.dart`): an unanchored version
+         * also swallowed lines that merely contained a time ("会议改到 8:11"),
+         * and the two whole-frame paths must read one screen the same way.
+         */
+        val PURE_TIME = Regex(
+            """^\s*(上午|下午|AM|PM|am|pm)?\s*\d{1,2}[:：]\d{2}\s*(上午|下午|AM|PM|am|pm)?\s*$"""
+        )
     }
 }
 

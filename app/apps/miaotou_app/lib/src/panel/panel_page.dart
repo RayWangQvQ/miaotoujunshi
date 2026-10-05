@@ -249,7 +249,13 @@ class _PanelPageState extends State<PanelPage> {
             ),
         Padding(
           padding: AppSpacing.card,
-          child: Row(
+          // A Wrap rather than a Row with a Spacer: three buttons in a 300dp
+          // panel do not fit on one line, and the panel is the one surface that
+          // cannot grow to make them.
+          child: Wrap(
+            alignment: WrapAlignment.end,
+            spacing: AppSpacing.s,
+            runSpacing: AppSpacing.s,
             children: <Widget>[
               if (view.allows(PanelAction.details))
                 OutlinedButton(
@@ -258,7 +264,13 @@ class _PanelPageState extends State<PanelPage> {
                   ),
                   child: Text(copy.text(CopyKey.panelActionDetails)),
                 ),
-              const Spacer(),
+              OutlinedButton(
+                key: const Key('panel-recognise-once'),
+                onPressed: () => widget.onCommand(
+                  const PanelCommand(PanelCommandKind.recogniseOnce),
+                ),
+                child: Text(copy.text(CopyKey.panelActionRecognise)),
+              ),
               FilledButton(
                 onPressed: () => widget.onCommand(
                   PanelCommand(
