@@ -20,6 +20,7 @@ export 'src/model/conversation_ref.dart';
 export 'src/model/screen_rect.dart';
 export 'src/model/speaker.dart';
 export 'src/platform/floating_panel.dart';
+export 'src/platform/panel_placement.dart';
 export 'src/platform/ocr.dart';
 export 'src/platform/screen_capture.dart';
 export 'src/platform/text_inject.dart';

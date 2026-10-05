@@ -16,11 +16,9 @@ import 'src/panel/protocol.dart';
 /// reach a capability, a store or the model: the panel is handed a [PanelFrame]
 /// and a callback, and there is no path for anything else to cross.
 ///
-/// Until the frame channel is carried over a window channel the panel runs on an
-/// in-memory one and shows the empty frame — the same frame the gallery shows, so
-/// what is on screen is the real widget rather than a mock-up of it. Carrying the
-/// two ends is the window mechanism's work, and the seam is [PanelChannel]: the
-/// only thing that changes when it arrives is which channel the two widgets share.
+/// The production Windows entry point supplies a multi-window channel; tests and
+/// the standalone preview may use the in-memory implementation. Both carry only
+/// [PanelFrame] values down and [PanelCommand] values up.
 void main() {
   runApp(const PanelApp());
 }
@@ -31,11 +29,22 @@ void main() {
 /// never print a package name (ADR-0002), so the first thing worth seeing on
 /// screen is the 「未识别会话」 fallback rather than a plausible-looking name.
 class PanelApp extends StatefulWidget {
-  const PanelApp({super.key, this.channel});
+  const PanelApp({
+    super.key,
+    this.channel,
+    this.onExpandedChanged,
+    this.onDragStart,
+    this.onInputFocusChanged,
+    this.initialExpanded = true,
+  });
 
   /// The seam. An in-memory one by default so the panel runs with nothing else
   /// present; a window channel replaces it without changing anything below.
   final PanelChannel? channel;
+  final ValueChanged<bool>? onExpandedChanged;
+  final VoidCallback? onDragStart;
+  final Future<void> Function(bool focusable)? onInputFocusChanged;
+  final bool initialExpanded;
 
   @override
   State<PanelApp> createState() => _PanelAppState();
@@ -72,19 +81,23 @@ class _PanelAppState extends State<PanelApp> {
 
   @override
   Widget build(BuildContext context) => CopyScope(
-        copy: AppCopy.zh,
-        child: MaterialApp(
-          title: AppCopy.zh.text(CopyKey.appTitle),
-          debugShowCheckedModeBanner: false,
-          theme: buildTheme(),
-          home: StreamBuilder<PanelFrame>(
-            stream: _channel.frames,
-            builder: (BuildContext context, AsyncSnapshot<PanelFrame> snapshot) =>
-                PanelPage(
-                  frame: snapshot.data ?? _empty,
-                  onCommand: _channel.send,
-                ),
-          ),
-        ),
-      );
+    copy: AppCopy.zh,
+    child: MaterialApp(
+      title: AppCopy.zh.text(CopyKey.appTitle),
+      debugShowCheckedModeBanner: false,
+      theme: buildTheme(),
+      home: StreamBuilder<PanelFrame>(
+        stream: _channel.frames,
+        builder: (BuildContext context, AsyncSnapshot<PanelFrame> snapshot) =>
+            PanelPage(
+              frame: snapshot.data ?? _empty,
+              onCommand: _channel.send,
+              onExpandedChanged: widget.onExpandedChanged,
+              onDragStart: widget.onDragStart,
+              onInputFocusChanged: widget.onInputFocusChanged,
+              initialExpanded: widget.initialExpanded,
+            ),
+      ),
+    ),
+  );
 }

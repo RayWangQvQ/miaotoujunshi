@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 
 import '../native.dart';
+import '../panel_native.dart';
 
 final class FakeWindowsNative implements WindowsNative {
   FakeWindowsNative({
@@ -64,5 +66,56 @@ final class FakeWindowsNative implements WindowsNative {
     log.add('inject:${target.windowId}');
     injectedText = text;
     return injectResult ?? InjectResult.verified(text);
+  }
+}
+
+final class FakeWindowsPanelNative implements WindowsPanelNative {
+  PanelGeometry geometry = const PanelGeometry(
+    screen: ScreenRect(left: 0, top: 0, right: 1440, bottom: 900),
+    window: ScreenRect(left: 0, top: 0, right: 420, bottom: 620),
+  );
+  bool visible = false;
+  bool focusable = false;
+  int restores = 0;
+  final List<(PanelPlacement, ScreenRect?)> shows =
+      <(PanelPlacement, ScreenRect?)>[];
+  final StreamController<NativeWindowsPanelEvent> _events =
+      StreamController<NativeWindowsPanelEvent>.broadcast();
+
+  void drag({required ScreenRect window, required ScreenRect screen}) {
+    _events.add(NativeWindowsPanelDragged(window: window, screen: screen));
+  }
+
+  @override
+  Stream<NativeWindowsPanelEvent> get events => _events.stream;
+
+  @override
+  Future<PanelGeometry> panelGeometry() async => geometry;
+
+  @override
+  Future<void> showPanel({
+    required PanelPlacement placement,
+    ScreenRect? at,
+  }) async {
+    visible = true;
+    shows.add((placement, at));
+  }
+
+  @override
+  Future<bool> hidePanel() async {
+    final bool wasVisible = visible;
+    visible = false;
+    return wasVisible;
+  }
+
+  @override
+  Future<void> restorePanel() async {
+    visible = true;
+    restores++;
+  }
+
+  @override
+  Future<void> setPanelFocusable(bool value) async {
+    focusable = value;
   }
 }

@@ -21,6 +21,5 @@ export 'src/native.dart';
 export 'src/pacing.dart';
 export 'src/payload.dart';
 export 'src/perception.dart';
-export 'src/placement.dart';
 export 'src/preferences.dart';
 export 'src/secrets.dart';

@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
-import 'package:miaotou_capabilities_macos/miaotou_capabilities_macos.dart';
 
 /// Snapping a dragged window to an edge, and remembering where it was.
 ///

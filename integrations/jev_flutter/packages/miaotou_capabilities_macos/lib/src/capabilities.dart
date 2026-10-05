@@ -4,7 +4,6 @@ import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 
 import 'native.dart';
 import 'pacing.dart';
-import 'placement.dart';
 
 /// macOS's answer for screen capture.
 ///

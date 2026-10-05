@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 
+import 'panel/session.dart';
 import 'shell/destination.dart';
 
 /// What the process is doing, as opposed to what the window is showing.
@@ -18,11 +19,13 @@ import 'shell/destination.dart';
 /// and its panel are its own to close. The session promises to call it once, and
 /// promises never to call it on the way to hiding a window.
 final class Session {
-  Session({required this.capabilities, this.onEnd});
+  Session({required this.capabilities, this.onEnd, PanelSession? panel})
+    : panel = panel ?? PanelSession();
 
   /// The ten capabilities this port answers for. Read by the diagnostics page,
   /// and by nothing that could mistake a hidden window for a dead one.
   final CapabilitySet capabilities;
+  final PanelSession panel;
 
   /// Called exactly once, by [end], and by nothing else.
   final Future<void> Function()? onEnd;
@@ -52,6 +55,7 @@ final class Session {
     if (stop != null) {
       await stop();
     }
+    await panel.dispose();
   }
 }
 

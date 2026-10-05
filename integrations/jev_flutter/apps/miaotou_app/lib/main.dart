@@ -1,11 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 
+import 'panel_main.dart';
 import 'src/app.dart';
 import 'src/capability_registry.dart';
 import 'src/session.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final PanelWindowRuntime? panel = await attachPanelWindowForCurrentPlatform();
+  if (panel != null) {
+    runApp(
+      PanelApp(
+        channel: panel.channel,
+        onExpandedChanged: panel.setExpanded,
+        onDragStart: panel.startDragging,
+        onInputFocusChanged: panel.setFocusable,
+        initialExpanded: false,
+      ),
+    );
+    return;
+  }
+
   // The one line that knows what it is running on. Everything below `runApp`
   // receives the capability set rather than looking for one, which is what lets a
   // test drive the whole application with no device attached (ADR-0009).
@@ -22,6 +38,8 @@ void main() {
   // implementation ticket.
   final Session session = Session(capabilities: capabilities);
   final MainWindowController window = MainWindowController();
+
+  await startPanelForCurrentPlatform(capabilities, session.panel);
 
   runApp(MiaotouApp(session: session, window: window));
 }

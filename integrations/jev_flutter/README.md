@@ -4,11 +4,11 @@ The three platform ports are being replaced by one Flutter application built for
 Android, Windows and macOS from a single codebase. The decisions behind that are
 `docs/adr/0007` onwards; this file is how to build and test what is here today.
 
-**Status: macOS promoted; Windows bridge implemented.** The shared workspace and
-contract are live, the macOS port is the promoted implementation, and Windows
-has its process-isolated capture/OCR/input bridge. The Windows panel, storage and
-release packaging and all Android native capabilities are still pending — see
-*What is not here yet* below.
+**Status: macOS promoted; Windows bridge and panel implemented.** The shared
+workspace and contract are live, the macOS port is the promoted implementation,
+and Windows has its process-isolated capture/OCR/input bridge plus a second-engine
+frameless floating panel. General storage, release packaging and all Android
+native capabilities are still pending — see *What is not here yet* below.
 
 ## Layout
 
@@ -61,6 +61,19 @@ flutter analyze
 A Windows build cannot be produced on macOS or Linux; that leg is only ever
 exercised on a Windows host.
 
+### Windows floating panel
+
+At startup the Windows runner creates the 56px floating ball in a second Flutter
+engine. The window is frameless, always on top, omitted from the taskbar and
+marked `WS_EX_NOACTIVATE` until the user enters an editable draft. Dragging snaps
+the window to the nearest display edge and stores its last bounds in
+`%LOCALAPPDATA%\妙投军师\panel-placement.json`.
+
+The panel isolate receives only serialized `PanelFrame` snapshots and sends only
+`PanelCommand` values through `desktop_multi_window`; capabilities and session
+state remain in the primary engine. A real Windows host is required to validate
+focus handoff and system IME behavior.
+
 ### Building the Windows bridge
 
 The Windows package's capture, OCR and text injection run in a separate Rust
@@ -109,7 +122,7 @@ fails if anyone declares the payload as an asset.
 | The design system and the main-window routing shell | #11 |
 | Panel content and the read-only derivation | #12 |
 | The macOS implementations | #14, #15 |
-| The Windows panel, storage and packaged bridge/models | #18, #19 |
+| Windows general storage and packaged bridge/models | #19 |
 | The Android overlay plugin and implementations | #21–#23 |
 | A `tool/` directory and a `fixtures/` directory | #15, #19 — written together with the build step that calls them and the fixtures that use them, so that neither is scaffolding nothing invokes |
 | The `flutter-*` CI jobs | the packaging ticket; until then this tree is built by hand |

@@ -24,6 +24,7 @@ resolution: workspace
 # when #17 and #21 give theirs native code the plugin mechanism will simply not
 # register a plugin for a platform it does not declare.
 dependencies:
+  desktop_multi_window: ^0.3.1
   flutter:
     sdk: flutter
 

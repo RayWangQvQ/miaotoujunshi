@@ -303,9 +303,9 @@ void main() {
           reason: 'still collapsed: transient state is the panel\'s own and a '
               'new frame is not a reason to lose it');
 
-      await tester.tap(find.byIcon(Icons.expand_more));
+      await tester.tap(find.byKey(const Key('panel-ball')));
       await tester.pumpAndSettle();
-      expect(find.text('新的一句'), findsOneWidget,
+      expect(find.text('新的一句'), findsNWidgets(2),
           reason: 'the panel renders the frame it was handed, not the one it '
               'was handed first');
       expect(find.text('好'), findsNothing);

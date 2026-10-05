@@ -74,6 +74,9 @@ licences remain with their respective copyright holders:
 | `rapidocr-core` 0.2.2 | RapidOCR-compatible detection, recognition and post-processing | Apache-2.0 |
 | ONNX Runtime (`ort`) | Local inference runtime used by `rapidocr-core` | MIT |
 | PaddleOCR PP-OCRv5 Chinese mobile models | Offline Chinese detection and recognition | Apache-2.0 |
+| `desktop_multi_window` 0.3.1 | Second Flutter engine and window messaging on Windows | MIT |
+| `window_manager` 0.5.2 | Frameless, always-on-top Windows window control | MIT |
+| `screen_retriever` 0.2.2 | Windows display geometry | MIT |
 
 The Windows bridge disables `rapidocr-core`'s model-download feature. Model
 files are release inputs and are never fetched while the application is

@@ -16,6 +16,7 @@ import 'package:test/test.dart';
 void main() {
   final CapabilitySet capabilities = windowsCapabilities(
     native: FakeWindowsNative(),
+    panelNative: FakeWindowsPanelNative(),
   );
 
   test('every member of the contract answers for itself', () async {

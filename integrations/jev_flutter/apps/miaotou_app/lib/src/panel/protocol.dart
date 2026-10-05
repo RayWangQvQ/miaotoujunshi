@@ -10,16 +10,10 @@ import 'package:miaotou_domain/miaotou_domain.dart';
 /// panel cannot ask a capability, read a store or call a model, because there is
 /// no path for it to do so — it is handed a [PanelFrame] and a callback.
 ///
-/// ## Why a typed interface and not a codec
-///
-/// The obvious thing to put here is a JSON encoder, because that is what a
-/// second window will eventually carry. It is deliberately absent: `Advice` has
-/// no `fromJson` (it is parsed out of a model's reply, which is a different
-/// contract with different tolerances), and writing a second decoder for the
-/// sake of a transport that does not exist yet would invent a contract nobody
-/// has agreed to. What #18 and #21 need is the list of things that may cross —
-/// this file — and then an encoding, which belongs beside the window mechanism
-/// that carries it.
+/// The typed contract lives here; the Windows JSON encoding lives beside the
+/// multi-window transport in `window_channel.dart`. That keeps serialization
+/// out of the domain while making every value crossing the engine boundary
+/// explicit and testable.
 ///
 /// ## Why the frame carries references and not labels
 ///
@@ -60,7 +54,8 @@ final class PanelFrame {
   final Map<String, String> appNames;
 
   /// The resolver [derivePanel] wants, over this frame's map.
-  String? appNameFor(ConversationRef reference) => appNames[reference.packageName];
+  String? appNameFor(ConversationRef reference) =>
+      appNames[reference.packageName];
 }
 
 /// One thing the panel is asking for.
@@ -79,16 +74,20 @@ enum PanelCommandKind {
 
 /// A command going up.
 final class PanelCommand {
-  const PanelCommand(this.kind, {this.candidateIndex});
+  const PanelCommand(this.kind, {this.candidateIndex, this.text});
 
   final PanelCommandKind kind;
 
   /// Which draft, for [PanelCommandKind.fill] and [PanelCommandKind.copy].
   final int? candidateIndex;
 
+  /// The user-edited draft for fill/copy commands.
+  final String? text;
+
   @override
   String toString() =>
-      'PanelCommand(${kind.name}${candidateIndex == null ? '' : ', $candidateIndex'})';
+      'PanelCommand(${kind.name}${candidateIndex == null ? '' : ', $candidateIndex'}'
+      '${text == null ? '' : ', edited'})';
 }
 
 /// The one seam between the two windows.

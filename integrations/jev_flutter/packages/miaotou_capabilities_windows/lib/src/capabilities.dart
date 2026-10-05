@@ -97,41 +97,6 @@ final class WindowsTextInject implements TextInject {
       _native.inject(text, target: target);
 }
 
-/// Windows's answer for the floating window.
-///
-/// Owned by #18. A frameless, always-on-top window that owns only the ball and
-/// the panel; every other surface is a route in the main window (ADR-0012).
-final class WindowsFloatingPanel implements FloatingPanel {
-  const WindowsFloatingPanel();
-
-  static const String _platform = 'Windows';
-
-  Never _refuse(String member) =>
-      notYetBuilt(platform: _platform, member: member, ticket: '#18');
-
-  @override
-  Future<void> show({required PanelPlacement placement}) async =>
-      _refuse('FloatingPanel.show');
-
-  @override
-  Future<void> hide() async => _refuse('FloatingPanel.hide');
-
-  @override
-  Future<void> hideForCapture() async =>
-      _refuse('FloatingPanel.hideForCapture');
-
-  @override
-  Future<void> restoreAfterCapture() async =>
-      _refuse('FloatingPanel.restoreAfterCapture');
-
-  @override
-  Future<void> setFocusable(bool value) async =>
-      _refuse('FloatingPanel.setFocusable');
-
-  @override
-  Stream<PanelEvent> get events => _refuse('FloatingPanel.events');
-}
-
 /// Windows's answer for the shared payload.
 ///
 /// Owned by #19. Reads the real files that sit next to the executable, which

@@ -5,6 +5,10 @@ import 'package:miaotou_capabilities_android/miaotou_capabilities_android.dart';
 import 'package:miaotou_capabilities_macos/miaotou_capabilities_macos.dart';
 import 'package:miaotou_capabilities_windows/miaotou_capabilities_windows.dart';
 
+import 'panel/protocol.dart';
+import 'panel/session.dart';
+import 'panel/window_channel.dart';
+
 /// The one place in the application that asks what it is running on.
 ///
 /// ADR-0009 makes the contract the only boundary the three ports may differ
@@ -20,6 +24,7 @@ CapabilitySet capabilitiesForCurrentPlatform() {
   if (Platform.isAndroid) {
     return androidCapabilities();
   }
+
   if (Platform.isMacOS) {
     return macosCapabilities();
   }
@@ -30,4 +35,73 @@ CapabilitySet capabilitiesForCurrentPlatform() {
     'this application is built for Android, Windows and macOS; it is running on '
     '${Platform.operatingSystem}',
   );
+}
+
+final class PanelWindowRuntime {
+  const PanelWindowRuntime({
+    required this.channel,
+    required this.setExpanded,
+    required this.startDragging,
+    required this.setFocusable,
+  });
+
+  final PanelChannel channel;
+  final Future<void> Function(bool expanded) setExpanded;
+  final Future<void> Function() startDragging;
+  final Future<void> Function(bool focusable) setFocusable;
+}
+
+Future<PanelWindowRuntime?> attachPanelWindowForCurrentPlatform() async {
+  if (!Platform.isWindows) {
+    return null;
+  }
+  final WindowsPanelWindowBinding? panel =
+      await WindowsPanelWindowBinding.attachIfPanel();
+  if (panel == null) {
+    return null;
+  }
+  final WindowsPanelViewChannel channel = WindowsPanelViewChannel();
+  await channel.initialize();
+  return PanelWindowRuntime(
+    channel: channel,
+    setExpanded: panel.setExpanded,
+    startDragging: panel.startDragging,
+    setFocusable: panel.setFocusable,
+  );
+}
+
+Future<void> startPanelForCurrentPlatform(
+  CapabilitySet capabilities,
+  PanelSession panel,
+) async {
+  if (!Platform.isWindows) {
+    return;
+  }
+  final WindowsPanelMainChannel channel = WindowsPanelMainChannel();
+  final WindowsPanelPositionStore positionStore =
+      FileWindowsPanelPositionStore();
+  final WindowsPanelPosition? savedPosition = await positionStore.read();
+  await channel.initialize();
+  await capabilities.floatingPanel.show(
+    placement: PanelPlacement(
+      anchor: PanelAnchor.free,
+      dx: savedPosition?.x ?? 0,
+      dy: savedPosition?.y ?? 0,
+      width: 56,
+      height: 56,
+    ),
+  );
+  capabilities.floatingPanel.events.listen((PanelEvent event) {
+    if (event case PanelDragged(:final x, :final y)) {
+      positionStore.write(WindowsPanelPosition(x: x, y: y));
+    }
+  });
+  await channel.push(panel.current);
+  panel.frames.listen(channel.push);
+  channel.commands.listen((PanelCommand command) {
+    panel.receive(command);
+    if (command.kind == PanelCommandKind.close) {
+      capabilities.floatingPanel.hide();
+    }
+  });
 }

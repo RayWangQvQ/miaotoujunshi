@@ -9,9 +9,16 @@ environment:
 resolution: workspace
 
 dependencies:
+  desktop_multi_window: ^0.3.1
   ffi: ^2.1.4
+  flutter:
+    sdk: flutter
   miaotou_capabilities:
     path: ../miaotou_capabilities
+  screen_retriever: ^0.2.2
+  window_manager: ^0.5.2
 
 dev_dependencies:
+  flutter_test:
+    sdk: flutter
   test: ^1.25.0
