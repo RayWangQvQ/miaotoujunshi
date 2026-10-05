@@ -8,8 +8,9 @@ This file records the provenance and the licence layering of this repository.
 The root LICENSE (MIT, Copyright (c) 2026 powerycy) covers only the code written
 in this repository — the Skill layer and the glue code of the integrations.
 The promoted Flutter implementation translates derived logic from all three
-upstream ports, including retained Kotlin from the Android assistant; those
-attribution obligations live in this NOTICE rather than lapsing.
+upstream ports, including retained Kotlin from the Android assistant; the
+obligations those ports imposed are carried in this `NOTICE` — listed under
+"The three upstream attribution obligations" — rather than lapsing.
 
 Written in this repository: the repository tooling under `scripts/`, the ports
 under `integrations/`, the root governance files (`README.md`, `NOTICE`,
@@ -32,42 +33,103 @@ Upstream's own governance files (`README.md`, `README_EN.md`, `LICENSE`,
 notes are deliberately **not** imported. The root `documentation/` in this
 repository is app-layer material, not upstream's documentation directory.
 
-## Provenance and attribution per port
+## Provenance and attribution for the Flutter implementation
 
-| Directory | Derived from | Copyright | Attribution files |
+`integrations/jev_flutter` is the single Flutter codebase that carries all three
+ports. The three old port directories, and the attribution file each of them
+carried — a `LICENSE` and a `NOTICE` for the Android and Windows ports, and the
+vendored upstream `LICENSE` credited by the macOS port's `README.md` — were
+deleted when that port was promoted; the ports remain reachable only as the
+archive tags `archive/jev-android-kotlin-final`,
+`archive/jev-windows-python-final` and `archive/jev-mac-python-final`. The
+attribution obligations those files imposed are carried here instead — none was
+dropped together with them.
+
+| Upstream | What it contributes to `integrations/jev_flutter` | Copyright | Attribution files |
 | --- | --- | --- | --- |
-| `integrations/jev_flutter` | [jev-chat/jev-chat-jarvis](https://github.com/jev-chat/jev-chat-jarvis), [jev-chat/jev-chat-windows](https://github.com/jev-chat/jev-chat-windows), and [jev-chat/jev-chat-jarvis-mac](https://github.com/jev-chat/jev-chat-jarvis-mac) at `afb58cf53d098e314a1368d15e13ab5330015688` | Finderchangchang, rezoch340, eatmoreduck and the jev-chat contributors | This `NOTICE` and the root `LICENSE` |
+| [jev-chat/jev-chat-jarvis](https://github.com/jev-chat/jev-chat-jarvis) | The Android reading shape, including the retained Kotlin accessibility and capture service | Finderchangchang and the jev-chat contributors | This `NOTICE` and the root `LICENSE` |
+| [jev-chat/jev-chat-windows](https://github.com/jev-chat/jev-chat-windows) | The Windows capture, OCR and injection shape; the judging kernel and its question wording stay Finderchangchang's | rezoch340 and the jev-chat contributors | This `NOTICE` and the root `LICENSE` |
+| [jev-chat/jev-chat-jarvis-mac](https://github.com/jev-chat/jev-chat-jarvis-mac) at `afb58cf53d098e314a1368d15e13ab5330015688` | The macOS reading, overlay and memory shape | eatmoreduck | This `NOTICE` and the root `LICENSE` |
 
-Distributing the Flutter implementation requires shipping its listed
-attribution files and stating the origin.
+All three upstreams are MIT. Distributing the Flutter implementation on any of
+the three platforms means shipping the attribution files above and stating the
+origin.
+
+### The three upstream attribution obligations
+
+All three upstreams are MIT, and MIT imposes the same three obligations on every
+derivative of each of them. The Android and Windows ports wrote them out in their
+own notices; the wording below is what they required, and it applies to all
+three:
+
+1. **Keep the licence text and this notice.** Ship the MIT text — the root
+   `LICENSE` — and this `NOTICE` with every distribution, and keep the copyright
+   lines restated in the table above.
+2. **State the origin.** Credit the source in the product's about page, its
+   documentation or its release page. The upstreams' own suggested wording is
+   "Based on Jev Chat Assistant
+   (https://github.com/jev-chat/jev-chat-jarvis)" for the first, "Integrated
+   from jev-chat-windows
+   (https://github.com/jev-chat/jev-chat-windows)" for the second, and the
+   pinned commit above for the third. This `NOTICE` is that statement for this
+   repository.
+3. **Do not imply endorsement.** The upstream names, the "Jev 聊天助手" name and
+   the upstream domains must not be used to imply that the upstream authors
+   produced or endorsed this product. See "Brand boundary".
 
 ## Licence layering (important)
 
 The promoted Flutter Android, macOS and Windows applications are MIT, with the
-upstream notices above retained for their
-derivative logic. Their third-party components keep their own licences, but no
-component imposes a repository-wide copyleft constraint on a release artifact.
+upstream notices above retained for their derivative logic. Their third-party
+components keep their own licences — see the table below — but no component
+imposes a repository-wide copyleft constraint on a release artifact.
 
 ## Third-party components in the Flutter implementation
 
-The Flutter implementation directly depends on the following components. Their
-licences remain with their respective copyright holders:
+The Flutter implementation, and the Windows native bridge it builds, depend on the
+components below. Their licences remain with their respective copyright holders.
+Versions are the ones the manifests declare or the lock files resolve today.
 
 | Component | Use | Licence |
 | --- | --- | --- |
-| Flutter SDK / Dart `ffi` package | Application framework and Windows shared-memory FFI | BSD-3-Clause |
-| `windows-capture` 2.0.1 | Windows Graphics Capture wrapper | MIT |
-| `windows` / windows-rs | Win32, WinRT and UI Automation bindings | MIT or Apache-2.0 |
-| `rapidocr-core` 0.2.2 | RapidOCR-compatible detection, recognition and post-processing | Apache-2.0 |
-| ONNX Runtime (`ort`) | Local inference runtime used by `rapidocr-core` | MIT |
-| PaddleOCR PP-OCRv5 Chinese mobile models | Offline Chinese detection and recognition | Apache-2.0 |
-| `desktop_multi_window` 0.3.1 | Second Flutter engine and window messaging on Windows | MIT |
+| Flutter SDK | Application framework and tooling for all three ports | BSD-3-Clause |
+| Dart `http` 1.6.0 | Calls to the configured judging and reply services | BSD-3-Clause |
+| Dart `ffi` 2.2.0 | Windows shared-memory FFI | BSD-3-Clause |
+| `desktop_multi_window` 0.3.1 | Second Flutter engine and window messaging on Windows | Apache-2.0 |
 | `window_manager` 0.5.2 | Frameless, always-on-top Windows window control | MIT |
 | `screen_retriever` 0.2.2 | Windows display geometry | MIT |
+| `windows` (windows-rs) 0.62.2 | Win32, WinRT and UI Automation bindings | MIT or Apache-2.0 |
+| `windows-capture` 2.0.1 | Windows Graphics Capture wrapper | MIT |
+| `anyhow` 1.0, `parking_lot` 0.12 | Bridge error and state plumbing | MIT or Apache-2.0 |
+| `image` 0.25 | Frame decoding and encoding inside the bridge | MIT or Apache-2.0 |
+| `serde` 1.0, `serde_json` 1.0 | Bridge command and result encoding | MIT or Apache-2.0 |
+| `rapidocr-core` 0.2.2 | RapidOCR-compatible detection, recognition and post-processing | Apache-2.0 |
+| ONNX Runtime (`ort` 2.0.0-rc.13) | Local inference runtime used by `rapidocr-core` | MIT or Apache-2.0 |
+| PaddleOCR PP-OCRv5 Chinese mobile models | Offline Chinese detection and recognition | Apache-2.0 |
+| ML Kit `text-recognition-chinese` 16.0.1 | On-device Chinese OCR fallback on Android | Google ML Kit — a proprietary Android SDK binary, used under Google's ML Kit terms; not open source and not redistributed as source |
+
+Build and test dependencies, listed for completeness. They run on a developer's
+machine or in CI and are not part of a release artifact, so they create no
+distribution obligation:
+
+| Component | Use | Licence |
+| --- | --- | --- |
+| `flutter_lints` 6.0.0 | Lint rules for the whole workspace | BSD-3-Clause |
+| `test` 1.31.1 | Test harness for the pure-Dart packages | BSD-3-Clause |
+| `yaml` 3.1.4 | Reading manifests in the invariant tests | MIT |
+| `com.android.tools.build:gradle` 9.1.0 | Android Gradle Plugin, builds the Android capability plugin | Apache-2.0 |
+| `org.jetbrains.kotlin:kotlin-gradle-plugin` 2.4.0 | Kotlin compilation for the retained Android Kotlin | Apache-2.0 |
+| `junit:junit` 4.13.2 | Unit tests for the Android capability plugin | EPL-1.0 |
 
 The Windows bridge disables `rapidocr-core`'s model-download feature. Model
 files are release inputs and are never fetched while the application is
 running.
+
+`native_bridge` itself — the Rust process that hosts Windows capture, OCR and
+injection — is MIT, like the rest of this repository. Python 3 is a build-time
+tool: the Android and macOS builds use it to copy the shared payload, and the
+Windows packaging step uses it to assert the payload keys at install time. It is
+not shipped inside any artifact.
 
 ## Brand boundary
 

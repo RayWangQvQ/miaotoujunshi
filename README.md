@@ -30,8 +30,8 @@ UI element is 「喵球」. **They are layered on purpose — do not mix them.**
 ## Origin, attribution and licensing
 
 The Flutter application contains derivative logic from the upstream Jev Chat
-assistants. Its translated attribution, including the retained Android capture
-and adapter logic, is recorded in the root `NOTICE`.
+assistants. The attribution obligations of all three upstreams — including the
+retained Android capture and adapter logic — are carried in the root `NOTICE`.
 
 The root and the promoted Android, Windows and macOS preview artifacts are MIT.
 Their third-party notices remain in `NOTICE`, but no release artifact carries a
@@ -44,9 +44,16 @@ live in [NOTICE](NOTICE); privacy notes in [PRIVACY.md](PRIVACY.md).
 
 ```bash
 python -B scripts/validate_layout.py
+python -B scripts/validate_attribution.py
 python -B goutoujunshi/scripts/validate_skill.py --runtime
 python -B scripts/check_upstream.py    # network required; read-only drift report
 ```
+
+`validate_attribution.py` keeps the licensing notes honest: the three upstreams'
+copyright holders and obligations must stay in `NOTICE`, every dependency the
+Flutter workspace declares — including its build and test plugins — must be
+recorded there with its licence, and `PRIVACY.md` must state the memory-store
+bounds the code enforces.
 
 The application's own suite — every package's tests plus the widget tests — lives
 in the Flutter workspace and needs Flutter 3.47 or newer; see

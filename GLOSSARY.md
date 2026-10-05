@@ -15,10 +15,10 @@
 | --- | --- |
 | 喵头军师 | 应用的中文显示名。出现在窗口标题、应用图标名称、通知栏标题、设置页与打包说明中 |
 | 喵球 | 悬浮球的显示名，只是这个 UI 元件的名字，**不是应用名**。只出现在球面与其自带文案（球的窗口标题、无障碍标签）中 |
-| miaotoujunshi | 应用的技术标识前缀。用于 applicationId（`com.miaotoujunshi.chat`）、PyInstaller `NAME`、CI artifact 名、zip 前缀与 dist 目录名。**也是本仓自有载荷目录名 `miaotoujunshi/`**——同名是有意的：本仓自有的一侧统一叫这个 |
+| miaotoujunshi | 应用的技术标识前缀。用于 applicationId（`com.miaotoujunshi.chat`）、CI artifact 名与 zip 前缀。**也是本仓自有载荷目录名 `miaotoujunshi/`**——同名是有意的：本仓自有的一侧统一叫这个 |
 | Jev Chat | 上游 `jev-chat-jarvis` 的品牌名。应用侧**不再使用**，以免违反 NOTICE 的署名禁令。仍作为策略判断服务名（TypeSafe Jev）出现在配置界面 |
 | 跨端公用材料 | **设计上供三端运行期读取**的内容：本仓自有载荷 `miaotoujunshi/`（散文在 `references/knowledge/`，结构化数据在 `references/data/`，演示案例在 `examples/`），加上上游 skill 载荷 `goutoujunshi/`。三端一律读文件，不在任一端内联副本 |
-| preview 包 | 未签名/未公证的源码或调试构建，仅供自行安装验收，不是商店发布版 |
+| preview 包 | 供自行安装验收的构建产物（zip、`.app` 或调试 APK），不是商店发布版 |
 
 ## 自有载荷层（`miaotoujunshi/`）
 

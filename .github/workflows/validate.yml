@@ -17,6 +17,11 @@ jobs:
           python-version: "3.12"
       - name: Validate repository layout
         run: python3 -B scripts/validate_layout.py
+      # The three upstream notices were folded into the root NOTICE when the old
+      # ports were deleted; this guard is what stops an obligation, a dependency
+      # or a data-use promise from disappearing with the next edit.
+      - name: Validate attribution and data-use notes
+        run: python3 -B scripts/validate_attribution.py
       - name: Validate skill payload
         run: python3 -B goutoujunshi/scripts/validate_skill.py --runtime
       # The application's own suite lives with the Flutter workspace and is run by
