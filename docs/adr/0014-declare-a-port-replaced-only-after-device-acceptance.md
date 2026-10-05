@@ -95,3 +95,8 @@ port.**
   layering rather than a third-party package's.
 - **macOS's experiment B is the only one on the critical path now**, so the pilot
   can start without the Android or Windows questions being answered.
+- **The three tags are `archive/jev-<port>-<language>-final`**, not the
+  `legacy/<port>-final` the migration plan suggested. The plan's §13 records the
+  naming and why; what matters for this ADR is that all three were pushed to the
+  remote in the same change that deleted the directory, so the archived tree is
+  reachable from a clone and not only from the machine that did the deletion.

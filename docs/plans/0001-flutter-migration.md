@@ -407,17 +407,36 @@ port is deleted.**
 
 ---
 
-## 13. Items to settle before implementation (no decision needed now)
+## 13. Items to settle before implementation — all four settled
+
+Every item below was open when this plan was written. All four have since been
+decided by the port that needed them, and the decision is recorded beside the item
+so a reader can tell settled from pending without re-reading the commit history.
 
 1. **The concrete design of Windows shared-memory frame transfer** — the current implementation copies
    every frame through a queue (a 2560-wide raw frame is about 20 MB; debug frames are capped at ≤1100).
    The Flutter side needs shared memory, and the design must be settled before Windows starts.
+   *Settled by the Windows bridge (#17): frames cross the process boundary through
+   shared memory instead of a queue copy, inside the same out-of-process bridge as
+   capture and synthetic input.*
 2. **The method set of the self-written Android overlay plugin** — once aligned with the
    `FloatingPanel` interface, it still needs the flag combinations, edge-snap parameters and position
    persistence keys defined.
+   *Settled by #21: the plugin answers for `FloatingPanel` directly — runtime focus
+   flags, persisted edge snapping, and the ball's position kept separate from the
+   keyboard-safe expanded geometry. The shared placement and edging logic moved into
+   `miaotou_capabilities`, so macOS no longer carries a private copy.*
 3. **How to handle the macOS screen-recording permission prompt** — the system picker, an MDM profile,
    or an entitlement request to Apple: pick one or accept the prompt.
+   *Settled by [ADR-0016](../adr/0016-ask-for-screen-recording-permission-and-accept-the-re-prompt.md):
+   accept the re-prompt and ask for the permission from inside the app. A missing
+   grant preflights into a coded failure, never an empty result.*
 4. **Old-port tag naming** (suggested: `legacy/<port>-final`).
+   *Settled as `archive/jev-<port>-<language>-final` — `archive/jev-mac-python-final`,
+   `archive/jev-windows-python-final`, `archive/jev-android-kotlin-final`, all three
+   pushed to the remote. `archive/` reads as "this is history" rather than "still
+   supported somewhere", and the language is part of the name because what was
+   archived is an implementation, not the platform: the platform outlives it.*
 
 ---
 
@@ -433,3 +452,5 @@ port is deleted.**
 | [0012](../adr/0012-only-the-bubble-and-panel-are-their-own-window.md) | Give only the bubble and the panel their own window |
 | [0013](../adr/0013-run-the-windows-native-bridge-out-of-process.md) | Run the Windows native bridge out of process |
 | [0014](../adr/0014-declare-a-port-replaced-only-after-device-acceptance.md) | Declare a port replaced only after device acceptance passes |
+| [0015](../adr/0015-unify-the-speaker-token-and-leave-the-model-vocabulary-at-the-boundary.md) | Unify the speaker token and leave the model vocabulary at the boundary |
+| [0016](../adr/0016-ask-for-screen-recording-permission-and-accept-the-re-prompt.md) | Ask for screen-recording permission from the app and accept the re-prompt |
