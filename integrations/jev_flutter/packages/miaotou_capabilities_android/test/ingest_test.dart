@@ -103,6 +103,33 @@ void main() {
     expect(native.readCount, 0);
     await events.close();
   });
+
+  test('tree reader publishes conversation-only changes', () async {
+    final StreamController<AndroidIngestEvent> events =
+        StreamController<AndroidIngestEvent>();
+    final AndroidUiTreeReader reader = AndroidUiTreeReader(
+      _FakeIngestNative(events.stream),
+    );
+    const ConversationRef conversation = ConversationRef(
+      packageName: 'com.ss.android.lark',
+      title: '另一个会话',
+    );
+
+    final Future<ChatUiSnapshot> pushed = reader.snapshots.first;
+    events.add(
+      const AndroidConversationEvent(
+        current: conversation,
+        bound: null,
+        displayLabel: '另一个会话',
+        readOnly: true,
+      ),
+    );
+
+    final ChatUiSnapshot snapshot = await pushed;
+    expect(snapshot.conversation, conversation);
+    expect(snapshot.lines, isEmpty);
+    await events.close();
+  });
 }
 
 final class _FakeIngestNative implements AndroidIngestNative {

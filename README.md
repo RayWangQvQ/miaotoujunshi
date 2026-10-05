@@ -4,7 +4,8 @@ Jev Chat's "chat co-pilot" idea, rebuilt as two layers: an independently
 distributable AI Skill, plus three app entries — Android, Windows and macOS.
 
 The floating ball reads the screen → you confirm the transcript → analysis →
-candidate replies → **one-tap fill, never auto-send**.
+candidate replies → **copy, or verified one-tap fill where supported; never
+auto-send**. Android one-tap fill is currently tracked in #29.
 
 ## Layout
 
@@ -12,7 +13,7 @@ candidate replies → **one-tap fill, never auto-send**.
 | --- | --- | --- |
 | Upstream payload | `goutoujunshi/` | The `goutoujunshi` / 狗头军师 payload — `SKILL.md`, `references/`, `agents/`, `assets/`, `scripts/`. A maintained fork of the upstream skill, kept byte-identical; `scripts/check_upstream.py` reports the drift |
 | Own payload | `miaotoujunshi/` | This repository's own payload: the shared tone rules (`references/knowledge/`), the structured data (`references/data/`) and the demo cases (`examples/`) all three ports read at runtime. See `docs/adr/0006` |
-| Apps | `integrations/jev_flutter`, `integrations/jev_android` | One Flutter app for the promoted macOS and Windows ports; frozen Android remains active until device acceptance |
+| Apps | `integrations/jev_flutter` | One Flutter app for the promoted Android, macOS and Windows ports |
 | Repo tooling | `scripts/` | `validate_layout.py` (root-entry allowlist), `check_upstream.py` (upstream drift) |
 
 Every entry at the repository root is registered with the layer it belongs to in
@@ -28,13 +29,12 @@ UI element is 「喵球」. **They are layered on purpose — do not mix them.**
 
 ## Origin, attribution and licensing
 
-All three application implementations contain derivative logic from the
-upstream Jev Chat assistants. The frozen Android port ships its own LICENSE and
-attribution files; the promoted Flutter macOS and Windows implementation's
-translated attribution is retained in the root `NOTICE`.
+The Flutter application contains derivative logic from the upstream Jev Chat
+assistants. Its translated attribution, including the retained Android capture
+and adapter logic, is recorded in the root `NOTICE`.
 
-The root and the promoted Windows and macOS preview artifacts are MIT. Their
-third-party notices remain in `NOTICE`, but no release artifact carries a
+The root and the promoted Android, Windows and macOS preview artifacts are MIT.
+Their third-party notices remain in `NOTICE`, but no release artifact carries a
 repository-wide copyleft constraint.
 
 The full provenance table, the attribution obligations and the licence split

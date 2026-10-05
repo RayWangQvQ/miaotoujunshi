@@ -9,7 +9,6 @@ on:
         type: string
   push:
     paths:
-      - "integrations/jev_android/**"
       - "integrations/jev_flutter/**"
       - "miaotoujunshi/**"
       - "goutoujunshi/**"
@@ -20,7 +19,6 @@ on:
       - ".github/workflows/platform-build.yml"
   pull_request:
     paths:
-      - "integrations/jev_android/**"
       - "integrations/jev_flutter/**"
       - "miaotoujunshi/**"
       - "goutoujunshi/**"
@@ -38,20 +36,24 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: integrations/jev_android
+        working-directory: integrations/jev_flutter/apps/miaotou_app
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
-      - uses: android-actions/setup-android@v4
-      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
-      - run: ./gradlew :app:testDebugUnitTest :app:assembleDebug --no-daemon
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.6"
+          channel: stable
+      - run: flutter pub get
+      - run: flutter test
+      - run: flutter build apk --debug
       - uses: actions/upload-artifact@v4
         with:
           name: miaotoujunshi-android-debug
-          path: integrations/jev_android/app/build/outputs/apk/debug/*.apk
+          path: integrations/jev_flutter/apps/miaotou_app/build/app/outputs/flutter-apk/app-debug.apk
 
   flutter-windows:
     runs-on: windows-latest
@@ -201,7 +203,7 @@ jobs:
 
           - **macOS:** `miaotoujunshi-mac.zip` — the accepted Flutter `.app`, signed with Developer ID and notarised by Apple. Extract it before launching.
           - **Windows:** `miaotoujunshi-windows-preview.zip` — the accepted Flutter application. Extract the complete directory before launching the executable.
-          - **Android:** `miaotoujunshi-android-debug.apk` — Android 11+ debug preview. An older debug APK may have a different signing certificate; uninstall it first if Android rejects the update (this clears local app data). **WeChat is currently unsupported because this Android build cannot capture WeChat chat screenshots.** Other chat-app paths still need device-level validation.
+          - **Android:** `miaotoujunshi-android-debug.apk` — the accepted Flutter Android 11+ debug preview. An older debug APK may have a different signing certificate; uninstall it first if Android rejects the update (this clears local app data). Supported capture adapters are QQ, Feishu and X; WeChat and Douyin are not supported. Candidate generation, editing and copy were accepted on a physical Android 15 device. Verified one-tap fill is tracked separately.
 
           Transcript review, Jev/DeepSeek strategy selection, ranked drafts, detailed analysis, style rewrite, relationship stage/goal, and example/CSV K-line views are included across the three platforms. UI layouts and capture support differ; the screenshots in the README show Mac. Check `SHA256SUMS.txt` after downloading. See the README and PRIVACY.md for setup, feature scope, and data use.
           EOF

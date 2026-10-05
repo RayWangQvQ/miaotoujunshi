@@ -107,10 +107,10 @@ and no chat application are involved.
 Android remains event-driven. The Kotlin `AccessibilityService` is woken by
 window-content changes and pushes snapshots, conversation changes and capture
 errors over `miaotou/ingest`; Dart sends binding, overlay, capture, OCR and
-verified draft-injection commands over `miaotou/control`. The Gradle plugin syncs
-the measured adapter, screenshot and ML Kit sources directly from
-`integrations/jev_android` before compilation, so capture pacing and per-app node
-paths are not rewritten in Dart.
+verified draft-injection commands over `miaotou/control`. The measured adapter,
+screenshot and ML Kit sources live directly in the Android capability plugin, so
+capture pacing and per-app node paths remain in retained Kotlin rather than being
+rewritten in Dart.
 
 Conversation read-only state is computed by the service and sent as presentation
 state. Either identity half may be absent, and Kotlin supplies the display label

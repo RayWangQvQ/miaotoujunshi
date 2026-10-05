@@ -105,7 +105,11 @@ class _MainWindowShellState extends State<MainWindowShell> {
       case ShellDestination.knowledge:
         return KnowledgePage(content: widget.content);
       case ShellDestination.settings:
-        return SettingsPage(onOpen: _open);
+        return SettingsPage(
+          onOpen: _open,
+          preferences: widget.session.capabilities.preferences,
+          secrets: widget.session.capabilities.secretStore,
+        );
       case ShellDestination.gallery:
         return GalleryPage(samples: widget.samples);
       case ShellDestination.diagnostics:

@@ -23,14 +23,20 @@ import 'support/harness.dart';
 /// [ConversationLabel] has no package field, and the assertions below check both
 /// halves — that the label is right, and that the package is nowhere on screen.
 void main() {
-  const ConversationRef wechat =
-      ConversationRef(packageName: 'com.tencent.mm', title: '张三');
-  const ConversationRef qq =
-      ConversationRef(packageName: 'com.tencent.mobileqq', title: '李四');
-  const ConversationRef unnamed =
-      ConversationRef(packageName: 'com.tencent.mm');
-  const ConversationRef stranger =
-      ConversationRef(packageName: 'com.example.unknown');
+  const ConversationRef wechat = ConversationRef(
+    packageName: 'com.tencent.mm',
+    title: '张三',
+  );
+  const ConversationRef qq = ConversationRef(
+    packageName: 'com.tencent.mobileqq',
+    title: '李四',
+  );
+  const ConversationRef unnamed = ConversationRef(
+    packageName: 'com.tencent.mm',
+  );
+  const ConversationRef stranger = ConversationRef(
+    packageName: 'com.example.unknown',
+  );
 
   const Map<String, String> appNames = <String, String>{
     'com.tencent.mm': '微信',
@@ -38,34 +44,50 @@ void main() {
   };
 
   Advice adviceWith(String text) => Advice(
-        support: '.',
-        facts: const <String>['x'],
-        hypotheses: const <String>[],
-        unknowns: const <String>[],
-        intent: null,
-        intentConfidence: null,
-        strategy: '.',
-        recommendation: '.',
-        nextStep: '.',
-        stopCondition: '.',
-        question: '',
-        candidates: <Candidate>[
-          Candidate(text: text, reason: '.', tradeoff: '.'),
-        ],
-        rankingStatus: RankingStatus.ranked,
-      );
+    support: '.',
+    facts: const <String>['x'],
+    hypotheses: const <String>[],
+    unknowns: const <String>[],
+    intent: null,
+    intentConfidence: null,
+    strategy: '.',
+    recommendation: '.',
+    nextStep: '.',
+    stopCondition: '.',
+    question: '',
+    candidates: <Candidate>[Candidate(text: text, reason: '.', tradeoff: '.')],
+    rankingStatus: RankingStatus.ranked,
+  );
+
+  Advice adviceWithCandidates(List<String> texts) => Advice(
+    support: '.',
+    facts: const <String>['x'],
+    hypotheses: const <String>[],
+    unknowns: const <String>[],
+    intent: null,
+    intentConfidence: null,
+    strategy: '.',
+    recommendation: '.',
+    nextStep: '.',
+    stopCondition: '.',
+    question: '',
+    candidates: <Candidate>[
+      for (final String text in texts)
+        Candidate(text: text, reason: '.', tradeoff: '.'),
+    ],
+    rankingStatus: RankingStatus.ranked,
+  );
 
   PanelFrame frame({
     required ConversationRef analysed,
     ConversationRef? live,
     Advice? advice,
-  }) =>
-      PanelFrame(
-        analysed: analysed,
-        live: live,
-        advice: advice,
-        appNames: appNames,
-      );
+  }) => PanelFrame(
+    analysed: analysed,
+    live: live,
+    advice: advice,
+    appNames: appNames,
+  );
 
   group('the header names the analysed conversation', () {
     testWidgets('both halves known', (WidgetTester tester) async {
@@ -90,7 +112,8 @@ void main() {
       expect(
         onScreen.where((String text) => text.contains('com.tencent.mm')),
         isEmpty,
-        reason: 'ADR-0002 decision 1: a raw package name is never shown. The '
+        reason:
+            'ADR-0002 decision 1: a raw package name is never shown. The '
             'frame does carry one — it has to, to tell two conversations apart '
             '— which is exactly why the label is built before the header sees '
             'anything: $onScreen',
@@ -111,7 +134,8 @@ void main() {
       expect(
         onScreen.where((String text) => text.contains('com.example.unknown')),
         isEmpty,
-        reason: 'the fallback for an unknown app is the neutral label, never '
+        reason:
+            'the fallback for an unknown app is the neutral label, never '
             'the package: $onScreen',
       );
     });
@@ -128,12 +152,20 @@ void main() {
 
       expect(tester.takeException(), isNull);
       expect(find.text('微信 · 未识别会话'), findsOneWidget);
-      expect(find.byType(CandidateCard), findsOneWidget,
-          reason: 'the drafts are still there: an unnamed thread is not an '
-              'empty panel');
-      expect(find.text('填入'), findsNothing,
-          reason: 'a fill writes into a specific thread, and this one is not '
-              'named — macOS gates on the same thing');
+      expect(
+        find.byType(CandidateCard),
+        findsOneWidget,
+        reason:
+            'the drafts are still there: an unnamed thread is not an '
+            'empty panel',
+      );
+      expect(
+        find.text('填入'),
+        findsNothing,
+        reason:
+            'a fill writes into a specific thread, and this one is not '
+            'named — macOS gates on the same thing',
+      );
     });
   });
 
@@ -155,8 +187,11 @@ void main() {
     testWidgets('the user moved on: fill goes, copy and detail stay', (
       WidgetTester tester,
     ) async {
-      final PanelFrame before =
-          frame(analysed: wechat, live: wechat, advice: adviceWith('好'));
+      final PanelFrame before = frame(
+        analysed: wechat,
+        live: wechat,
+        advice: adviceWith('好'),
+      );
       await pumpPanel(tester, before);
       expect(find.text('填入'), findsOneWidget);
 
@@ -168,30 +203,45 @@ void main() {
       );
 
       expect(find.text('浏览中 · 只读'), findsOneWidget);
-      expect(find.text('填入'), findsNothing,
-          reason: 'ADR-0002 decision 3: read-only revokes fill. Windows used to '
-              'disable copy and reason as well, and that is the divergence this '
-              'corrects');
-      expect(find.text('复制'), findsOneWidget,
-          reason: 'the drafts are still useful');
+      expect(
+        find.text('填入'),
+        findsNothing,
+        reason:
+            'ADR-0002 decision 3: read-only revokes fill. Windows used to '
+            'disable copy and reason as well, and that is the divergence this '
+            'corrects',
+      );
+      expect(
+        find.text('复制'),
+        findsOneWidget,
+        reason: 'the drafts are still useful',
+      );
       expect(find.text('详情'), findsOneWidget);
       expect(find.byType(CandidateCard), findsOneWidget);
-      expect(find.text(AppCopy.zh.text(CopyKey.panelReadOnlyBanner)),
-          findsOneWidget,
-          reason: 'a silently missing button is not an explanation');
+      expect(
+        find.text(AppCopy.zh.text(CopyKey.panelReadOnlyBanner)),
+        findsOneWidget,
+        reason: 'a silently missing button is not an explanation',
+      );
     });
 
-    testWidgets('reanalyse becomes analyse-current', (WidgetTester tester) async {
+    testWidgets('reanalyse becomes analyse-current', (
+      WidgetTester tester,
+    ) async {
       await pumpPanel(
         tester,
         frame(analysed: wechat, live: qq, advice: adviceWith('好')),
       );
 
       expect(find.text('重新分析'), findsNothing);
-      expect(find.text('分析当前会话'), findsOneWidget,
-          reason: 'ADR-0002 decision 3: the old 「重新分析」 reused the snapshot '
-              'on the panel, which while read-only belongs to another '
-              'conversation, so tapping it silently did nothing');
+      expect(
+        find.text('分析当前会话'),
+        findsOneWidget,
+        reason:
+            'ADR-0002 decision 3: the old 「重新分析」 reused the snapshot '
+            'on the panel, which while read-only belongs to another '
+            'conversation, so tapping it silently did nothing',
+      );
     });
   });
 
@@ -208,8 +258,11 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(channel.sent.single.kind, PanelCommandKind.copy);
-      expect(channel.sent.single.candidateIndex, 0,
-          reason: 'which draft matters: the panel is not allowed to guess');
+      expect(
+        channel.sent.single.candidateIndex,
+        0,
+        reason: 'which draft matters: the panel is not allowed to guess',
+      );
     });
 
     testWidgets('read-only still lets the user ask for the details', (
@@ -248,15 +301,45 @@ void main() {
         for (final PanelCommandKind kind in PanelCommandKind.values) kind.name,
       };
       for (final PanelAction action in PanelAction.values) {
-        expect(kinds, contains(action.name),
-            reason: '${action.name} is allowed by derivePanel but has no '
-                'command kind, so the panel could be told to offer something '
-                'it cannot ask for');
+        expect(
+          kinds,
+          contains(action.name),
+          reason:
+              '${action.name} is allowed by derivePanel but has no '
+              'command kind, so the panel could be told to offer something '
+              'it cannot ask for',
+        );
       }
     });
   });
 
   group('only transient state lives in the panel', () {
+    testWidgets('multiple candidates scroll inside the fixed overlay height', (
+      WidgetTester tester,
+    ) async {
+      await pumpPanel(
+        tester,
+        frame(
+          analysed: wechat,
+          live: wechat,
+          advice: adviceWithCandidates(<String>['第一条', '第二条', '第三条', '第四条']),
+        ),
+        panelSize: const Size(300, 380),
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('第一条'), findsNWidgets(2));
+
+      await tester.drag(
+        find.byKey(const Key('panel-scroll')),
+        const Offset(0, -1000),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('第四条').hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('the drag landing is the panel\'s own', (
       WidgetTester tester,
     ) async {
@@ -265,16 +348,43 @@ void main() {
         frame(analysed: wechat, live: wechat, advice: adviceWith('好')),
       );
 
-      expect(_landing(tester), Matrix4.identity(),
-          reason: 'the panel starts where the window put it');
+      expect(
+        _landing(tester),
+        Matrix4.identity(),
+        reason: 'the panel starts where the window put it',
+      );
 
       // ADR-0012's panel is frameless, so the header is the drag handle.
       await tester.drag(find.text('喵头军师'), const Offset(40, 25));
       await tester.pumpAndSettle();
 
-      expect(_landing(tester), Matrix4.translationValues(40, 25, 0),
-          reason: 'the user dragged the panel, and where it landed is the '
-              'panel\'s own to remember');
+      expect(
+        _landing(tester),
+        Matrix4.translationValues(40, 25, 0),
+        reason:
+            'the user dragged the panel, and where it landed is the '
+            'panel\'s own to remember',
+      );
+    });
+
+    testWidgets('the collapsed ball starts native window dragging', (
+      WidgetTester tester,
+    ) async {
+      var dragStarts = 0;
+      await pumpPanel(
+        tester,
+        frame(analysed: wechat, live: wechat, advice: adviceWith('好')),
+        initialExpanded: false,
+        onDragStart: () => dragStarts += 1,
+      );
+
+      await tester.drag(
+        find.byKey(const Key('panel-ball')),
+        const Offset(40, 25),
+      );
+      await tester.pumpAndSettle();
+
+      expect(dragStarts, 1);
     });
 
     testWidgets('expanded or collapsed, and new content does not collapse it', (
@@ -288,8 +398,11 @@ void main() {
 
       await tester.tap(find.byIcon(Icons.expand_less));
       await tester.pumpAndSettle();
-      expect(find.byType(CandidateCard), findsNothing,
-          reason: 'collapsed hides the body');
+      expect(
+        find.byType(CandidateCard),
+        findsNothing,
+        reason: 'collapsed hides the body',
+      );
 
       // The main window sends a new analysis. The panel must show *it* — which
       // is what fails if the advice is ever cached in the panel's own state —
@@ -299,15 +412,23 @@ void main() {
         frame(analysed: wechat, live: wechat, advice: adviceWith('新的一句')),
       );
 
-      expect(find.byType(CandidateCard), findsNothing,
-          reason: 'still collapsed: transient state is the panel\'s own and a '
-              'new frame is not a reason to lose it');
+      expect(
+        find.byType(CandidateCard),
+        findsNothing,
+        reason:
+            'still collapsed: transient state is the panel\'s own and a '
+            'new frame is not a reason to lose it',
+      );
 
       await tester.tap(find.byKey(const Key('panel-ball')));
       await tester.pumpAndSettle();
-      expect(find.text('新的一句'), findsNWidgets(2),
-          reason: 'the panel renders the frame it was handed, not the one it '
-              'was handed first');
+      expect(
+        find.text('新的一句'),
+        findsNWidgets(2),
+        reason:
+            'the panel renders the frame it was handed, not the one it '
+            'was handed first',
+      );
       expect(find.text('好'), findsNothing);
     });
 
@@ -329,7 +450,8 @@ void main() {
       expect(
         stored.allMatches(_stripComments(state)).toList(),
         isEmpty,
-        reason: 'the panel holds no content: everything it shows comes from the '
+        reason:
+            'the panel holds no content: everything it shows comes from the '
             'frame, and a field here would be a second source of truth',
       );
     });
@@ -337,11 +459,12 @@ void main() {
     test('the panel asks for nothing', () {
       final String source = _sourceOf('panel/panel_page.dart');
       expect(
-        RegExp(r'Session|CapabilitySet|capabilityRegistry|SharedMaterial|ModelTransport')
-            .allMatches(_stripComments(source))
-            .toList(),
+        RegExp(
+          r'Session|CapabilitySet|capabilityRegistry|SharedMaterial|ModelTransport',
+        ).allMatches(_stripComments(source)).toList(),
         isEmpty,
-        reason: 'the panel cannot ask which conversation is in front: that is '
+        reason:
+            'the panel cannot ask which conversation is in front: that is '
             'the main window\'s to answer, and a second source of truth beside '
             'it is the drift ADR-0002 decision 2 exists to prevent',
       );
@@ -359,9 +482,13 @@ void main() {
     await tester.tap(find.text('组件陈列'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(PanelPage), findsNWidgets(2),
-        reason: 'one showing the analysed conversation, one showing the same '
-            'analysis after the user has moved on');
+    expect(
+      find.byType(PanelPage),
+      findsNWidgets(2),
+      reason:
+          'one showing the analysed conversation, one showing the same '
+          'analysis after the user has moved on',
+    );
     expect(find.text('浏览中 · 只读'), findsOneWidget);
     expect(find.text('正在看'), findsOneWidget);
   });
@@ -375,6 +502,9 @@ Future<InMemoryPanelChannel> pumpPanel(
   WidgetTester tester,
   PanelFrame frame, {
   AppCopy copy = AppCopy.zh,
+  bool initialExpanded = true,
+  VoidCallback? onDragStart,
+  Size? panelSize,
 }) async {
   final InMemoryPanelChannel channel = InMemoryPanelChannel();
   addTearDown(channel.dispose);
@@ -386,7 +516,16 @@ Future<InMemoryPanelChannel> pumpPanel(
         theme: buildTheme(),
         home: Scaffold(
           body: SingleChildScrollView(
-            child: PanelPage(frame: frame, onCommand: channel.send),
+            child: SizedBox(
+              width: panelSize?.width,
+              height: panelSize?.height,
+              child: PanelPage(
+                frame: frame,
+                onCommand: channel.send,
+                initialExpanded: initialExpanded,
+                onDragStart: onDragStart,
+              ),
+            ),
           ),
         ),
       ),

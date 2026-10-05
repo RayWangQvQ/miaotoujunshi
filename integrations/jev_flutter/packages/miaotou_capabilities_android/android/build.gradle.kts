@@ -25,21 +25,6 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-val retainedKotlin = layout.buildDirectory.dir("retainedKotlin")
-val syncRetainedKotlin by tasks.registering(Sync::class) {
-    from("../../../../jev_android/app/src/main/java") {
-        include(
-            "com/jev/probe/core/ChatApps.kt",
-            "com/jev/probe/core/ChatModels.kt",
-            "com/jev/probe/capture/ChatAppAdapter.kt",
-            "com/jev/probe/capture/ocr/MlKitOcr.kt",
-            "com/jev/probe/capture/ocr/OcrEngine.kt",
-            "com/jev/probe/capture/ocr/ScreenCapture.kt",
-        )
-    }
-    into(retainedKotlin)
-}
-
 android {
     namespace = "com.miaotoujunshi.capabilities.android"
     compileSdk = 36
@@ -53,14 +38,9 @@ android {
         minSdk = 30
     }
 
-    sourceSets["main"].java.srcDir(retainedKotlin.get().asFile)
-
     testOptions {
         unitTests.isIncludeAndroidResources = true
     }
-
-    tasks.matching { it.name.startsWith("compile") && it.name.endsWith("Kotlin") }
-        .configureEach { dependsOn(syncRetainedKotlin) }
 }
 
 kotlin {

@@ -38,13 +38,31 @@ final class AndroidUiTreeReader implements UiTreeReader {
   final AndroidIngestNative _native;
 
   @override
-  Future<ChatUiSnapshot?> readActiveChat() => _native.readActiveChat();
+  Future<ChatUiSnapshot?> readActiveChat() async {
+    final ChatUiSnapshot? snapshot = await _native.readActiveChat();
+    if (snapshot != null) {
+      await _native.bindConversation(snapshot.conversation);
+    }
+    return snapshot;
+  }
 
   @override
   late final Stream<ChatUiSnapshot> snapshots = _native.events
-      .where((AndroidIngestEvent event) => event is AndroidSnapshotEvent)
-      .cast<AndroidSnapshotEvent>()
-      .map((AndroidSnapshotEvent event) => event.snapshot);
+      .where(
+        (AndroidIngestEvent event) =>
+            event is AndroidSnapshotEvent || event is AndroidConversationEvent,
+      )
+      .map(
+        (AndroidIngestEvent event) => switch (event) {
+          AndroidSnapshotEvent() => event.snapshot,
+          AndroidConversationEvent() => ChatUiSnapshot(
+            conversation: event.current,
+            lines: const <ChatLine>[],
+            capturedAt: DateTime.now(),
+          ),
+          _ => throw StateError('unreachable ingest event'),
+        },
+      );
 }
 
 /// Android's answer for OCR.

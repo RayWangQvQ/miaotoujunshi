@@ -69,6 +69,25 @@ enum CopyKey {
 
   settingsTitle,
   settingsStorage,
+  settingsReplySection,
+  settingsReplyBaseUrl,
+  settingsReplyModel,
+  settingsReplyKey,
+  settingsStrategySection,
+  settingsStrategyProvider,
+  settingsStrategyNone,
+  settingsStrategyJev,
+  settingsStrategyDeepSeek,
+  settingsStrategyBaseUrl,
+  settingsStrategyModel,
+  settingsStrategyKey,
+  settingsRelationshipBackground,
+  settingsGoalDefault,
+  settingsAutoAnalyze,
+  settingsSave,
+  settingsSaved,
+  settingsLoadFailed,
+  settingsSaveFailed,
   settingsGallery,
   settingsDiagnostics,
 
@@ -127,6 +146,18 @@ enum CopyKey {
   panelPreviewCurrent,
   panelPreviewBrowsing,
 
+  runtimeAnalysing,
+  runtimeConfigureModels,
+  runtimeConversationChanged,
+  runtimeNoConversation,
+  runtimeCopied,
+  runtimeFilled,
+  runtimeFillUnverified,
+  runtimeAnalysisFailed,
+  runtimeHttpStatus,
+  runtimeNetworkFailure,
+  runtimeInvalidResponse,
+
   noValue,
 }
 
@@ -165,11 +196,9 @@ final class AppCopy {
   /// One marker for every key. For tests only: it is what makes every
   /// hard-coded string visible, because a hard-coded string is the one string
   /// on the page that is not the marker.
-  factory AppCopy.sentinel(String marker) => AppCopy(
-        <CopyKey, String>{
-          for (final CopyKey key in CopyKey.values) key: marker,
-        },
-      );
+  factory AppCopy.sentinel(String marker) => AppCopy(<CopyKey, String>{
+    for (final CopyKey key in CopyKey.values) key: marker,
+  });
 
   static const Map<CopyKey, String> _zh = <CopyKey, String>{
     CopyKey.appTitle: '喵头军师',
@@ -220,7 +249,26 @@ final class AppCopy {
     CopyKey.profileNotes: '备注',
 
     CopyKey.settingsTitle: '设置',
-    CopyKey.settingsStorage: '偏好与凭据的存储由所在端的实现提供，尚未接入。',
+    CopyKey.settingsStorage: '偏好保存在应用数据中；密钥单独保存在系统凭据存储中。',
+    CopyKey.settingsReplySection: '回复模型',
+    CopyKey.settingsReplyBaseUrl: '兼容 OpenAI 的 API 地址（到 /v1）',
+    CopyKey.settingsReplyModel: '回复模型',
+    CopyKey.settingsReplyKey: '回复模型密钥',
+    CopyKey.settingsStrategySection: '独立策略判断',
+    CopyKey.settingsStrategyProvider: '策略提供方',
+    CopyKey.settingsStrategyNone: '关闭（由回复模型直接判断）',
+    CopyKey.settingsStrategyJev: 'TypeSafe Jev',
+    CopyKey.settingsStrategyDeepSeek: 'DeepSeek',
+    CopyKey.settingsStrategyBaseUrl: '策略 API 地址',
+    CopyKey.settingsStrategyModel: '策略模型',
+    CopyKey.settingsStrategyKey: '策略模型密钥',
+    CopyKey.settingsRelationshipBackground: '关系与背景',
+    CopyKey.settingsGoalDefault: '自然接话',
+    CopyKey.settingsAutoAnalyze: '对话变化后自动分析',
+    CopyKey.settingsSave: '保存设置',
+    CopyKey.settingsSaved: '设置已保存',
+    CopyKey.settingsLoadFailed: '无法读取设置',
+    CopyKey.settingsSaveFailed: '无法保存设置',
     CopyKey.settingsGallery: '组件陈列',
     CopyKey.settingsDiagnostics: '能力自检',
 
@@ -272,6 +320,18 @@ final class AppCopy {
     CopyKey.panelPreviewCurrent: '悬浮面板 · 正在看',
     CopyKey.panelPreviewBrowsing: '悬浮面板 · 浏览中（只读）',
 
+    CopyKey.runtimeAnalysing: '正在分析当前会话…',
+    CopyKey.runtimeConfigureModels: '请先在设置中填写回复模型地址、模型和密钥。',
+    CopyKey.runtimeConversationChanged: '会话已切换，未填入；请分析当前会话后重试。',
+    CopyKey.runtimeNoConversation: '当前没有可分析的会话。',
+    CopyKey.runtimeCopied: '已复制。',
+    CopyKey.runtimeFilled: '已填入并确认落地，请检查后自行发送。',
+    CopyKey.runtimeFillUnverified: '无法确认是否填入；内容已复制，请手动粘贴。',
+    CopyKey.runtimeAnalysisFailed: '分析失败，请检查模型设置和网络后重试。',
+    CopyKey.runtimeHttpStatus: '模型请求失败（HTTP {status}），请检查地址、模型和密钥。',
+    CopyKey.runtimeNetworkFailure: '模型请求失败，请检查网络和 API 地址。',
+    CopyKey.runtimeInvalidResponse: '模型返回了无法识别的响应。',
+
     CopyKey.noValue: '未填写',
   };
 }
@@ -289,8 +349,8 @@ class CopyScope extends InheritedWidget {
   final AppCopy copy;
 
   static AppCopy of(BuildContext context) {
-    final CopyScope? scope =
-        context.dependOnInheritedWidgetOfExactType<CopyScope>();
+    final CopyScope? scope = context
+        .dependOnInheritedWidgetOfExactType<CopyScope>();
     if (scope == null) {
       throw StateError(
         'no CopyScope above this widget; the application was built without one, '

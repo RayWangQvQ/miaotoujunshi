@@ -26,7 +26,7 @@ class MiaotouApp extends StatelessWidget {
     required this.session,
     required this.window,
     this.copy = AppCopy.zh,
-    this.content = ShellContent.empty,
+    this.content,
   });
 
   /// The capabilities, and the lifetime that outlives the window.
@@ -38,21 +38,24 @@ class MiaotouApp extends StatelessWidget {
   final AppCopy copy;
 
   /// What the pages show. Empty until a conversation has been read.
-  final ShellContent content;
+  final ShellContent? content;
 
   @override
-  Widget build(BuildContext context) => CopyScope(
-        copy: copy,
-        child: MaterialApp(
-          title: copy.text(CopyKey.appTitle),
-          debugShowCheckedModeBanner: false,
-          theme: buildTheme(),
-          home: MainWindowShell(
-            session: session,
-            window: window,
-            samples: GallerySamples.synthetic(copy),
-            content: content,
-          ),
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: session,
+    builder: (BuildContext context, Widget? child) => CopyScope(
+      copy: copy,
+      child: MaterialApp(
+        title: copy.text(CopyKey.appTitle),
+        debugShowCheckedModeBanner: false,
+        theme: buildTheme(),
+        home: MainWindowShell(
+          session: session,
+          window: window,
+          samples: GallerySamples.synthetic(copy),
+          content: content ?? session.content,
         ),
-      );
+      ),
+    ),
+  );
 }

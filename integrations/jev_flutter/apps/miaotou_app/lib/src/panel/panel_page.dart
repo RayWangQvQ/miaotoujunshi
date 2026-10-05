@@ -144,17 +144,142 @@ class _PanelPageState extends State<PanelPage> {
     if (!_expanded) {
       return SizedBox.square(
         dimension: 56,
-        child: Card(
-          margin: EdgeInsets.zero,
-          shape: const CircleBorder(),
-          child: IconButton(
-            key: const Key('panel-ball'),
-            onPressed: _toggleExpanded,
-            icon: const Icon(Icons.auto_awesome),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onPanStart: widget.onDragStart == null
+              ? null
+              : (DragStartDetails details) => widget.onDragStart!(),
+          child: Card(
+            margin: EdgeInsets.zero,
+            shape: const CircleBorder(),
+            child: IconButton(
+              key: const Key('panel-ball'),
+              onPressed: _toggleExpanded,
+              icon: const Icon(Icons.auto_awesome),
+            ),
           ),
         ),
       );
     }
+
+    final List<Widget> fixed = <Widget>[
+      _header(context, copy, theme, view),
+      if (view.readOnly) _banner(copy, colors, theme),
+      if (widget.frame.note != null)
+        Padding(
+          padding: AppSpacing.card,
+          child: Text(
+            widget.frame.note!,
+            style: theme.textTheme.bodySmall?.copyWith(color: colors.textMuted),
+          ),
+        ),
+    ];
+    final Widget body = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        if (advice == null)
+          Padding(
+            padding: AppSpacing.page,
+            child: EmptyState(message: copy.text(CopyKey.panelEmpty)),
+          )
+        else
+          for (int i = 0; i < advice.candidates.length; i++)
+            Padding(
+              padding: AppSpacing.card,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  CandidateCard(
+                    candidate: advice.candidates[i],
+                    rank: i + 1,
+                    rankingStatus: advice.rankingStatus,
+                    onCopy: view.allows(PanelAction.copy)
+                        ? () => widget.onCommand(
+                            PanelCommand(
+                              PanelCommandKind.copy,
+                              candidateIndex: i,
+                              text: _drafts[i].text,
+                            ),
+                          )
+                        : null,
+                  ),
+                  Listener(
+                    onPointerDown: (_) async {
+                      final Future<void> Function(bool focusable)? changeFocus =
+                          widget.onInputFocusChanged;
+                      if (changeFocus != null) {
+                        await changeFocus(true);
+                      }
+                      _draftFocus[i].requestFocus();
+                    },
+                    child: TextField(
+                      key: ValueKey<String>('panel-draft-$i'),
+                      controller: _drafts[i],
+                      focusNode: _draftFocus[i],
+                      decoration: InputDecoration(
+                        labelText: copy.text(CopyKey.panelDraftLabel),
+                      ),
+                      onTapOutside: (_) {
+                        FocusManager.instance.primaryFocus?.unfocus();
+                        final Future<void> Function(bool focusable)?
+                        changeFocus = widget.onInputFocusChanged;
+                        if (changeFocus != null) {
+                          unawaited(changeFocus(false));
+                        }
+                      },
+                    ),
+                  ),
+                  if (view.allows(PanelAction.fill))
+                    Padding(
+                      padding: const EdgeInsets.only(top: AppSpacing.s),
+                      child: FilledButton.tonal(
+                        onPressed: () => widget.onCommand(
+                          PanelCommand(
+                            PanelCommandKind.fill,
+                            candidateIndex: i,
+                            text: _drafts[i].text,
+                          ),
+                        ),
+                        child: Text(copy.text(CopyKey.panelActionFill)),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+        Padding(
+          padding: AppSpacing.card,
+          child: Row(
+            children: <Widget>[
+              if (view.allows(PanelAction.details))
+                OutlinedButton(
+                  onPressed: () => widget.onCommand(
+                    const PanelCommand(PanelCommandKind.details),
+                  ),
+                  child: Text(copy.text(CopyKey.panelActionDetails)),
+                ),
+              const Spacer(),
+              FilledButton(
+                onPressed: () => widget.onCommand(
+                  PanelCommand(
+                    view.readOnly
+                        ? PanelCommandKind.analyseCurrent
+                        : PanelCommandKind.reanalyse,
+                  ),
+                ),
+                child: Text(
+                  copy.text(
+                    view.readOnly
+                        ? CopyKey.panelActionAnalyseCurrent
+                        : CopyKey.panelActionReanalyse,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
 
     return Transform.translate(
       // Keyed so a test can read the offset the user dragged to.
@@ -162,125 +287,24 @@ class _PanelPageState extends State<PanelPage> {
       offset: _landing,
       child: Card(
         margin: EdgeInsets.zero,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            _header(context, copy, theme, view),
-            if (view.readOnly) _banner(copy, colors, theme),
-            if (widget.frame.note != null)
-              Padding(
-                padding: AppSpacing.card,
-                child: Text(
-                  widget.frame.note!,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colors.textMuted,
-                  ),
-                ),
-              ),
-            if (_expanded) ...<Widget>[
-              if (advice == null)
-                Padding(
-                  padding: AppSpacing.page,
-                  child: EmptyState(message: copy.text(CopyKey.panelEmpty)),
-                )
-              else
-                for (int i = 0; i < advice.candidates.length; i++)
-                  Padding(
-                    padding: AppSpacing.card,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: <Widget>[
-                        CandidateCard(
-                          candidate: advice.candidates[i],
-                          rank: i + 1,
-                          rankingStatus: advice.rankingStatus,
-                          onCopy: view.allows(PanelAction.copy)
-                              ? () => widget.onCommand(
-                                  PanelCommand(
-                                    PanelCommandKind.copy,
-                                    candidateIndex: i,
-                                    text: _drafts[i].text,
-                                  ),
-                                )
-                              : null,
-                        ),
-                        Listener(
-                          onPointerDown: (_) async {
-                            final Future<void> Function(bool focusable)?
-                            changeFocus = widget.onInputFocusChanged;
-                            if (changeFocus != null) {
-                              await changeFocus(true);
-                            }
-                            _draftFocus[i].requestFocus();
-                          },
-                          child: TextField(
-                            key: ValueKey<String>('panel-draft-$i'),
-                            controller: _drafts[i],
-                            focusNode: _draftFocus[i],
-                            decoration: InputDecoration(
-                              labelText: copy.text(CopyKey.panelDraftLabel),
-                            ),
-                            onTapOutside: (_) {
-                              FocusManager.instance.primaryFocus?.unfocus();
-                              final Future<void> Function(bool focusable)?
-                              changeFocus = widget.onInputFocusChanged;
-                              if (changeFocus != null) {
-                                unawaited(changeFocus(false));
-                              }
-                            },
-                          ),
-                        ),
-                        if (view.allows(PanelAction.fill))
-                          Padding(
-                            padding: const EdgeInsets.only(top: AppSpacing.s),
-                            child: FilledButton.tonal(
-                              onPressed: () => widget.onCommand(
-                                PanelCommand(
-                                  PanelCommandKind.fill,
-                                  candidateIndex: i,
-                                  text: _drafts[i].text,
-                                ),
-                              ),
-                              child: Text(copy.text(CopyKey.panelActionFill)),
-                            ),
-                          ),
-                      ],
+        child: LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints constraints) => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              ...fixed,
+              if (_expanded)
+                if (constraints.hasBoundedHeight)
+                  Expanded(
+                    child: SingleChildScrollView(
+                      key: const Key('panel-scroll'),
+                      child: body,
                     ),
-                  ),
-              Padding(
-                padding: AppSpacing.card,
-                child: Row(
-                  children: <Widget>[
-                    if (view.allows(PanelAction.details))
-                      OutlinedButton(
-                        onPressed: () => widget.onCommand(
-                          const PanelCommand(PanelCommandKind.details),
-                        ),
-                        child: Text(copy.text(CopyKey.panelActionDetails)),
-                      ),
-                    const Spacer(),
-                    FilledButton(
-                      onPressed: () => widget.onCommand(
-                        PanelCommand(
-                          view.readOnly
-                              ? PanelCommandKind.analyseCurrent
-                              : PanelCommandKind.reanalyse,
-                        ),
-                      ),
-                      child: Text(
-                        copy.text(
-                          view.readOnly
-                              ? CopyKey.panelActionAnalyseCurrent
-                              : CopyKey.panelActionReanalyse,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+                  )
+                else
+                  body,
             ],
-          ],
+          ),
         ),
       ),
     );

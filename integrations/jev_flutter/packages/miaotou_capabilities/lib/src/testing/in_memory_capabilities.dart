@@ -136,12 +136,15 @@ final class InMemoryUiTreeReader implements UiTreeReader {
             ];
 
   final List<ChatLine> lines;
+  ChatUiSnapshot? _current;
 
   final StreamController<ChatUiSnapshot> _snapshots =
       StreamController<ChatUiSnapshot>.broadcast();
 
   @override
-  Future<ChatUiSnapshot?> readActiveChat() async => ChatUiSnapshot(
+  Future<ChatUiSnapshot?> readActiveChat() async =>
+      _current ??
+      ChatUiSnapshot(
         conversation: const ConversationRef(
           packageName: 'com.tencent.mm',
           title: '张三',
@@ -155,7 +158,10 @@ final class InMemoryUiTreeReader implements UiTreeReader {
 
   /// Pushes one snapshot down the stream, the way Android's accessibility
   /// service does.
-  void push(ChatUiSnapshot snapshot) => _snapshots.add(snapshot);
+  void push(ChatUiSnapshot snapshot) {
+    _current = snapshot;
+    _snapshots.add(snapshot);
+  }
 
   void dispose() => _snapshots.close();
 }

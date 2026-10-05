@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 
 import 'panel_main.dart';
 import 'src/app.dart';
 import 'src/capability_registry.dart';
+import 'src/design/copy.dart';
+import 'src/runtime/conversation_runtime.dart';
 import 'src/session.dart';
 
 Future<void> main() async {
@@ -36,10 +39,23 @@ Future<void> main() async {
   // Nothing in this file ends the session either. Quitting is a platform
   // decision — a tray item, a dock menu — and arrives through a port's own
   // implementation ticket.
-  final Session session = Session(capabilities: capabilities);
+  late final ConversationRuntime runtime;
+  final Session session = Session(
+    capabilities: capabilities,
+    onEnd: () => runtime.dispose(),
+  );
   final MainWindowController window = MainWindowController();
+  runtime = ConversationRuntime(
+    capabilities: capabilities,
+    panel: session.panel,
+    copy: AppCopy.zh,
+    clipboardWrite: (String text) =>
+        Clipboard.setData(ClipboardData(text: text)),
+    onAdvice: session.publishAdvice,
+  );
 
   await startPanelForCurrentPlatform(capabilities, session.panel);
+  await runtime.start();
 
   runApp(MiaotouApp(session: session, window: window));
 }

@@ -2,41 +2,27 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "android: 单元测试挂起等待调试器",
+      "label": "android: Flutter 测试",
       "type": "shell",
-      "command": "./gradlew :app:testDebugUnitTest --debug-jvm --console=plain",
+      "command": "flutter test",
       "options": {
-        "cwd": "${workspaceFolder}/integrations/jev_android"
+        "cwd": "${workspaceFolder}/integrations/jev_flutter/apps/miaotou_app"
       },
-      "isBackground": true,
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated"
-      },
-      "problemMatcher": {
-        "owner": "gradle-jvm-debug",
-        "background": {
-          "activeOnStart": true,
-          "beginsPattern": "Starting a Gradle Daemon|Downloading|Task :app:|Welcome to Gradle",
-          "endsPattern": "Listening for transport dt_socket at address: 5005"
-        }
-      }
+      "group": "test",
+      "problemMatcher": []
     },
     {
       "label": "android: 选择调试设备",
       "type": "shell",
       "command": "\"${workspaceFolder}/.vscode/adb_target.sh\" --verbose",
-      "options": {
-        "cwd": "${workspaceFolder}/integrations/jev_android"
-      },
       "problemMatcher": []
     },
     {
-      "label": "android: 构建并安装 debug APK",
+      "label": "android: 构建并安装 Flutter debug APK",
       "type": "shell",
-      "command": "export ANDROID_SERIAL=\"$(\"${workspaceFolder}/.vscode/adb_target.sh\")\"; [ -n \"$ANDROID_SERIAL\" ] || { echo '无法确定唯一调试设备，已中止'; exit 1; }; echo \"目标设备：$ANDROID_SERIAL\"; ./gradlew :app:installDebug --console=plain",
+      "command": "export ANDROID_SERIAL=\"$(\"${workspaceFolder}/.vscode/adb_target.sh\")\"; [ -n \"$ANDROID_SERIAL\" ] || { echo '无法确定唯一调试设备，已中止'; exit 1; }; flutter build apk --debug && adb -s \"$ANDROID_SERIAL\" install -r build/app/outputs/flutter-apk/app-debug.apk",
       "options": {
-        "cwd": "${workspaceFolder}/integrations/jev_android"
+        "cwd": "${workspaceFolder}/integrations/jev_flutter/apps/miaotou_app"
       },
       "group": {
         "kind": "build",
@@ -45,41 +31,25 @@
       "problemMatcher": []
     },
     {
-      "label": "android: 启动应用并等待进程",
+      "label": "android: 启动 Flutter 应用",
       "type": "shell",
-      "command": "export ANDROID_SERIAL=\"$(\"${workspaceFolder}/.vscode/adb_target.sh\")\"; [ -n \"$ANDROID_SERIAL\" ] || { echo '无法确定唯一调试设备，已中止'; exit 1; }; echo \"目标设备：$ANDROID_SERIAL\"; adb -s \"$ANDROID_SERIAL\" shell am start -W -n com.miaotoujunshi.chat/com.jev.probe.MainActivity || { echo 'am start 失败，最近日志：'; adb -s \"$ANDROID_SERIAL\" logcat -d -t 100 | tail -40; exit 1; }; for i in $(seq 1 40); do pid=$(adb -s \"$ANDROID_SERIAL\" shell pidof com.miaotoujunshi.chat | tr -d '\\r' | awk '{print $1}'); if [ -n \"$pid\" ]; then echo \"应用进程已就绪：pid=$pid\"; exit 0; fi; sleep 0.25; done; echo '应用已启动但进程没有存活，最近日志：'; adb -s \"$ANDROID_SERIAL\" logcat -d -t 100 | tail -40; exit 1",
-      "options": {
-        "cwd": "${workspaceFolder}/integrations/jev_android"
-      },
+      "command": "export ANDROID_SERIAL=\"$(\"${workspaceFolder}/.vscode/adb_target.sh\")\"; [ -n \"$ANDROID_SERIAL\" ] || { echo '无法确定唯一调试设备，已中止'; exit 1; }; adb -s \"$ANDROID_SERIAL\" shell am start -W -n com.miaotoujunshi.miaotou_app/.MainActivity",
       "problemMatcher": []
     },
     {
-      "label": "android: 转发 JDWP 端口 (8700)",
-      "type": "shell",
-      "command": "export ANDROID_SERIAL=\"$(\"${workspaceFolder}/.vscode/adb_target.sh\")\"; [ -n \"$ANDROID_SERIAL\" ] || { echo '无法确定唯一调试设备，已中止'; exit 1; }; pid=$(adb -s \"$ANDROID_SERIAL\" shell pidof com.miaotoujunshi.chat | tr -d '\\r' | awk '{print $1}'); if [ -z \"$pid\" ]; then echo '找不到 com.miaotoujunshi.chat 的进程：先启动应用，并确认它没有崩溃。'; exit 1; fi; adb -s \"$ANDROID_SERIAL\" forward tcp:8700 jdwp:$pid && echo \"调试通道已就绪：localhost:8700 -> pid $pid（设备 $ANDROID_SERIAL）\"",
-      "options": {
-        "cwd": "${workspaceFolder}/integrations/jev_android"
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "android: 构建安装并建好调试通道",
+      "label": "android: 构建安装并启动",
       "dependsOrder": "sequence",
       "dependsOn": [
         "android: 选择调试设备",
-        "android: 构建并安装 debug APK",
-        "android: 启动应用并等待进程",
-        "android: 转发 JDWP 端口 (8700)"
+        "android: 构建并安装 Flutter debug APK",
+        "android: 启动 Flutter 应用"
       ],
       "problemMatcher": []
     },
     {
-      "label": "android: 查看 logcat",
+      "label": "android: 查看 Flutter logcat",
       "type": "shell",
-      "command": "export ANDROID_SERIAL=\"$(\"${workspaceFolder}/.vscode/adb_target.sh\")\"; [ -n \"$ANDROID_SERIAL\" ] || { echo '无法确定唯一调试设备，已中止'; exit 1; }; echo \"目标设备：$ANDROID_SERIAL\"; adb -s \"$ANDROID_SERIAL\" logcat -s 'JevChat:*' 'ChatCapture:*' '*:E'",
-      "options": {
-        "cwd": "${workspaceFolder}/integrations/jev_android"
-      },
+      "command": "export ANDROID_SERIAL=\"$(\"${workspaceFolder}/.vscode/adb_target.sh\")\"; [ -n \"$ANDROID_SERIAL\" ] || { echo '无法确定唯一调试设备，已中止'; exit 1; }; pid=$(adb -s \"$ANDROID_SERIAL\" shell pidof com.miaotoujunshi.miaotou_app | tr -d '\\r' | awk '{print $1}'); [ -n \"$pid\" ] || { echo '应用未运行'; exit 1; }; adb -s \"$ANDROID_SERIAL\" logcat --pid=\"$pid\"",
       "isBackground": true,
       "problemMatcher": []
     }

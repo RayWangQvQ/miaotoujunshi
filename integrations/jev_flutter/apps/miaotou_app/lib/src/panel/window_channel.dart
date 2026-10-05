@@ -120,9 +120,8 @@ final class AndroidPanelViewChannel implements PanelChannel {
 }
 
 final class WindowsPanelMainChannel {
-  WindowsPanelMainChannel({
-    this._channel = const WindowMethodChannel(_channelName),
-  });
+  WindowsPanelMainChannel({WindowMethodChannel? channel})
+    : _channel = channel ?? const WindowMethodChannel(_channelName);
 
   final WindowMethodChannel _channel;
   final StreamController<PanelCommand> _commands =
@@ -143,9 +142,8 @@ final class WindowsPanelMainChannel {
 }
 
 final class WindowsPanelViewChannel implements PanelChannel {
-  WindowsPanelViewChannel({
-    this._channel = const WindowMethodChannel(_channelName),
-  });
+  WindowsPanelViewChannel({WindowMethodChannel? channel})
+    : _channel = channel ?? const WindowMethodChannel(_channelName);
 
   final WindowMethodChannel _channel;
   final StreamController<PanelFrame> _frames =

@@ -7,11 +7,9 @@ This file records the provenance and the licence layering of this repository.
 
 The root LICENSE (MIT, Copyright (c) 2026 powerycy) covers only the code written
 in this repository — the Skill layer and the glue code of the integrations.
-The frozen Android port under `integrations/` is a derivative work of the
-upstream Jev Chat assistant and carries its own LICENSE and attribution files.
-It is **not** covered by the root LICENSE. The promoted Flutter implementation
-translates derived logic from all three upstream ports; those attribution
-obligations move into this NOTICE rather than lapsing.
+The promoted Flutter implementation translates derived logic from all three
+upstream ports, including retained Kotlin from the Android assistant; those
+attribution obligations live in this NOTICE rather than lapsing.
 
 Written in this repository: the repository tooling under `scripts/`, the ports
 under `integrations/`, `tests/`, the root governance files (`README.md`, `NOTICE`,
@@ -38,16 +36,15 @@ repository is app-layer material, not upstream's documentation directory.
 
 | Directory | Derived from | Copyright | Attribution files |
 | --- | --- | --- | --- |
-| `integrations/jev_android` | [jev-chat/jev-chat-jarvis](https://github.com/jev-chat/jev-chat-jarvis) | Finderchangchang and the jev-chat contributors | `integrations/jev_android/NOTICE`, `integrations/jev_android/LICENSE` |
 | `integrations/jev_flutter` | [jev-chat/jev-chat-jarvis](https://github.com/jev-chat/jev-chat-jarvis), [jev-chat/jev-chat-windows](https://github.com/jev-chat/jev-chat-windows), and [jev-chat/jev-chat-jarvis-mac](https://github.com/jev-chat/jev-chat-jarvis-mac) at `afb58cf53d098e314a1368d15e13ab5330015688` | Finderchangchang, rezoch340, eatmoreduck and the jev-chat contributors | This `NOTICE` and the root `LICENSE` |
 
-Distributing either implementation requires shipping its listed attribution
-files and stating the origin.
+Distributing the Flutter implementation requires shipping its listed
+attribution files and stating the origin.
 
 ## Licence layering (important)
 
-The frozen Android application and the promoted Flutter macOS and Windows
-applications are MIT, with the upstream notices above retained for their
+The promoted Flutter Android, macOS and Windows applications are MIT, with the
+upstream notices above retained for their
 derivative logic. Their third-party components keep their own licences, but no
 component imposes a repository-wide copyleft constraint on a release artifact.
 

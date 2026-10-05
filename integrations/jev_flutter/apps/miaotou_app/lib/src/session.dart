@@ -1,8 +1,10 @@
 import 'package:flutter/foundation.dart';
 
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
+import 'package:miaotou_domain/miaotou_domain.dart';
 
 import 'panel/session.dart';
+import 'shell/content.dart';
 import 'shell/destination.dart';
 
 /// What the process is doing, as opposed to what the window is showing.
@@ -18,7 +20,7 @@ import 'shell/destination.dart';
 /// only the platform layer can finish: a port's capture loop, its credentials
 /// and its panel are its own to close. The session promises to call it once, and
 /// promises never to call it on the way to hiding a window.
-final class Session {
+final class Session extends ChangeNotifier {
   Session({required this.capabilities, this.onEnd, PanelSession? panel})
     : panel = panel ?? PanelSession();
 
@@ -26,6 +28,14 @@ final class Session {
   /// and by nothing that could mistake a hidden window for a dead one.
   final CapabilitySet capabilities;
   final PanelSession panel;
+  ShellContent _content = ShellContent.empty;
+
+  ShellContent get content => _content;
+
+  void publishAdvice(Advice? advice) {
+    _content = ShellContent(advice: advice);
+    notifyListeners();
+  }
 
   /// Called exactly once, by [end], and by nothing else.
   final Future<void> Function()? onEnd;
@@ -56,6 +66,7 @@ final class Session {
       await stop();
     }
     await panel.dispose();
+    dispose();
   }
 }
 
