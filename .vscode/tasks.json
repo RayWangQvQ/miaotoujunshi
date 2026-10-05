@@ -6,10 +6,34 @@
       "type": "shell",
       "command": "flutter test",
       "options": {
-        "cwd": "${workspaceFolder}/app/apps/miaotou_app"
+        "cwd": "${workspaceFolder}/app/apps/miaotou_app",
+        "env": {
+          "PATH": "/Users/raywang/dev/flutter-3.47.6/bin:${env:PATH}"
+        }
       },
       "group": "test",
       "problemMatcher": []
+    },
+    {
+      "label": "android: Kotlin 单测挂起等待调试器",
+      "type": "shell",
+      "command": "./gradlew :miaotou_capabilities_android:testDebugUnitTest --debug-jvm --console=plain",
+      "options": {
+        "cwd": "${workspaceFolder}/app/apps/miaotou_app/android"
+      },
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": {
+        "owner": "gradle-jvm-debug",
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "Starting a Gradle Daemon|Downloading|Task :|Welcome to Gradle",
+          "endsPattern": "Listening for transport dt_socket at address: 5005"
+        }
+      }
     },
     {
       "label": "android: 选择调试设备",
@@ -22,7 +46,10 @@
       "type": "shell",
       "command": "export ANDROID_SERIAL=\"$(\"${workspaceFolder}/.vscode/adb_target.sh\")\"; [ -n \"$ANDROID_SERIAL\" ] || { echo '无法确定唯一调试设备，已中止'; exit 1; }; flutter build apk --debug && adb -s \"$ANDROID_SERIAL\" install -r build/app/outputs/flutter-apk/app-debug.apk",
       "options": {
-        "cwd": "${workspaceFolder}/app/apps/miaotou_app"
+        "cwd": "${workspaceFolder}/app/apps/miaotou_app",
+        "env": {
+          "PATH": "/Users/raywang/dev/flutter-3.47.6/bin:${env:PATH}"
+        }
       },
       "group": {
         "kind": "build",

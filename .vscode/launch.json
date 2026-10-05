@@ -10,22 +10,19 @@
       "deviceId": "macos"
     },
     {
-      "name": "② Android · JVM 单元测试 (attach 5005)",
+      "name": "② Flutter · Android 真机",
+      "type": "dart",
+      "request": "launch",
+      "program": "${workspaceFolder}/app/apps/miaotou_app/lib/main.dart",
+      "cwd": "${workspaceFolder}/app/apps/miaotou_app"
+    },
+    {
+      "name": "③ Android · Kotlin 单测 attach 5005",
       "type": "java",
       "request": "attach",
       "hostName": "localhost",
       "port": 5005,
-      "projectName": "android",
-      "preLaunchTask": "android: 单元测试挂起等待调试器"
-    },
-    {
-      "name": "③ Android · attach 真机进程 (8700)",
-      "type": "java",
-      "request": "attach",
-      "hostName": "localhost",
-      "port": 8700,
-      "projectName": "android",
-      "preLaunchTask": "android: 构建安装并建好调试通道"
+      "preLaunchTask": "android: Kotlin 单测挂起等待调试器"
     }
   ]
 }
