@@ -8,6 +8,116 @@ import 'package:miaotou_domain/miaotou_domain.dart';
 import 'protocol.dart';
 
 const String _channelName = 'miaotoujunshi/windows/panel-protocol';
+const String _androidBootstrapName = 'miaotoujunshi/android/panel-bootstrap';
+const String _androidChannelName = 'miaotoujunshi/android/panel-protocol';
+
+enum AndroidPanelEngineRole { main, panel }
+
+final class AndroidPanelBootstrap {
+  AndroidPanelBootstrap({
+    MethodChannel? channel,
+    this.retryDelay = const Duration(milliseconds: 20),
+    this.attempts = 20,
+  }) : _channel = channel ?? const MethodChannel(_androidBootstrapName);
+
+  final MethodChannel _channel;
+  final Duration retryDelay;
+  final int attempts;
+
+  Future<AndroidPanelEngineRole> role() async {
+    Object? lastError;
+    for (int attempt = 0; attempt < attempts; attempt++) {
+      try {
+        final String? raw = await _channel.invokeMethod<String>('whichEngine');
+        return switch (raw) {
+          'main' => AndroidPanelEngineRole.main,
+          'panel' => AndroidPanelEngineRole.panel,
+          _ => throw StateError(
+            'the Android host reported unknown engine "$raw"',
+          ),
+        };
+      } on MissingPluginException catch (error) {
+        lastError = error;
+        await Future<void>.delayed(retryDelay);
+      }
+    }
+    throw StateError(
+      'the Android panel host did not register its bootstrap channel after '
+      '$attempts attempts: $lastError',
+    );
+  }
+
+  Future<void> markResumed() => _channel.invokeMethod<void>('appResumed');
+}
+
+final class AndroidPanelMainChannel {
+  AndroidPanelMainChannel({MethodChannel? channel})
+    : _channel = channel ?? const MethodChannel(_androidChannelName);
+
+  final MethodChannel _channel;
+  final StreamController<PanelCommand> _commands =
+      StreamController<PanelCommand>.broadcast();
+
+  Stream<PanelCommand> get commands => _commands.stream;
+
+  Future<void> initialize() async {
+    _channel.setMethodCallHandler((MethodCall call) async {
+      if (call.method != 'command') {
+        throw MissingPluginException(
+          'Unknown Android panel call ${call.method}',
+        );
+      }
+      _commands.add(PanelWireCodec.decodeCommand(call.arguments));
+    });
+  }
+
+  Future<void> push(PanelFrame frame) =>
+      _channel.invokeMethod<void>('frame', PanelWireCodec.encodeFrame(frame));
+}
+
+final class AndroidPanelViewChannel implements PanelChannel {
+  AndroidPanelViewChannel({MethodChannel? channel})
+    : _channel = channel ?? const MethodChannel(_androidChannelName);
+
+  final MethodChannel _channel;
+  final StreamController<PanelFrame> _frames =
+      StreamController<PanelFrame>.broadcast();
+
+  Future<void> initialize() async {
+    _channel.setMethodCallHandler((MethodCall call) async {
+      if (call.method != 'frame') {
+        throw MissingPluginException('Unknown main-engine call ${call.method}');
+      }
+      _frames.add(PanelWireCodec.decodeFrame(call.arguments));
+    });
+    await _channel.invokeMethod<void>('panelReady');
+  }
+
+  Future<void> setExpanded(bool expanded) => _channel.invokeMethod<void>(
+    'setExpanded',
+    <String, Object?>{'value': expanded},
+  );
+
+  Future<void> startDragging() => _channel.invokeMethod<void>('startDragging');
+
+  Future<void> setFocusable(bool focusable) => _channel.invokeMethod<void>(
+    'setFocusable',
+    <String, Object?>{'value': focusable},
+  );
+
+  @override
+  Stream<PanelFrame> get frames => _frames.stream;
+
+  @override
+  void send(PanelCommand command) {
+    unawaited(
+      _channel.invokeMethod<void>(
+        'command',
+        PanelWireCodec.encodeCommand(command),
+      ),
+    );
+  }
+}
 
 final class WindowsPanelMainChannel {
   WindowsPanelMainChannel({

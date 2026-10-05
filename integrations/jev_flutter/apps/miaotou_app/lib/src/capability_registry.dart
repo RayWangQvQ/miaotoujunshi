@@ -52,6 +52,21 @@ final class PanelWindowRuntime {
 }
 
 Future<PanelWindowRuntime?> attachPanelWindowForCurrentPlatform() async {
+  if (Platform.isAndroid) {
+    final AndroidPanelBootstrap bootstrap = AndroidPanelBootstrap();
+    if (await bootstrap.role() == AndroidPanelEngineRole.main) {
+      return null;
+    }
+    await bootstrap.markResumed();
+    final AndroidPanelViewChannel channel = AndroidPanelViewChannel();
+    await channel.initialize();
+    return PanelWindowRuntime(
+      channel: channel,
+      setExpanded: channel.setExpanded,
+      startDragging: channel.startDragging,
+      setFocusable: channel.setFocusable,
+    );
+  }
   if (!Platform.isWindows) {
     return null;
   }
@@ -74,6 +89,28 @@ Future<void> startPanelForCurrentPlatform(
   CapabilitySet capabilities,
   PanelSession panel,
 ) async {
+  if (Platform.isAndroid) {
+    final AndroidPanelMainChannel channel = AndroidPanelMainChannel();
+    await channel.initialize();
+    await capabilities.floatingPanel.show(
+      placement: const PanelPlacement(
+        anchor: PanelAnchor.topLeft,
+        dx: 12,
+        dy: 56,
+        width: 56,
+        height: 56,
+      ),
+    );
+    await channel.push(panel.current);
+    panel.frames.listen(channel.push);
+    channel.commands.listen((PanelCommand command) {
+      panel.receive(command);
+      if (command.kind == PanelCommandKind.close) {
+        capabilities.floatingPanel.hide();
+      }
+    });
+    return;
+  }
   if (!Platform.isWindows) {
     return;
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 
+import 'src/design/colors.dart';
 import 'src/design/copy.dart';
 import 'src/design/theme.dart';
 import 'src/panel/panel_page.dart';
@@ -80,24 +81,39 @@ class _PanelAppState extends State<PanelApp> {
   }
 
   @override
-  Widget build(BuildContext context) => CopyScope(
-    copy: AppCopy.zh,
-    child: MaterialApp(
-      title: AppCopy.zh.text(CopyKey.appTitle),
-      debugShowCheckedModeBanner: false,
-      theme: buildTheme(),
-      home: StreamBuilder<PanelFrame>(
-        stream: _channel.frames,
-        builder: (BuildContext context, AsyncSnapshot<PanelFrame> snapshot) =>
-            PanelPage(
-              frame: snapshot.data ?? _empty,
-              onCommand: _channel.send,
-              onExpandedChanged: widget.onExpandedChanged,
-              onDragStart: widget.onDragStart,
-              onInputFocusChanged: widget.onInputFocusChanged,
-              initialExpanded: widget.initialExpanded,
-            ),
+  Widget build(BuildContext context) {
+    final AppColors palette = AppColors.light();
+    final ThemeData baseTheme = buildTheme(colors: palette);
+    final ThemeData theme = baseTheme.copyWith(
+      canvasColor: palette.surface.withValues(alpha: 0),
+      scaffoldBackgroundColor: palette.surface.withValues(alpha: 0),
+      cardTheme: baseTheme.cardTheme.copyWith(
+        color: palette.surfaceRaised.withValues(alpha: 0.6),
       ),
-    ),
-  );
+    );
+    return CopyScope(
+      copy: AppCopy.zh,
+      child: MaterialApp(
+        title: AppCopy.zh.text(CopyKey.appTitle),
+        debugShowCheckedModeBanner: false,
+        theme: theme,
+        home: Material(
+          type: MaterialType.transparency,
+          child: StreamBuilder<PanelFrame>(
+            stream: _channel.frames,
+            builder:
+                (BuildContext context, AsyncSnapshot<PanelFrame> snapshot) =>
+                    PanelPage(
+                      frame: snapshot.data ?? _empty,
+                      onCommand: _channel.send,
+                      onExpandedChanged: widget.onExpandedChanged,
+                      onDragStart: widget.onDragStart,
+                      onInputFocusChanged: widget.onInputFocusChanged,
+                      initialExpanded: widget.initialExpanded,
+                    ),
+          ),
+        ),
+      ),
+    );
+  }
 }

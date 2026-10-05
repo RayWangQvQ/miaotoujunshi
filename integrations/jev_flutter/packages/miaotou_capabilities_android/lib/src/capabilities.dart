@@ -2,6 +2,8 @@ import 'dart:typed_data';
 
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 
+import 'panel_native.dart';
+
 /// Android's answer for screen capture.
 ///
 /// Owned by #22. The `takeScreenshot` / `takeScreenshotOfWindow` calls stay in
@@ -17,17 +19,17 @@ final class AndroidScreenCapture implements ScreenCapture {
 
   @override
   Future<String?> findTargetWindow() async => notYetBuilt(
-        platform: _platform,
-        member: 'ScreenCapture.findTargetWindow',
-        ticket: '#22',
-      );
+    platform: _platform,
+    member: 'ScreenCapture.findTargetWindow',
+    ticket: '#22',
+  );
 
   @override
   Future<CaptureOutcome> capture({String? targetWindowId}) async => notYetBuilt(
-        platform: _platform,
-        member: 'ScreenCapture.capture',
-        ticket: '#22',
-      );
+    platform: _platform,
+    member: 'ScreenCapture.capture',
+    ticket: '#22',
+  );
 }
 
 /// Android's answer for reading the foreground application's own view of itself.
@@ -45,17 +47,17 @@ final class AndroidUiTreeReader implements UiTreeReader {
 
   @override
   Future<ChatUiSnapshot?> readActiveChat() async => notYetBuilt(
-        platform: _platform,
-        member: 'UiTreeReader.readActiveChat',
-        ticket: '#22',
-      );
+    platform: _platform,
+    member: 'UiTreeReader.readActiveChat',
+    ticket: '#22',
+  );
 
   @override
   Stream<ChatUiSnapshot> get snapshots => notYetBuilt(
-        platform: _platform,
-        member: 'UiTreeReader.snapshots',
-        ticket: '#22',
-      );
+    platform: _platform,
+    member: 'UiTreeReader.snapshots',
+    ticket: '#22',
+  );
 }
 
 /// Android's answer for OCR.
@@ -73,11 +75,7 @@ final class AndroidOcr implements Ocr {
     CaptureFrame frame, {
     required List<String> languages,
   }) async =>
-      notYetBuilt(
-        platform: _platform,
-        member: 'Ocr.recognize',
-        ticket: '#22',
-      );
+      notYetBuilt(platform: _platform, member: 'Ocr.recognize', ticket: '#22');
 }
 
 /// Android's answer for injecting text.
@@ -90,12 +88,14 @@ final class AndroidTextInject implements TextInject {
   static const String _platform = 'Android';
 
   @override
-  Future<InjectResult> inject(String text, {required InjectTarget target}) async =>
-      notYetBuilt(
-        platform: _platform,
-        member: 'TextInject.inject',
-        ticket: '#22',
-      );
+  Future<InjectResult> inject(
+    String text, {
+    required InjectTarget target,
+  }) async => notYetBuilt(
+    platform: _platform,
+    member: 'TextInject.inject',
+    ticket: '#22',
+  );
 }
 
 /// Android's answer for the floating window.
@@ -107,36 +107,58 @@ final class AndroidTextInject implements TextInject {
 /// experiment on a real device is what established that all four rendering pieces
 /// are required.
 final class AndroidFloatingPanel implements FloatingPanel {
-  const AndroidFloatingPanel();
+  AndroidFloatingPanel({
+    AndroidPanelNative? native,
+    this.hideSettle = const Duration(milliseconds: 120),
+  }) : _native = native ?? MethodChannelAndroidPanelNative();
 
-  static const String _platform = 'Android';
-
-  Never _refuse(String member) => notYetBuilt(
-        platform: _platform,
-        member: member,
-        ticket: '#21',
-      );
-
-  @override
-  Future<void> show({required PanelPlacement placement}) async =>
-      _refuse('FloatingPanel.show');
+  final AndroidPanelNative _native;
+  final Duration hideSettle;
+  bool _upBeforeCapture = false;
 
   @override
-  Future<void> hide() async => _refuse('FloatingPanel.hide');
+  Future<void> show({required PanelPlacement placement}) =>
+      _native.showPanel(placement);
 
   @override
-  Future<void> hideForCapture() async => _refuse('FloatingPanel.hideForCapture');
+  Future<void> hide() async {
+    _upBeforeCapture = false;
+    await _native.hidePanel();
+  }
 
   @override
-  Future<void> restoreAfterCapture() async =>
-      _refuse('FloatingPanel.restoreAfterCapture');
+  Future<void> hideForCapture() async {
+    _upBeforeCapture = await _native.hidePanel();
+    if (_upBeforeCapture) {
+      await Future<void>.delayed(hideSettle);
+    }
+  }
 
   @override
-  Future<void> setFocusable(bool value) async =>
-      _refuse('FloatingPanel.setFocusable');
+  Future<void> restoreAfterCapture() async {
+    if (!_upBeforeCapture) {
+      return;
+    }
+    _upBeforeCapture = false;
+    await _native.restorePanel();
+  }
 
   @override
-  Stream<PanelEvent> get events => _refuse('FloatingPanel.events');
+  Future<void> setFocusable(bool value) => _native.setPanelFocusable(value);
+
+  @override
+  late final Stream<PanelEvent> events = _native.panelEvents.map(
+    (AndroidPanelEvent event) => switch (event) {
+      AndroidPanelDragged(:final double x, :final double y) => PanelDragged(
+        x: x,
+        y: y,
+      ),
+      AndroidPanelTapped(:final String action) => PanelTapped(action: action),
+      AndroidPanelReadOnly(:final bool readOnly) => PanelReadOnlyChanged(
+        readOnly: readOnly,
+      ),
+    },
+  );
 }
 
 /// Android's answer for the shared payload.
@@ -151,17 +173,17 @@ final class AndroidSharedPayload implements SharedPayload {
 
   @override
   Future<Uint8List> read(String repoRelativePath) async => notYetBuilt(
-        platform: _platform,
-        member: 'SharedPayload.read',
-        ticket: '#23',
-      );
+    platform: _platform,
+    member: 'SharedPayload.read',
+    ticket: '#23',
+  );
 
   @override
   Future<List<String>> list(String repoRelativeDir) async => notYetBuilt(
-        platform: _platform,
-        member: 'SharedPayload.list',
-        ticket: '#23',
-      );
+    platform: _platform,
+    member: 'SharedPayload.list',
+    ticket: '#23',
+  );
 }
 
 /// Android's answer for small remembered values.
@@ -173,14 +195,12 @@ final class AndroidPreferences implements Preferences {
 
   static const String _platform = 'Android';
 
-  Never _refuse(String member) => notYetBuilt(
-        platform: _platform,
-        member: member,
-        ticket: '#23',
-      );
+  Never _refuse(String member) =>
+      notYetBuilt(platform: _platform, member: member, ticket: '#23');
 
   @override
-  Future<String?> getString(String key) async => _refuse('Preferences.getString');
+  Future<String?> getString(String key) async =>
+      _refuse('Preferences.getString');
 
   @override
   Future<bool?> getBool(String key) async => _refuse('Preferences.getBool');
@@ -224,11 +244,8 @@ final class AndroidSecretStore implements SecretStore {
 
   static const String _platform = 'Android';
 
-  Never _refuse(String member) => notYetBuilt(
-        platform: _platform,
-        member: member,
-        ticket: '#23',
-      );
+  Never _refuse(String member) =>
+      notYetBuilt(platform: _platform, member: member, ticket: '#23');
 
   @override
   Future<String?> read(String key) async => _refuse('SecretStore.read');
@@ -253,11 +270,8 @@ final class AndroidKnowledgeStore implements KnowledgeStore {
 
   static const String _platform = 'Android';
 
-  Never _refuse(String member) => notYetBuilt(
-        platform: _platform,
-        member: member,
-        ticket: '#23',
-      );
+  Never _refuse(String member) =>
+      notYetBuilt(platform: _platform, member: member, ticket: '#23');
 
   @override
   Future<List<KnowledgeNote>> notes() async => _refuse('KnowledgeStore.notes');
@@ -278,8 +292,7 @@ final class AndroidKnowledgeStore implements KnowledgeStore {
   Future<KnowledgeContact?> findContact({
     required String title,
     required String packageName,
-  }) async =>
-      _refuse('KnowledgeStore.findContact');
+  }) async => _refuse('KnowledgeStore.findContact');
 
   @override
   Future<void> saveContact(KnowledgeContact contact) async =>
@@ -290,15 +303,16 @@ final class AndroidKnowledgeStore implements KnowledgeStore {
       _refuse('KnowledgeStore.deleteContact');
 
   @override
-  Future<void> appendLog(String contactId, List<KnowledgeLogEntry> entries) async =>
-      _refuse('KnowledgeStore.appendLog');
+  Future<void> appendLog(
+    String contactId,
+    List<KnowledgeLogEntry> entries,
+  ) async => _refuse('KnowledgeStore.appendLog');
 
   @override
   Future<List<KnowledgeLogEntry>> recentLog(
     String contactId, {
     required int limit,
-  }) async =>
-      _refuse('KnowledgeStore.recentLog');
+  }) async => _refuse('KnowledgeStore.recentLog');
 
   @override
   Future<void> clearAll() async => _refuse('KnowledgeStore.clearAll');
@@ -313,11 +327,8 @@ final class AndroidMemoryStore implements MemoryStore {
 
   static const String _platform = 'Android';
 
-  Never _refuse(String member) => notYetBuilt(
-        platform: _platform,
-        member: member,
-        ticket: '#23',
-      );
+  Never _refuse(String member) =>
+      notYetBuilt(platform: _platform, member: member, ticket: '#23');
 
   @override
   Future<MemoryStatus> status() async => _refuse('MemoryStore.status');
@@ -331,8 +342,7 @@ final class AndroidMemoryStore implements MemoryStore {
     required String subjectId,
     required String field,
     required String value,
-  }) async =>
-      _refuse('MemoryStore.apply');
+  }) async => _refuse('MemoryStore.apply');
 
   @override
   Future<int> undo() async => _refuse('MemoryStore.undo');

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 import 'package:miaotou_capabilities/testing.dart';
 import 'package:miaotou_capabilities_android/miaotou_capabilities_android.dart';
@@ -12,7 +14,9 @@ import 'package:test/test.dart';
 /// enforces that no member is missing; these tests are what make the *kind* of
 /// answer observable.
 void main() {
-  final CapabilitySet capabilities = androidCapabilities();
+  final CapabilitySet capabilities = androidCapabilities(
+    panelNative: _ProbePanelNative(),
+  );
 
   test('every member of the contract answers for itself', () async {
     final List<String> defects = <String>[];
@@ -31,7 +35,8 @@ void main() {
     expect(
       defects,
       isEmpty,
-      reason: 'a member must either do the work or refuse it as one of the two '
+      reason:
+          'a member must either do the work or refuse it as one of the two '
           'refusals. Returning null, an empty collection or a default would pass '
           'the compiler and reach the user as a blank panel (ADR-0009)',
     );
@@ -43,7 +48,8 @@ void main() {
     for (final MapEntry<String, Future<Object?> Function(CapabilitySet)> entry
         in capabilityProbes.entries) {
       final Object outcome = await runProbe(() => entry.value(capabilities));
-      if (outcome is UnimplementedError && !'${outcome.message}'.contains('#')) {
+      if (outcome is UnimplementedError &&
+          !'${outcome.message}'.contains('#')) {
         silent.add('${entry.key}: ${outcome.message}');
       }
     }
@@ -51,7 +57,8 @@ void main() {
     expect(
       silent,
       isEmpty,
-      reason: 'a refusal that does not say who owns the work leaves the next '
+      reason:
+          'a refusal that does not say who owns the work leaves the next '
           'reader unable to tell a permanent statement from an open to-do',
     );
   });
@@ -72,7 +79,8 @@ void main() {
     expect(
       permanent,
       isEmpty,
-      reason: 'the desktop ports throw UnsupportedError for UiTreeReader '
+      reason:
+          'the desktop ports throw UnsupportedError for UiTreeReader '
           'because no accessibility node tree exists there. Android has one, so '
           'a permanent refusal here would mean the port lost a capability the '
           'union baseline (ADR-0007 decision 4) says it keeps',
@@ -85,8 +93,27 @@ void main() {
     expect(
       report.values,
       everyElement(startsWith('Android')),
-      reason: 'an implementation package that silently wires another platform '
+      reason:
+          'an implementation package that silently wires another platform '
           'would still compile',
     );
   });
+}
+
+final class _ProbePanelNative implements AndroidPanelNative {
+  @override
+  Future<void> showPanel(PanelPlacement placement) async {}
+
+  @override
+  Future<bool> hidePanel() async => false;
+
+  @override
+  Future<void> restorePanel() async {}
+
+  @override
+  Future<void> setPanelFocusable(bool value) async {}
+
+  @override
+  Stream<AndroidPanelEvent> get panelEvents =>
+      const Stream<AndroidPanelEvent>.empty();
 }

@@ -165,4 +165,23 @@ void main() {
       contains('RegisterPlugins(flutter_view_controller->engine())'),
     );
   });
+
+  test('the Android overlay keeps every gate-A rendering invariant', () {
+    final String source = File(
+      '../../packages/miaotou_capabilities_android/android/src/main/kotlin/'
+      'com/miaotoujunshi/capabilities/android/AndroidOverlayHost.kt',
+    ).readAsStringSync();
+
+    expect(source, contains('FlutterEngineGroup'));
+    expect(source, contains('TYPE_APPLICATION_OVERLAY'));
+    expect(source, contains('PixelFormat.TRANSLUCENT'));
+    expect(source, contains('FlutterTextureView'));
+    expect(source, contains('attachToFlutterEngine'));
+    expect(source, contains('appIsResumed'));
+    expect(source, contains('setAutomaticallyRegisterPlugins(false)'));
+    expect(source, contains('FLAG_NOT_FOCUSABLE'));
+    expect(source, contains('FLAG_NOT_TOUCH_MODAL'));
+    expect(source, contains('alpha = 1.0f'));
+    expect(source, contains('SAFE_EXPANDED_TOP_DP'));
+  });
 }

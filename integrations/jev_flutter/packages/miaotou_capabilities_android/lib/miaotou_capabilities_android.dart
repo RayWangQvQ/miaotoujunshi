@@ -12,3 +12,4 @@ library;
 
 export 'src/bundle.dart';
 export 'src/capabilities.dart';
+export 'src/panel_native.dart';

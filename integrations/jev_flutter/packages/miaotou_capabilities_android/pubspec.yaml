@@ -9,8 +9,19 @@ environment:
 resolution: workspace
 
 dependencies:
+  flutter:
+    sdk: flutter
   miaotou_capabilities:
     path: ../miaotou_capabilities
 
 dev_dependencies:
+  flutter_test:
+    sdk: flutter
   test: ^1.25.0
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.miaotoujunshi.capabilities.android
+        pluginClass: MiaotouAndroidPlugin
