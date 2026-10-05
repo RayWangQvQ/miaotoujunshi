@@ -471,6 +471,71 @@ void main() {
     });
   });
 
+  group('a capture shows what it read', () {
+    testWidgets('the transcript takes the empty state\'s place', (
+      WidgetTester tester,
+    ) async {
+      // The first device run read 48 lines off a Feishu screen and the panel
+      // showed the caveat about the sides and nothing else, which is what a
+      // capture that found nothing looks like. ADR-0018.
+      await pumpPanel(
+        tester,
+        PanelFrame(
+          analysed: wechat,
+          live: wechat,
+          note: AppCopy.zh.text(CopyKey.panelNoteSidesGuessed),
+          transcript: const <PanelLine>[
+            PanelLine(speaker: Speaker.me, text: '在吗'),
+            PanelLine(speaker: Speaker.other, text: '在的'),
+          ],
+          appNames: appNames,
+        ),
+      );
+
+      expect(find.text(AppCopy.zh.text(CopyKey.panelTranscriptLabel)), findsOneWidget);
+      expect(find.text('我：在吗'), findsOneWidget);
+      expect(find.text('对方：在的'), findsOneWidget);
+      expect(
+        find.text(AppCopy.zh.text(CopyKey.panelEmpty)),
+        findsNothing,
+        reason:
+            'telling the user to read the conversation first, on a panel that '
+            'is holding what it just read, is the sentence that made the '
+            'capture look broken',
+      );
+    });
+
+    testWidgets('a line nobody claimed is neither side', (
+      WidgetTester tester,
+    ) async {
+      await pumpPanel(
+        tester,
+        PanelFrame(
+          analysed: wechat,
+          live: wechat,
+          transcript: const <PanelLine>[
+            PanelLine(speaker: Speaker.unknown, text: '嗯'),
+          ],
+          appNames: appNames,
+        ),
+      );
+
+      expect(find.text('未定：嗯'), findsOneWidget);
+    });
+
+    testWidgets('no transcript keeps the empty state', (
+      WidgetTester tester,
+    ) async {
+      await pumpPanel(tester, frame(analysed: wechat, live: wechat));
+
+      expect(find.text(AppCopy.zh.text(CopyKey.panelEmpty)), findsOneWidget);
+      expect(
+        find.text(AppCopy.zh.text(CopyKey.panelTranscriptLabel)),
+        findsNothing,
+      );
+    });
+  });
+
   testWidgets('the gallery hosts it, so it is not dead code', (
     WidgetTester tester,
   ) async {

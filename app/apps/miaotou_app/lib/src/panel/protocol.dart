@@ -29,6 +29,7 @@ final class PanelFrame {
     this.live,
     this.advice,
     this.note,
+    this.transcript = const <PanelLine>[],
     this.appNames = const <String, String>{},
   });
 
@@ -46,6 +47,17 @@ final class PanelFrame {
   /// an OCR capture cannot tell who said what, and that belongs on the panel.
   final String? note;
 
+  /// What the last whole-frame capture read off the screen, in the order it
+  /// appeared, and empty for every other source.
+  ///
+  /// A capture is the one path where the panel is the only witness: the user
+  /// pressed a button, the screen it photographed is still behind the panel, and
+  /// the words came out of pixels rather than out of a view the user can scroll
+  /// to. Without this the panel can say that a capture happened and nothing at
+  /// all about what it read — which is indistinguishable from a capture that
+  /// read nothing, and was read that way (ADR-0018).
+  final List<PanelLine> transcript;
+
   /// Package name to display name, resolved by the side that owns the platform.
   ///
   /// A package left out of this map has no known name, which is a real answer
@@ -56,6 +68,22 @@ final class PanelFrame {
   /// The resolver [derivePanel] wants, over this frame's map.
   String? appNameFor(ConversationRef reference) =>
       appNames[reference.packageName];
+}
+
+/// One line of that transcript.
+///
+/// The panel needs the speaker and the words and nothing else, so the rectangle
+/// a captured line also carries stays on this side of the window boundary. It is
+/// what the panel would need to point *at* the screen, and the panel has no way
+/// to point at anything.
+final class PanelLine {
+  const PanelLine({required this.speaker, required this.text});
+
+  final Speaker speaker;
+  final String text;
+
+  @override
+  String toString() => 'PanelLine(${speaker.name}, $text)';
 }
 
 /// One thing the panel is asking for.

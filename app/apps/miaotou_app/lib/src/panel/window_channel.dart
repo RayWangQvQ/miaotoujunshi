@@ -181,6 +181,14 @@ final class PanelWireCodec {
         if (frame.live != null) 'live': _encodeReference(frame.live!),
         if (frame.advice != null) 'advice': frame.advice!.toJson(),
         if (frame.note != null) 'note': frame.note,
+        if (frame.transcript.isNotEmpty)
+          'transcript': <Map<String, Object?>>[
+            for (final PanelLine line in frame.transcript)
+              <String, Object?>{
+                'speaker': line.speaker.name,
+                'text': line.text,
+              },
+          ],
         'appNames': frame.appNames,
       };
 
@@ -191,7 +199,30 @@ final class PanelWireCodec {
       live: map['live'] == null ? null : _decodeReference(map['live']),
       advice: map['advice'] == null ? null : _decodeAdvice(map['advice']),
       note: map['note'] as String?,
+      transcript: _decodeTranscript(map['transcript']),
       appNames: _stringMap(map['appNames'], 'appNames'),
+    );
+  }
+
+  static List<PanelLine> _decodeTranscript(Object? value) {
+    if (value == null) {
+      return const <PanelLine>[];
+    }
+    if (value is! List<Object?>) {
+      throw const FormatException('panel transcript must be a list');
+    }
+    return <PanelLine>[for (final Object? raw in value) _decodeLine(raw)];
+  }
+
+  static PanelLine _decodeLine(Object? value) {
+    final Map<Object?, Object?> map = _map(value, 'panel line');
+    final String speaker = _string(map, 'speaker');
+    return PanelLine(
+      speaker: Speaker.values.firstWhere(
+        (Speaker candidate) => candidate.name == speaker,
+        orElse: () => throw FormatException('unknown speaker $speaker'),
+      ),
+      text: _string(map, 'text'),
     );
   }
 

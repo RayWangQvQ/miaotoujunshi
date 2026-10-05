@@ -232,6 +232,63 @@ void main() {
     expect(capabilities.screenCapture.captureCalls, <String?>[null]);
   });
 
+  test('what a capture read reaches the panel, not just that it read', () async {
+    // The device run that started this: 48 lines came back off a Feishu screen
+    // and the panel showed only the caveat about the sides. A successful read
+    // and a read that found nothing looked the same to the user, because the
+    // frame had nowhere to put the lines.
+    final InMemoryCapabilities capabilities = InMemoryCapabilities(
+      captureOutcome: CaptureOk(
+        CaptureFrame(
+          pixels: Uint8List(0),
+          width: 1080,
+          height: 2400,
+          scaleX: 1,
+          scaleY: 1,
+          originX: 0,
+          originY: 0,
+        ),
+      ),
+      ocrLines: const <OcrLine>[
+        OcrLine(
+          text: '在吗',
+          bounds: ScreenRect(left: 700, top: 700, right: 900, bottom: 740),
+          confidence: 1,
+        ),
+        OcrLine(
+          text: '在的',
+          bounds: ScreenRect(left: 40, top: 900, right: 240, bottom: 940),
+          confidence: 1,
+        ),
+      ],
+    );
+    addTearDown(capabilities.dispose);
+    final PanelSession panel = PanelSession();
+    addTearDown(panel.dispose);
+    final ConversationRuntime runtime = ConversationRuntime(
+      capabilities: capabilities.toSet(),
+      panel: panel,
+      copy: AppCopy.zh,
+      clipboardWrite: (_) {},
+      analyzer: (_, _) async => _advice('unused'),
+    );
+    addTearDown(runtime.dispose);
+    await runtime.start();
+
+    panel.receive(const PanelCommand(PanelCommandKind.recogniseOnce));
+    await _until(() => panel.current.transcript.isNotEmpty);
+
+    expect(
+      panel.current.transcript.map((PanelLine line) => line.speaker),
+      <Speaker>[Speaker.me, Speaker.other],
+      reason: 'the right half of the frame is the user, the left is the other',
+    );
+    expect(
+      panel.current.transcript.map((PanelLine line) => line.text),
+      <String>['在吗', '在的'],
+    );
+  });
+
   test('a refused frame reaches the panel in the platform\'s own words', () async {
     // The platform writes these sentences to be shown unchanged, and the panel is
     // the only channel: a generic replacement would leave the user with a

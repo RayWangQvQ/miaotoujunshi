@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:miaotou_capabilities/miaotou_capabilities.dart' show Speaker;
 import 'package:miaotou_domain/miaotou_domain.dart';
 
 import '../design/colors.dart';
@@ -178,7 +179,9 @@ class _PanelPageState extends State<PanelPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        if (advice == null)
+        if (advice == null && widget.frame.transcript.isNotEmpty)
+          _transcript(copy, colors, theme)
+        else if (advice == null)
           Padding(
             padding: AppSpacing.page,
             child: EmptyState(message: copy.text(CopyKey.panelEmpty)),
@@ -391,6 +394,46 @@ class _PanelPageState extends State<PanelPage> {
       ),
     ),
   );
+
+  /// What the last whole-frame capture read, in place of the empty state.
+  ///
+  /// ADR-0018: a capture is the one path where the panel is the only witness.
+  /// The note above it asks the user to check the sides before filling a reply
+  /// in, and asking for that check without showing what is being checked is what
+  /// made a successful read look exactly like a capture that found nothing. So
+  /// the lines go where the empty state was: the panel has nothing else to say
+  /// until the user asks for an analysis, and a read that worked is the most
+  /// interesting thing it knows.
+  Widget _transcript(AppCopy copy, AppColors colors, ThemeData theme) => Padding(
+    padding: AppSpacing.card,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          copy.text(CopyKey.panelTranscriptLabel),
+          style: theme.textTheme.labelSmall?.copyWith(color: colors.textMuted),
+        ),
+        for (final PanelLine line in widget.frame.transcript)
+          Padding(
+            padding: const EdgeInsets.only(top: AppSpacing.xs),
+            child: Text(
+              copy
+                  .text(CopyKey.panelTranscriptLine)
+                  .replaceAll('{who}', _speakerLabel(copy, line.speaker))
+                  .replaceAll('{text}', line.text),
+              style: theme.textTheme.bodySmall,
+            ),
+          ),
+      ],
+    ),
+  );
+
+  /// The side, in the panel's own words rather than the wire's.
+  static String _speakerLabel(AppCopy copy, Speaker speaker) => switch (speaker) {
+    Speaker.me => copy.text(CopyKey.panelSpeakerMe),
+    Speaker.other => copy.text(CopyKey.panelSpeakerOther),
+    Speaker.unknown => copy.text(CopyKey.panelSpeakerUnknown),
+  };
 
   /// Why 「填入」 is gone, in so many words. ADR-0002 decision 3 asks for a
   /// banner rather than a silently missing button.

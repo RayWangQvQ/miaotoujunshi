@@ -39,6 +39,11 @@ void main() {
       live: conversation,
       advice: advice,
       note: 'OCR 待核对',
+      transcript: <PanelLine>[
+        PanelLine(speaker: Speaker.me, text: '在吗'),
+        PanelLine(speaker: Speaker.other, text: '在的'),
+        PanelLine(speaker: Speaker.unknown, text: '？'),
+      ],
       appNames: <String, String>{'com.tencent.mm': '微信'},
     );
 
@@ -51,6 +56,16 @@ void main() {
     expect(after.advice?.candidates.single.text, '那你先忙');
     expect(after.advice?.rankingStatus, RankingStatus.single);
     expect(after.note, 'OCR 待核对');
+    expect(
+      after.transcript.map((PanelLine line) => line.speaker),
+      <Speaker>[Speaker.me, Speaker.other, Speaker.unknown],
+      reason: 'a side that does not survive the wire comes back as the wrong '
+          'speaker rather than as an error',
+    );
+    expect(
+      after.transcript.map((PanelLine line) => line.text),
+      <String>['在吗', '在的', '？'],
+    );
     expect(after.appNames, <String, String>{'com.tencent.mm': '微信'});
   });
 

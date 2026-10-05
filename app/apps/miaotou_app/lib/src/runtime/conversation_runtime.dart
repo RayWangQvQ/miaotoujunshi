@@ -216,6 +216,10 @@ final class ConversationRuntime {
       analysed: snapshot.conversation,
       live: snapshot.conversation,
       note: snapshot.note,
+      transcript: <PanelLine>[
+        for (final ChatLine line in capture.lines)
+          PanelLine(speaker: line.speaker, text: line.text),
+      ],
     );
   }
 
@@ -440,6 +444,7 @@ final class ConversationRuntime {
     ConversationRef? live,
     Advice? advice,
     String? note,
+    List<PanelLine>? transcript,
   }) {
     final PanelFrame current = panel.current;
     panel.publish(
@@ -448,6 +453,7 @@ final class ConversationRuntime {
         live: live ?? _latest?.conversation ?? current.live,
         advice: advice ?? _advice,
         note: note,
+        transcript: transcript ?? current.transcript,
         appNames: current.appNames,
       ),
     );
