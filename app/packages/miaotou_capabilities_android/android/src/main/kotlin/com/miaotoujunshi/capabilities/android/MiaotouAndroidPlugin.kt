@@ -96,8 +96,8 @@ class MiaotouAndroidPlugin :
             })
         }
         RetainedAndroidBridge.overlay(
-            hide = { host.hide() },
-            restore = { host.restore() },
+            hide = { host.hideForCapture() },
+            restore = { host.restoreAfterCapture() },
         )
         storageChannel = MethodChannel(binding.binaryMessenger, STORAGE_CHANNEL).also {
             it.setMethodCallHandler(AndroidStorageHost(binding.applicationContext))
@@ -109,11 +109,11 @@ class MiaotouAndroidPlugin :
             when (call.method) {
                 "setOverlayFlag" -> setOverlayFlag(call.arguments.asArguments(), result)
                 "hideForCapture" -> {
-                    host.hide()
+                    host.hideForCapture()
                     result.success(null)
                 }
                 "restore" -> {
-                    host.restore()
+                    host.restoreAfterCapture()
                     result.success(null)
                 }
                 else -> withCaptureService(result) { service ->

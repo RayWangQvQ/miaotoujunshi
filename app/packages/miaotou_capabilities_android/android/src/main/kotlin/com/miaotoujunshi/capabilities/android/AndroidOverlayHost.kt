@@ -54,6 +54,9 @@ internal class AndroidOverlayHost(
     private var edge = "left"
     private var collapsedY = 0
 
+    /** Whether the panel is currently drawn as nothing for a screenshot. */
+    private var hiddenForCapture = false
+
     fun show(arguments: Map<*, *>) {
         ensurePanel()
         val window = params ?: createParams(arguments).also { params = it }
@@ -81,6 +84,51 @@ internal class AndroidOverlayHost(
         }
         windowManager.addView(container, params)
         visible = true
+    }
+
+    /**
+     * Take the panel off the screen for one screenshot, without giving up its
+     * window.
+     *
+     * [hide] is the wrong tool here and was the cause of a device bug worth
+     * recording. It removes the window, so for as long as the shot takes this
+     * process owns no window at all — and a phone that freezes background
+     * applications is entitled to freeze it, which suspends the very callback
+     * the shot is waiting on. Measured on a Galaxy S21 (Android 15): `hide()`
+     * during a manual capture, then Freecess `FZ ... reason: Bg` 264 ms later,
+     * and the recogniser's result **16 s** after that instead of immediately.
+     * Freecess reports `has floating or onScreen window, skip to freeze` every
+     * six seconds whenever the ball is up, so the ball is what protects the
+     * process — and the capture was destroying it on purpose.
+     *
+     * An alpha of zero with `FLAG_NOT_TOUCHABLE` draws nothing and takes no
+     * touches while leaving the window registered, so the shot is as clean as it
+     * was and the process stays out of the freezer.
+     */
+    fun hideForCapture() {
+        val window = params ?: return
+        if (!visible || hiddenForCapture) {
+            return
+        }
+        hiddenForCapture = true
+        window.alpha = 0f
+        window.flags = window.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        windowManager.updateViewLayout(container, window)
+    }
+
+    /** Puts the panel back after [hideForCapture]. Never adds a window. */
+    fun restoreAfterCapture() {
+        val window = params ?: return
+        if (!hiddenForCapture) {
+            return
+        }
+        hiddenForCapture = false
+        window.alpha = 1f
+        window.flags =
+            window.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
+        if (visible) {
+            windowManager.updateViewLayout(container, window)
+        }
     }
 
     fun setFocusable(value: Boolean) {
