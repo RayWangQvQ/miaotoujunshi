@@ -4,13 +4,14 @@ The three platform ports are being replaced by one Flutter application built for
 Android, Windows and macOS from a single codebase. The decisions behind that are
 `docs/adr/0007` onwards; this file is how to build and test what is here today.
 
-**Status: macOS promoted; Windows bridge and panel implemented; Android ingest
-and control implemented.** The shared
+**Status: macOS and Windows promoted; Android implementation complete but not
+promoted.** The shared
 workspace and contract are live, the macOS port is the promoted implementation,
 Windows has its process-isolated capture/OCR/input bridge plus a second-engine
 frameless floating panel, and Android pushes accessibility snapshots through its
-retained Kotlin service. General storage and release packaging are still pending
-— see *What is not here yet* below.
+retained Kotlin service and persists its four stores through app-private Android
+storage. The frozen Android APK remains the release artifact until the real-device
+promotion criteria in the migration plan pass.
 
 ## Layout
 
@@ -115,6 +116,11 @@ Conversation read-only state is computed by the service and sent as presentation
 state. Either identity half may be absent, and Kotlin supplies the display label
 so the panel never falls back to rendering a raw package name.
 
+The same plugin exposes one storage channel. Preferences use private
+`SharedPreferences`; credentials are AES-GCM encrypted with an Android Keystore
+key; knowledge and memory documents use atomic app-private file writes. The
+payload is read through `AssetManager`.
+
 ## The shared payload does not travel through Flutter assets
 
 `goutoujunshi/` and `miaotoujunshi/` are read from disk at runtime on all three
@@ -128,6 +134,13 @@ intended cost of the decision. The answer is this ADR, each platform's build ste
 and `packages/miaotou_capabilities/test/shared_payload_invariant_test.dart`, which
 fails if anyone declares the payload as an asset.
 
+On Android, the retained `copySharedMaterial` shape is a Gradle `Sync` task wired
+into every assets merge. The Flutter domain reads documents below
+`goutoujunshi/references/`, so this task expands the frozen port's SKILL-only copy
+to the whole upstream tree. The same payload-key validator used by the desktop
+packages runs before that merge, so an APK build fails when any runtime key is
+missing.
+
 ## What is not here yet
 
 | Missing | Ticket |
@@ -139,6 +152,4 @@ fails if anyone declares the payload as an asset.
 | Panel content and the read-only derivation | #12 |
 | The macOS implementations | #14, #15 |
 | Windows general storage and packaged bridge/models | #19 |
-| Android persistence and payload reads | #23 |
 | A `tool/` directory and a `fixtures/` directory | #15, #19 — written together with the build step that calls them and the fixtures that use them, so that neither is scaffolding nothing invokes |
-| The `flutter-*` CI jobs | the packaging ticket; until then this tree is built by hand |

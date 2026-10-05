@@ -26,6 +26,7 @@ class MiaotouAndroidPlugin :
         const val PROTOCOL_CHANNEL = "miaotoujunshi/android/panel-protocol"
         const val CONTROL_CHANNEL = "miaotou/control"
         const val INGEST_CHANNEL = "miaotou/ingest"
+        const val STORAGE_CHANNEL = "miaotoujunshi/android/storage"
         private const val OVERLAY_PERMISSION_REQUEST = 41021
     }
 
@@ -35,6 +36,7 @@ class MiaotouAndroidPlugin :
     private lateinit var mainProtocol: MethodChannel
     private lateinit var controlChannel: MethodChannel
     private lateinit var ingestChannel: EventChannel
+    private lateinit var storageChannel: MethodChannel
     private lateinit var host: AndroidOverlayHost
 
     private var activity: Activity? = null
@@ -97,6 +99,9 @@ class MiaotouAndroidPlugin :
             hide = { host.hide() },
             restore = { host.restore() },
         )
+        storageChannel = MethodChannel(binding.binaryMessenger, STORAGE_CHANNEL).also {
+            it.setMethodCallHandler(AndroidStorageHost(binding.applicationContext))
+        }
     }
 
     private fun onControlCall(call: MethodCall, result: MethodChannel.Result) {
@@ -317,6 +322,7 @@ class MiaotouAndroidPlugin :
         mainProtocol.setMethodCallHandler(null)
         controlChannel.setMethodCallHandler(null)
         ingestChannel.setStreamHandler(null)
+        storageChannel.setMethodCallHandler(null)
         RetainedAndroidBridge.listen(null)
         RetainedAndroidBridge.overlay(null, null)
         host.destroy()

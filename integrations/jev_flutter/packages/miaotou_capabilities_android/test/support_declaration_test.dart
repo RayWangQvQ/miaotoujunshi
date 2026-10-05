@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 import 'package:miaotou_capabilities/testing.dart';
 import 'package:miaotou_capabilities_android/miaotou_capabilities_android.dart';
+import 'package:miaotou_capabilities_android/testing.dart';
 import 'package:test/test.dart';
 
 /// What the Android implementation package promises.
@@ -17,6 +19,7 @@ void main() {
   final CapabilitySet capabilities = androidCapabilities(
     panelNative: _ProbePanelNative(),
     ingestNative: _ProbeIngestNative(),
+    storageNative: _probeStorage(),
   );
 
   test('every member of the contract answers for itself', () async {
@@ -100,6 +103,16 @@ void main() {
           'would still compile',
     );
   });
+}
+
+MemoryAndroidStorageNative _probeStorage() {
+  final MemoryAndroidStorageNative storage = MemoryAndroidStorageNative(
+    payload: <String, Uint8List>{
+      'miaotoujunshi/references/data/trend-rules.json': Uint8List(0),
+    },
+  );
+  storage.documents['memory.json'] = '{"consentEnabled":true}';
+  return storage;
 }
 
 final class _ProbeIngestNative implements AndroidIngestNative {

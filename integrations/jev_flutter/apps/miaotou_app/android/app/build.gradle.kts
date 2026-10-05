@@ -4,6 +4,34 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// The shared payload keeps repository-relative paths at runtime. This is the
+// retained Android pipeline: Sync removes stale files, and AGP packages the
+// source directory recursively without a Flutter assets declaration.
+val repoRoot = rootProject.projectDir.parentFile.parentFile.parentFile
+    .parentFile.parentFile
+val sharedAssets = layout.buildDirectory.dir("sharedAssets")
+val copySharedMaterial by tasks.registering(Sync::class) {
+    description = "Copies the shared payload material into assets, paths unchanged"
+    from(File(repoRoot, "miaotoujunshi")) { into("miaotoujunshi") }
+    from(File(repoRoot, "goutoujunshi")) { into("goutoujunshi") }
+    into(sharedAssets)
+}
+val validateSharedPayload by tasks.registering(Exec::class) {
+    description = "Asserts every runtime payload key is present in Android assets"
+    dependsOn(copySharedMaterial)
+    commandLine(
+        "python3",
+        File(
+            repoRoot,
+            "integrations/jev_flutter/apps/miaotou_app/macos/Runner/validate_payload_keys.py",
+        ),
+        repoRoot,
+        sharedAssets.get().asFile,
+    )
+}
+tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }
+    .configureEach { dependsOn(validateSharedPayload) }
+
 android {
     namespace = "com.miaotoujunshi.miaotou_app"
     compileSdk = flutter.compileSdkVersion
@@ -36,6 +64,8 @@ android {
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
         }
+
+        sourceSets["main"].assets.srcDir(sharedAssets.get().asFile)
     }
 }
 

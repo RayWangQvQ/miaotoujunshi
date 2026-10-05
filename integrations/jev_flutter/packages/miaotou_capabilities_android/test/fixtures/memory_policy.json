@@ -1,0 +1,12 @@
+{
+  "policyVersion": "1",
+  "maxValueChars": 200,
+  "maxRows": 200,
+  "maxOperations": 20,
+  "retainedSafetySemantics": [
+    "consent",
+    "pause",
+    "capacity",
+    "undo-within-open-store"
+  ]
+}
