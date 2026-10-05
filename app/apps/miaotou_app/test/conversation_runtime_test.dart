@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:miaotou_app/src/design/copy.dart';
 import 'package:miaotou_app/src/panel/protocol.dart';
@@ -234,9 +235,7 @@ void main() {
   test('a refused frame reaches the panel in the platform\'s own words', () async {
     // The platform writes these sentences to be shown unchanged, and the panel is
     // the only channel: a generic replacement would leave the user with a
-    // sentence that fits every failure and therefore diagnoses none. The
-    // accessibility-unavailable case keeps the generic one, because there the
-    // platform declined to answer at all.
+    // sentence that fits every failure and therefore diagnoses none.
     final InMemoryCapabilities capabilities = InMemoryCapabilities();
     addTearDown(capabilities.dispose);
     capabilities.screenCapture.outcome = const CaptureFailed(
@@ -273,6 +272,76 @@ void main() {
       isEmpty,
       reason: 'nothing was read, so nothing should have been asked to read it',
     );
+  });
+
+  test('an absent accessibility service is named, not described in general', () async {
+    // This is what 「拿不到画面」 cost the first time: the Android bridge cannot
+    // take a picture without its accessibility service, so it raises this code
+    // before any capture machinery runs. The generic sentence tells the user to
+    // check accessibility without telling them that is what is wrong, and the
+    // first device run read as a broken capture rather than a switched-off
+    // service.
+    final InMemoryCapabilities capabilities = InMemoryCapabilities(
+      captureThrows: PlatformException(
+        code: 'accessibility_service_unavailable',
+        message: 'Enable the Miaotou accessibility service.',
+      ),
+    );
+    addTearDown(capabilities.dispose);
+    final PanelSession panel = PanelSession();
+    addTearDown(panel.dispose);
+    final ConversationRuntime runtime = ConversationRuntime(
+      capabilities: capabilities.toSet(),
+      panel: panel,
+      copy: AppCopy.zh,
+      clipboardWrite: (_) {},
+      analyzer: (_, _) async => _advice('unused'),
+    );
+    addTearDown(runtime.dispose);
+    await runtime.start();
+
+    panel.receive(const PanelCommand(PanelCommandKind.recogniseOnce));
+    await _until(
+      () =>
+          panel.current.note != null &&
+          panel.current.note != AppCopy.zh.text(CopyKey.runtimeRecognising),
+    );
+
+    expect(panel.current.note, AppCopy.zh.text(CopyKey.runtimeCaptureServiceOff));
+    expect(
+      capabilities.ocr.languageCalls,
+      isEmpty,
+      reason: 'there was never a frame to read',
+    );
+  });
+
+  test('an unnamed platform error keeps the generic sentence', () async {
+    // The bridge's other codes are written for a developer, so they are not
+    // shown: only the one that has a remedy of its own is spelled out.
+    final InMemoryCapabilities capabilities = InMemoryCapabilities(
+      captureThrows: PlatformException(code: 'android_control_capture_failed'),
+    );
+    addTearDown(capabilities.dispose);
+    final PanelSession panel = PanelSession();
+    addTearDown(panel.dispose);
+    final ConversationRuntime runtime = ConversationRuntime(
+      capabilities: capabilities.toSet(),
+      panel: panel,
+      copy: AppCopy.zh,
+      clipboardWrite: (_) {},
+      analyzer: (_, _) async => _advice('unused'),
+    );
+    addTearDown(runtime.dispose);
+    await runtime.start();
+
+    panel.receive(const PanelCommand(PanelCommandKind.recogniseOnce));
+    await _until(
+      () =>
+          panel.current.note != null &&
+          panel.current.note != AppCopy.zh.text(CopyKey.runtimeRecognising),
+    );
+
+    expect(panel.current.note, AppCopy.zh.text(CopyKey.runtimeCaptureFailed));
   });
 }
 

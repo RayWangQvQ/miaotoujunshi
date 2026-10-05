@@ -71,6 +71,20 @@ of contract members that already exist.**
    platforms already hide inside `capture()` and restore in a `finally`, and calling them here
    hid the panel twice. The decision itself is unchanged, and so is its shape: still no
    contract member added, and the retired port's manual path passed no window handle either.
+
+   **Amended (the same day, once the device was actually inspected):** that amendment named
+   the wrong cause. 「拿不到画面」 was not `-3 目标窗口已经切换` — no capture call ever got that
+   far, so nothing had been observed and the account above was reasoned from the code alone.
+   The device the first run used had `com.miaotoujunshi.miaotou_app`'s accessibility service
+   **switched off**: the enabled entries belonged to the pre-rename package
+   (`com.miaotoujunshi.chat`, still installed), while the running build's own component was
+   neither enabled nor bound, so the bridge raised
+   `accessibility_service_unavailable` before `ScreenCapture` was reached. The composition fix
+   above stands on its own merits — the handle really is stale by construction and hiding really
+   does belong to the implementation — but it was reasoned from the code rather than observed,
+   and the panel's single generic sentence is what made that possible. Fixed by naming the one
+   platform error that has a remedy, which is why the first run read as a broken capture rather
+   than a switched-off service.
 2. **It works on every application, and there is no allowlist.** An unadapted application is
    not an error state; it is the case the manual path exists for. The path is never
    automatic: the adapter registry stays the only thing that triggers a capture without the

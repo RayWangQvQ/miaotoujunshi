@@ -36,6 +36,7 @@ final class InMemoryCapabilities {
   InMemoryCapabilities({
     String? targetWindow,
     CaptureOutcome? captureOutcome,
+    Object? captureThrows,
     List<OcrLine>? ocrLines,
     bool verifyInjection = true,
     List<ChatLine>? chatLines,
@@ -48,6 +49,7 @@ final class InMemoryCapabilities {
   })  : screenCapture = InMemoryScreenCapture(
           targetWindow: targetWindow,
           outcome: captureOutcome,
+          captureThrows: captureThrows,
         ),
         uiTreeReader = InMemoryUiTreeReader(lines: chatLines),
         ocr = InMemoryOcr(lines: ocrLines),
@@ -105,8 +107,11 @@ CaptureFrame _defaultFrame() => CaptureFrame(
     );
 
 final class InMemoryScreenCapture implements ScreenCapture {
-  InMemoryScreenCapture({this.targetWindow, CaptureOutcome? outcome})
-      : outcome = outcome ?? CaptureOk(_defaultFrame());
+  InMemoryScreenCapture({
+    this.targetWindow,
+    CaptureOutcome? outcome,
+    this.captureThrows,
+  }) : outcome = outcome ?? CaptureOk(_defaultFrame());
 
   /// What [findTargetWindow] answers. Null is the "no window found" case and is
   /// the default, because it is the one a real port hits most often.
@@ -114,6 +119,14 @@ final class InMemoryScreenCapture implements ScreenCapture {
 
   /// What [capture] answers.
   CaptureOutcome outcome;
+
+  /// What [capture] throws instead of answering.
+  ///
+  /// The contract gives a refusal a value and an exception to a platform that
+  /// cannot answer at all, so this is not a refusal this double is pretending
+  /// to make — it is the other half of the interface, and the Android bridge
+  /// reaches it the moment its accessibility service is off.
+  Object? captureThrows;
 
   /// Every `targetWindowId` [capture] was called with, in order.
   final List<String?> captureCalls = <String?>[];
@@ -124,6 +137,10 @@ final class InMemoryScreenCapture implements ScreenCapture {
   @override
   Future<CaptureOutcome> capture({String? targetWindowId}) async {
     captureCalls.add(targetWindowId);
+    final Object? failure = captureThrows;
+    if (failure != null) {
+      throw failure;
+    }
     return outcome;
   }
 }

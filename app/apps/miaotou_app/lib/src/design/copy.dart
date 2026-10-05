@@ -160,6 +160,7 @@ enum CopyKey {
   runtimeRecognising,
   runtimeCaptureFailed,
   runtimeCaptureRefused,
+  runtimeCaptureServiceOff,
   runtimeRecogniseFailed,
   runtimeNothingRecognised,
   runtimeHttpStatus,
@@ -342,6 +343,8 @@ final class AppCopy {
     CopyKey.runtimeRecognising: '正在截屏识别这一屏…',
     CopyKey.runtimeCaptureFailed: '拿不到画面。请确认已开启无障碍与悬浮窗，且该界面允许截屏。',
     CopyKey.runtimeCaptureRefused: '拿不到画面。{reason}',
+    CopyKey.runtimeCaptureServiceOff:
+        '拿不到画面。无障碍服务未开启：去系统设置 → 无障碍里打开本应用的采集服务，再回来重试。',
     CopyKey.runtimeRecogniseFailed: '拿到了画面，但没能读出上面的文字，请重试或换一屏。',
     CopyKey.runtimeNothingRecognised: '这一屏没有识别到可用的文字。',
     CopyKey.runtimeHttpStatus: '模型请求失败（HTTP {status}），请检查地址、模型和密钥。',

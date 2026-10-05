@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 import 'package:miaotou_domain/miaotou_domain.dart';
 
@@ -164,9 +164,12 @@ final class ConversationRuntime {
         case CaptureOk(:final CaptureFrame frame):
           await _readFrame(frame);
       }
+    } on PlatformException catch (failure) {
+      _publish(note: _platformRefusal(failure));
     } on Object {
-      // The platform declining to answer at all — no accessibility service, a
-      // channel that is gone — rather than declining this particular frame.
+      // The platform declining to answer at all — a channel that is gone, a
+      // bridge that never attached — rather than declining this particular
+      // frame.
       _publish(note: copy.text(CopyKey.runtimeCaptureFailed));
     } finally {
       _recognising = false;
@@ -226,6 +229,27 @@ final class ConversationRuntime {
   String _refusal(String reason) => copy
       .text(CopyKey.runtimeCaptureRefused)
       .replaceAll('{reason}', reason);
+
+  /// The one platform error that has a remedy of its own.
+  ///
+  /// The contract reserves exceptions for the platform being unable to answer
+  /// at all, and on Android that is nearly always the accessibility service
+  /// being off — the bridge cannot take a picture without it, so it raises this
+  /// code before any capture machinery runs. Answering with the generic
+  /// sentence would name a symptom the user cannot act on («确认已开启无障碍»
+  /// when the panel cannot tell them *that* is what is wrong), which is what
+  /// cost a code-reading session the first time this happened.
+  ///
+  /// Every other platform error keeps the generic sentence: the bridge's
+  /// messages are written for a developer, not for the panel.
+  String _platformRefusal(PlatformException failure) =>
+      failure.code == _serviceUnavailable
+          ? copy.text(CopyKey.runtimeCaptureServiceOff)
+          : copy.text(CopyKey.runtimeCaptureFailed);
+
+  /// `MiaotouAndroidPlugin.withCaptureService`, which is the only place in the
+  /// three ports that raises it.
+  static const String _serviceUnavailable = 'accessibility_service_unavailable';
 
   Future<void> _analyze({required bool manual}) async {
     if (_analysing) {
