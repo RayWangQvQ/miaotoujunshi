@@ -27,6 +27,11 @@ public class MiaotouMacosPlugin: NSObject, FlutterPlugin {
         )
         registrar.addMethodCallDelegate(instance, channel: channel)
 
+        // The main window's end of the panel protocol. Wired here because this is
+        // the only place the main engine's messenger exists; the panel engine's
+        // end is created with that engine, in `FloatingPanelHost.ensurePanel`.
+        FloatingPanelHost.shared.attachToMainEngine(messenger: registrar.messenger)
+
         let events = FlutterEventChannel(
             name: eventChannelName,
             binaryMessenger: registrar.messenger
@@ -65,6 +70,7 @@ public class MiaotouMacosPlugin: NSObject, FlutterPlugin {
                     anchor: arguments["anchor"] as? String ?? "topLeft",
                     dx: MiaotouMacosPlugin.number(arguments["dx"]),
                     dy: MiaotouMacosPlugin.number(arguments["dy"]),
+                    size: MiaotouMacosPlugin.size(arguments),
                     at: rect
                 )
                 result(nil)
@@ -366,6 +372,21 @@ public class MiaotouMacosPlugin: NSObject, FlutterPlugin {
 
     static func number(_ raw: Any?) -> Double {
         (raw as? NSNumber)?.doubleValue ?? 0
+    }
+
+    /// The size the caller wants the panel to be, or nil when it did not say.
+    ///
+    /// Nil rather than the panel's current size, because the two mean different
+    /// things: "leave it as it is" is a legitimate answer and a zero-sized
+    /// rectangle is not, so a caller that omits both numbers is asking the host to
+    /// decide instead of asking for a window with no area.
+    static func size(_ arguments: [String: Any]) -> CGSize? {
+        guard let width = (arguments["width"] as? NSNumber)?.doubleValue,
+              let height = (arguments["height"] as? NSNumber)?.doubleValue,
+              width > 0, height > 0 else {
+            return nil
+        }
+        return CGSize(width: width, height: height)
     }
 }
 

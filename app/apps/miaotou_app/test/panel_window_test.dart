@@ -199,4 +199,170 @@ void main() {
     expect(source, contains('alpha = 1.0f'));
     expect(source, contains('SAFE_EXPANDED_TOP_DP'));
   });
+
+  test('the appearance survives the window wire codec', () {
+    for (final int percent in <int>[
+      PanelAppearance.minOpacity,
+      PanelAppearance.defaultOpacity,
+      PanelAppearance.maxOpacity,
+    ]) {
+      final PanelAppearance before = PanelAppearance.percent(percent);
+      expect(
+        PanelWireCodec.decodeAppearance(PanelWireCodec.encodeAppearance(before)),
+        before,
+      );
+    }
+  });
+
+  test('an appearance outside the range arrives clamped, not refused', () {
+    expect(
+      PanelWireCodec.decodeAppearance(<String, Object?>{'opacity': 900}).opacity,
+      PanelAppearance.maxOpacity,
+      reason: 'the range is this build\'s. A value from a build that opened it '
+          'further is still a percentage, and refusing it would leave the panel '
+          'on the default with nothing said',
+    );
+  });
+
+  test('a malformed appearance fails explicitly', () {
+    expect(
+      () => PanelWireCodec.decodeAppearance(<String, Object?>{'opacity': '80%'}),
+      throwsFormatException,
+    );
+    expect(() => PanelWireCodec.decodeAppearance('80'), throwsFormatException);
+  });
+
+  testWidgets('the panel paints the fill the main window pushed', (
+    WidgetTester tester,
+  ) async {
+    final InMemoryPanelChannel channel = InMemoryPanelChannel();
+    addTearDown(channel.dispose);
+    await tester.pumpWidget(PanelApp(channel: channel));
+    await tester.pump();
+
+    expect(
+      _fillAlpha(tester),
+      closeTo(PanelAppearance.defaultOpacity / 100, 0.0001),
+      reason: 'the panel engine has no store, so before the first push it '
+          'paints the default rather than waiting to be told',
+    );
+
+    channel.pushAppearance(const PanelAppearance(opacity: 60));
+    // Two pumps rather than one: the controller is a broadcast one, so the
+    // value arrives on a microtask and the rebuild lands on the frame after it.
+    await tester.pumpAndSettle();
+    expect(_fillAlpha(tester), closeTo(0.6, 0.0001));
+
+    channel.pushAppearance(const PanelAppearance(opacity: 100));
+    await tester.pumpAndSettle();
+    expect(_fillAlpha(tester), closeTo(1, 0.0001));
+  });
+
+  test('the macOS panel protocol is named the same on both sides', () {
+    final String source = File(
+      '../../packages/miaotou_capabilities_macos/macos/'
+      'miaotou_capabilities_macos/Sources/miaotou_capabilities_macos/'
+      'FloatingPanelHost.swift',
+    ).readAsStringSync();
+
+    expect(
+      source,
+      contains('"$macosPanelProtocolChannelName"'),
+      reason: 'the host owns both ends of the macOS relay, so this name is '
+          'written in two languages; a rename on one side is a panel that '
+          'receives nothing at all',
+    );
+    expect(
+      source,
+      contains('"${PanelEngineBootstrap.macosChannelName}"'),
+      reason: 'the bootstrap is how the macOS panel engine learns which side '
+          'it is, and the Dart side asserts the same string',
+    );
+    expect(
+      source,
+      contains('entrypoint = "panelMain"'),
+      reason: 'the entrypoint is a name looked up at runtime',
+    );
+    expect(
+      File('lib/main.dart').readAsStringSync(),
+      contains("@pragma('vm:entry-point')\nvoid panelMain()"),
+      reason: 'an unannotated entrypoint is tree-shaken out of a release build, '
+          'and the macOS panel engine then starts with no Dart at all',
+    );
+  });
+
+  test('the Android host caches the appearance the way it caches the frame', () {
+    const String kotlin =
+        '../../packages/miaotou_capabilities_android/android/src/main/kotlin/'
+        'com/miaotoujunshi/capabilities/android/';
+    final String host = File('${kotlin}AndroidOverlayHost.kt').readAsStringSync();
+    final String plugin =
+        File('${kotlin}MiaotouAndroidPlugin.kt').readAsStringSync();
+
+    expect(
+      host,
+      contains('latestAppearance'),
+      reason: 'the panel engine reaches Dart after the host starts it, so a '
+          'value pushed in between has to be held — the same treatment the '
+          'frame has always had',
+    );
+    expect(host, contains('fun publishAppearance'));
+    expect(
+      plugin,
+      contains('"appearance" ->'),
+      reason: 'the main engine\'s relay has to accept the second down-stream, '
+          'or the push fails as not-implemented',
+    );
+    expect(
+      host,
+      isNot(contains('getSharedPreferences')),
+      reason: 'the placement is one key in the application\'s Preferences now; '
+          'a store here would be the second shape of the same setting that '
+          'ADR-0020 retires',
+    );
+  });
+
+  test('the Windows panel no longer writes a placement file', () {
+    // Comments out, because the file explains in prose what it used to do, and
+    // the point of the test is what it does now.
+    final String code = _stripComments(
+      File(
+        '../../packages/miaotou_capabilities_windows/lib/src/panel.dart',
+      ).readAsStringSync(),
+    );
+
+    expect(
+      code,
+      isNot(contains('dart:io')),
+      reason: 'where the panel was left is one key in the application\'s '
+          'Preferences now, written from the [PanelDragged] event this file '
+          'already emits (ADR-0020 decision 4). A store beside the window is '
+          'the second shape of the same setting, and it is what put this value '
+          'into three formats on three ports.',
+    );
+    expect(code, isNot(contains('WindowsPanelPosition')));
+    expect(code, isNot(contains('panel-placement.json')));
+  });
 }
+
+/// The alpha the panel's one fill token is drawn at.
+double _fillAlpha(WidgetTester tester) => tester
+    .widget<MaterialApp>(find.byType(MaterialApp))
+    .theme!
+    .cardTheme
+    .color!
+    .a;
+
+/// Comments out, so that a name quoted in a doc comment is not read as a name
+/// the file still uses. Block comments go first, then line comments.
+String _stripComments(String source) {
+  final String noBlocks = source.replaceAll(
+    RegExp(r'/\*.*?\*/', dotAll: true),
+    '',
+  );
+  return noBlocks
+      .split('\n')
+      .map((String line) => line.replaceAll(RegExp(r'//.*'), ''))
+      .join('\n');
+}
+

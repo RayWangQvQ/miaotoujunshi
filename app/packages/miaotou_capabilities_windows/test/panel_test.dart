@@ -78,21 +78,12 @@ void main() {
     expect(native.focusable, isFalse);
   });
 
-  test('the durable placement file replaces an earlier position', () async {
-    final Directory directory = await Directory.systemTemp.createTemp(
-      'miaotou-panel-',
-    );
-    addTearDown(() => directory.delete(recursive: true));
-    final FileWindowsPanelPositionStore store = FileWindowsPanelPositionStore(
-      file: File('${directory.path}/panel-placement.json'),
-    );
-
-    await store.write(const WindowsPanelPosition(x: 1, y: 2));
-    await store.write(const WindowsPanelPosition(x: 10, y: 20));
-
-    final WindowsPanelPosition? restored = await store.read();
-    expect(restored?.x, 10);
-    expect(restored?.y, 20);
+  test('the panel window is sized by the caller, not by the native side', () {
+    // The panel starts collapsed and expands itself, and both sizes are the
+    // caller's to state: `setExpanded` is the only place either number appears.
+    final String source = File('lib/src/panel_native.dart').readAsStringSync();
+    expect(source, contains('Size(420, 620)'));
+    expect(source, contains('Size(56, 56)'));
   });
 
   test('the native source declares no-activate and always-on-top behavior', () {

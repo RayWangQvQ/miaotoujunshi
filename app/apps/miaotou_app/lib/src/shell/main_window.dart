@@ -109,6 +109,7 @@ class _MainWindowShellState extends State<MainWindowShell> {
           onOpen: _open,
           preferences: widget.session.capabilities.preferences,
           secrets: widget.session.capabilities.secretStore,
+          panel: widget.session.panel,
         );
       case ShellDestination.gallery:
         return GalleryPage(samples: widget.samples);

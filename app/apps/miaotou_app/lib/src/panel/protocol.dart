@@ -5,10 +5,17 @@ import 'package:miaotou_domain/miaotou_domain.dart';
 
 /// Everything that may cross between the main window and the floating panel.
 ///
-/// Two directions, and that is the whole contract (#12, AC2): a frame goes down,
-/// a command comes up. Nothing else crosses, and nothing reaches across: the
-/// panel cannot ask a capability, read a store or call a model, because there is
-/// no path for it to do so — it is handed a [PanelFrame] and a callback.
+/// **Two streams down and one up, and that is the whole contract** (#12, AC2): a
+/// frame goes down, an appearance goes down beside it, a command comes up.
+/// Nothing else crosses, and nothing reaches across: the panel cannot ask a
+/// capability, read a store or call a model, because there is no path for it to
+/// do so — it is handed a [PanelFrame], a [PanelAppearance] and a callback.
+///
+/// The appearance is a down-stream rather than a field on the frame because it is
+/// not a fact about an analysis: a frame only arrives when there is one, so a
+/// panel with nothing analysed yet would have nothing to paint its own surface
+/// from. It is not a `FloatingPanel` member either — that interface is window
+/// semantics, and this value never reaches a window (ADR-0020).
 ///
 /// The typed contract lives here; the Windows JSON encoding lives beside the
 /// multi-window transport in `window_channel.dart`. That keeps serialization
@@ -86,6 +93,57 @@ final class PanelLine {
   String toString() => 'PanelLine(${speaker.name}, $text)';
 }
 
+/// How the panel paints its own fill.
+///
+/// **The fill's alpha, not the window's.** The value lands on the one colour role
+/// the panel engine overrides — `cardTheme.color` — so a window alpha is a
+/// different effect: that one dims the text along with the background, and it
+/// would collide with the `0f`/`1f` the Android port uses to take the panel out
+/// of its own screenshot. Gate experiment A measured the difference (ADR-0020).
+///
+/// The panel is *fed* this and never derives it: the main window owns the
+/// setting, reads it and pushes it, exactly as it pushes frames. The panel's own
+/// state stays transient (ADR-0012).
+final class PanelAppearance {
+  const PanelAppearance({this.opacity = defaultOpacity});
+
+  /// The panel is never fully transparent: at the bottom of the range the ball
+  /// would disappear along with the fill it is drawn with, and the user would
+  /// lose both the panel and the handle that drags it.
+  static const int minOpacity = 40;
+
+  /// Fully opaque. The top of the range, because a fill cannot be more solid.
+  static const int maxOpacity = 100;
+
+  /// What a user who has never touched the slider gets, and what the panel
+  /// paints with before the main window's first push arrives.
+  static const int defaultOpacity = 80;
+
+  /// The fill's alpha as a whole percentage in
+  /// [minOpacity]..[maxOpacity].
+  final int opacity;
+
+  /// What the panel's shared fill token is drawn at.
+  double get fillAlpha => opacity / 100;
+
+  /// A percentage from a source that may be outside the range: a stored value,
+  /// or a slider that has not been clamped. Out-of-range is clamped rather than
+  /// refused, because "as solid as the panel gets" is a real answer and a value
+  /// from a previous release is not a fault.
+  static PanelAppearance percent(int value) =>
+      PanelAppearance(opacity: value.clamp(minOpacity, maxOpacity));
+
+  @override
+  bool operator ==(Object other) =>
+      other is PanelAppearance && other.opacity == opacity;
+
+  @override
+  int get hashCode => opacity.hashCode;
+
+  @override
+  String toString() => 'PanelAppearance($opacity%)';
+}
+
 /// One thing the panel is asking for.
 enum PanelCommandKind {
   fill,
@@ -136,6 +194,14 @@ abstract class PanelChannel {
   /// Frames going down.
   Stream<PanelFrame> get frames;
 
+  /// Appearances going down, beside the frames.
+  ///
+  /// A separate stream rather than a field on [PanelFrame] so that a panel with
+  /// no analysis yet still knows how to paint itself, and so that a value the
+  /// user is dragging lands the moment it changes rather than at the cadence
+  /// analyses happen to arrive at (ADR-0020).
+  Stream<PanelAppearance> get appearance;
+
   /// Commands going up.
   void send(PanelCommand command);
 }
@@ -144,6 +210,8 @@ abstract class PanelChannel {
 final class InMemoryPanelChannel implements PanelChannel {
   final StreamController<PanelFrame> _frames =
       StreamController<PanelFrame>.broadcast();
+  final StreamController<PanelAppearance> _appearance =
+      StreamController<PanelAppearance>.broadcast();
 
   /// Everything the panel asked for, in order. Readable by a test.
   final List<PanelCommand> sent = <PanelCommand>[];
@@ -152,10 +220,19 @@ final class InMemoryPanelChannel implements PanelChannel {
   Stream<PanelFrame> get frames => _frames.stream;
 
   @override
+  Stream<PanelAppearance> get appearance => _appearance.stream;
+
+  @override
   void send(PanelCommand command) => sent.add(command);
 
   /// A frame going down, from the main window's side.
   void push(PanelFrame frame) => _frames.add(frame);
 
-  void dispose() => _frames.close();
+  /// An appearance going down, from the main window's side.
+  void pushAppearance(PanelAppearance value) => _appearance.add(value);
+
+  void dispose() {
+    _frames.close();
+    _appearance.close();
+  }
 }

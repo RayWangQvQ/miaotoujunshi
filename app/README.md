@@ -81,13 +81,25 @@ exercised on a Windows host.
 At startup the Windows runner creates the 56px floating ball in a second Flutter
 engine. The window is frameless, always on top, omitted from the taskbar and
 marked `WS_EX_NOACTIVATE` until the user enters an editable draft. Dragging snaps
-the window to the nearest display edge and stores its last bounds in
-`%LOCALAPPDATA%\妙投军师\panel-placement.json`.
+the window to the nearest display edge and reports where it landed as a
+`PanelDragged` event; the application is what remembers it, as one
+`panel.placement` key in `Preferences` (ADR-0020 decision 4). No port keeps a
+store of its own beside its window.
 
-The panel isolate receives only serialized `PanelFrame` snapshots and sends only
-`PanelCommand` values through `desktop_multi_window`; capabilities and session
-state remain in the primary engine. A real Windows host is required to validate
-focus handoff and system IME behavior.
+The panel isolate receives only serialized `PanelFrame` and `PanelAppearance`
+values and sends only `PanelCommand` values through `desktop_multi_window`;
+capabilities and session state remain in the primary engine. A real Windows host
+is required to validate focus handoff and system IME behavior.
+
+### The panel's opacity is a setting
+
+The main window's settings page carries a 悬浮面板 slider (40–100%, default 80).
+It changes the fill alpha of the panel's one shared colour token,
+`cardTheme.color` — the ball, the frame and every candidate card are drawn from
+it — and never a native window alpha, which would dim the panel's text and
+collide with the `0f`/`1f` the Android port uses to take the panel out of its own
+screenshot. The value crosses on a second down-stream beside the frame, and a
+drag previews it through `PanelSession` while the release writes it.
 
 ### Building the Windows bridge
 

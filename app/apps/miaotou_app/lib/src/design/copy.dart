@@ -90,6 +90,10 @@ enum CopyKey {
   settingsSaveFailed,
   settingsGallery,
   settingsDiagnostics,
+  settingsPanelSection,
+  settingsPanelOpacity,
+  settingsPanelOpacityValue,
+  settingsPanelOpacityHint,
 
   galleryTitle,
   galleryIntro,
@@ -285,6 +289,10 @@ final class AppCopy {
     CopyKey.settingsSaveFailed: '无法保存设置',
     CopyKey.settingsGallery: '组件陈列',
     CopyKey.settingsDiagnostics: '能力自检',
+    CopyKey.settingsPanelSection: '悬浮面板',
+    CopyKey.settingsPanelOpacity: '面板底色浓度',
+    CopyKey.settingsPanelOpacityValue: '{value}%',
+    CopyKey.settingsPanelOpacityHint: '只改面板自己的底色，球、外框和候选卡片一起变；上面的文字始终是实的。',
 
     CopyKey.galleryTitle: '组件陈列',
     CopyKey.galleryIntro: '主窗口各页与悬浮面板复用同一套组件，这里把它们单独摆出来。',

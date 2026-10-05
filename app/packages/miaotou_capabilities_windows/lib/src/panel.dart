@@ -1,80 +1,17 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 
 import 'panel_native.dart';
 
-abstract interface class WindowsPanelPositionStore {
-  Future<WindowsPanelPosition?> read();
-
-  Future<void> write(WindowsPanelPosition position);
-}
-
-final class WindowsPanelPosition {
-  const WindowsPanelPosition({required this.x, required this.y});
-
-  final double x;
-  final double y;
-}
-
-final class FileWindowsPanelPositionStore implements WindowsPanelPositionStore {
-  FileWindowsPanelPositionStore({File? file}) : _file = file ?? _defaultFile();
-
-  final File _file;
-
-  static File _defaultFile() {
-    final String? root =
-        Platform.environment['LOCALAPPDATA'] ??
-        Platform.environment['USERPROFILE'];
-    if (root == null || root.isEmpty) {
-      throw StateError('Windows has no local application-data directory');
-    }
-    return File(
-      '$root${Platform.pathSeparator}妙投军师'
-      '${Platform.pathSeparator}panel-placement.json',
-    );
-  }
-
-  @override
-  Future<WindowsPanelPosition?> read() async {
-    if (!await _file.exists()) {
-      return null;
-    }
-    final Object? decoded = jsonDecode(await _file.readAsString());
-    if (decoded is! Map<Object?, Object?>) {
-      throw const FormatException('panel placement must be a JSON object');
-    }
-    return WindowsPanelPosition(
-      x: _finite(decoded, 'x'),
-      y: _finite(decoded, 'y'),
-    );
-  }
-
-  @override
-  Future<void> write(WindowsPanelPosition position) async {
-    await _file.parent.create(recursive: true);
-    final File temporary = File('${_file.path}.tmp');
-    await temporary.writeAsString(
-      jsonEncode(<String, double>{'x': position.x, 'y': position.y}),
-      flush: true,
-    );
-    if (await _file.exists()) {
-      await _file.delete();
-    }
-    await temporary.rename(_file.path);
-  }
-}
-
-double _finite(Map<Object?, Object?> map, String key) {
-  final Object? value = map[key];
-  if (value is! num || !value.toDouble().isFinite) {
-    throw FormatException('panel placement $key must be finite');
-  }
-  return value.toDouble();
-}
-
+/// Windows' answer for the floating window.
+///
+/// **No store.** Where the panel was left used to live in
+/// `%LOCALAPPDATA%\妙投军师\panel-placement.json`, written by this file; it is one
+/// key in the application's `Preferences` now, and the application writes it
+/// from the [PanelDragged] event below. Keeping the position beside the window
+/// rather than beside the setting was the reason the same value had three
+/// shapes on three ports (ADR-0020 decision 4).
 final class WindowsFloatingPanel implements FloatingPanel {
   WindowsFloatingPanel(
     this._native, {

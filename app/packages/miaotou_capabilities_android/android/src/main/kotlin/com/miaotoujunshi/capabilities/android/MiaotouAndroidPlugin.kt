@@ -78,6 +78,13 @@ class MiaotouAndroidPlugin :
                     host.publishFrame(call.arguments)
                     result.success(null)
                 }
+                // The second down-stream, beside the frame. Relayed and cached
+                // exactly like it, because the panel engine reaches Dart after
+                // this call and would otherwise miss the value (ADR-0020).
+                "appearance" -> {
+                    host.publishAppearance(call.arguments)
+                    result.success(null)
+                }
                 else -> result.notImplemented()
             }
         }

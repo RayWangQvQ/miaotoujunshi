@@ -29,16 +29,12 @@ internal class AndroidOverlayHost(
         private const val EXPANDED_HEIGHT_DP = 380
         private const val DEFAULT_TOP_DP = 56
         private const val SAFE_EXPANDED_TOP_DP = 48
-        private const val PREFS = "miaotou_android_panel"
-        private const val PREF_EDGE = "edge"
-        private const val PREF_Y_DP = "y_dp"
     }
 
     var activity: Activity? = null
 
     private val windowManager =
         context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-    private val preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     private val engineGroup = FlutterEngineGroup(context)
 
     private var engine: FlutterEngine? = null
@@ -47,6 +43,7 @@ internal class AndroidOverlayHost(
     private var params: WindowManager.LayoutParams? = null
     private var panelProtocol: MethodChannel? = null
     private var latestFrame: Any? = null
+    private var latestAppearance: Any? = null
     private var panelReady = false
     private var visible = false
     private var expanded = false
@@ -151,6 +148,22 @@ internal class AndroidOverlayHost(
         }
     }
 
+    /**
+     * How the panel paints its fill, cached the same way the frame is.
+     *
+     * A second down-stream, beside the frame, and it needs the same treatment
+     * for the same reason: the panel engine is started by [ensurePanel] and
+     * reaches Dart after that, so a value pushed in between would otherwise be
+     * lost and the panel would keep the default until something else changed it
+     * (ADR-0020).
+     */
+    fun publishAppearance(appearance: Any?) {
+        latestAppearance = appearance
+        if (panelReady) {
+            panelProtocol?.invokeMethod("appearance", appearance)
+        }
+    }
+
     fun destroy() {
         if (visible) {
             windowManager.removeViewImmediate(container)
@@ -200,6 +213,9 @@ internal class AndroidOverlayHost(
                         "panelReady" -> {
                             panelReady = true
                             latestFrame?.let { channel.invokeMethod("frame", it) }
+                            latestAppearance?.let {
+                                channel.invokeMethod("appearance", it)
+                            }
                             result.success(null)
                         }
                         "command" -> forwardCommand(call.arguments, result)
@@ -268,27 +284,40 @@ internal class AndroidOverlayHost(
         }
     }
 
+    /**
+     * Puts the window where the caller asked for it.
+     *
+     * **The caller supplies both coordinates, and this class stores neither.**
+     * It used to keep `edge` and `y_dp` in its own `SharedPreferences` and read
+     * them back on the next launch, which meant the same setting had a different
+     * shape on this port than on the two desktop ones. The application keeps one
+     * `PanelPlacement` now and sends it down; `edge` survives here only as
+     * runtime state, because [setExpanded] and [clamp] need to know which side
+     * the window is pinned to (ADR-0020 decision 4).
+     *
+     * `free` is the anchor a saved placement arrives with, and it means exactly
+     * that: two numbers in logical pixels, neither of them relative to an edge.
+     */
     private fun place(window: WindowManager.LayoutParams, arguments: Map<*, *>) {
         val screenWidth = context.resources.displayMetrics.widthPixels
         val screenHeight = context.resources.displayMetrics.heightPixels
-        val savedEdge = preferences.getString(PREF_EDGE, null)
         val requestedAnchor = arguments["anchor"] as? String ?: "topLeft"
-        edge = savedEdge ?: if (requestedAnchor.endsWith("Right")) "right" else "left"
 
-        window.x = when {
-            savedEdge != null -> if (edge == "right") screenWidth - window.width else 0
-            requestedAnchor.endsWith("Right") ->
-                screenWidth - window.width - dp(arguments.number("dx", 0.0))
-            else -> dp(arguments.number("dx", 0.0))
-        }.coerceIn(0, (screenWidth - window.width).coerceAtLeast(0))
-
-        val defaultY = arguments.number("dy", DEFAULT_TOP_DP.toDouble()).toFloat()
-        val yDp = if (preferences.contains(PREF_Y_DP)) {
-            preferences.getFloat(PREF_Y_DP, defaultY)
+        if (requestedAnchor == "free") {
+            window.x = dp(arguments.number("dx", 0.0))
+            edge = if (abs(window.x) <= abs(screenWidth - window.width - window.x)) {
+                "left"
+            } else {
+                "right"
+            }
         } else {
-            defaultY
+            edge = if (requestedAnchor.endsWith("Right")) "right" else "left"
+            val inset = dp(arguments.number("dx", 0.0))
+            window.x = if (edge == "right") screenWidth - window.width - inset else inset
         }
-        window.y = dp(yDp.toDouble()).coerceIn(
+        window.x = window.x.coerceIn(0, (screenWidth - window.width).coerceAtLeast(0))
+
+        window.y = dp(arguments.number("dy", DEFAULT_TOP_DP.toDouble())).coerceIn(
             0,
             (screenHeight - window.height).coerceAtLeast(0),
         )
@@ -329,6 +358,13 @@ internal class AndroidOverlayHost(
         }
     }
 
+    /**
+     * Snaps the window to the nearest edge and reports where it landed.
+     *
+     * The report is the whole of the persistence story now: the application
+     * writes one `PanelPlacement` from this event and sends it back through
+     * [show] on the next launch, so this class needs no store of its own.
+     */
     private fun finishDrag() {
         val window = params ?: return
         val screenWidth = context.resources.displayMetrics.widthPixels
@@ -342,12 +378,9 @@ internal class AndroidOverlayHost(
         if (visible) {
             windowManager.updateViewLayout(container, window)
         }
-        val editor = preferences.edit().putString(PREF_EDGE, edge)
         if (!expanded) {
             collapsedY = window.y
-            editor.putFloat(PREF_Y_DP, window.y / density)
         }
-        editor.apply()
         onEvent(
             mapOf(
                 "kind" to "dragged",

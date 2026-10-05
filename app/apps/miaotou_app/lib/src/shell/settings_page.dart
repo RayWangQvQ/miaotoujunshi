@@ -3,7 +3,10 @@ import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 
 import '../design/copy.dart';
 import '../design/spacing.dart';
+import '../panel/protocol.dart';
+import '../panel/session.dart';
 import '../runtime/model_settings.dart';
+import '../runtime/panel_settings.dart';
 import 'destination.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -12,11 +15,20 @@ class SettingsPage extends StatefulWidget {
     required this.onOpen,
     required this.preferences,
     required this.secrets,
+    required this.panel,
   });
 
   final void Function(ShellDestination destination) onOpen;
   final Preferences preferences;
   final SecretStore secrets;
+
+  /// Where the panel's own settings are published.
+  ///
+  /// The panel is a second window painted by a second engine, so "preview" means
+  /// pushing the value at it, not rebuilding a widget here. The session is the
+  /// main engine's holder of what the panel should look like, and the panel
+  /// protocol carries it from there (ADR-0020).
+  final PanelSession panel;
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
@@ -33,6 +45,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   StrategyProvider _provider = ModelSettings.defaults.strategyProvider;
   bool _autoAnalyze = ModelSettings.defaults.autoAnalyze;
+  int _opacity = PanelAppearance.defaultOpacity;
   bool _loading = true;
 
   @override
@@ -47,6 +60,9 @@ class _SettingsPageState extends State<SettingsPage> {
         widget.preferences,
         widget.secrets,
       );
+      final PanelSettings panel = await PanelSettings.load(
+        widget.preferences,
+      );
       if (!mounted) {
         return;
       }
@@ -60,6 +76,7 @@ class _SettingsPageState extends State<SettingsPage> {
         _background.text = settings.relationshipBackground;
         _provider = settings.strategyProvider;
         _autoAnalyze = settings.autoAnalyze;
+        _opacity = panel.appearance.opacity;
         _loading = false;
       });
     } on Object {
@@ -99,6 +116,37 @@ class _SettingsPageState extends State<SettingsPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(copy.text(key))),
     );
+  }
+
+  /// Every frame of the drag goes to the panel.
+  ///
+  /// The panel is a second window painted by a second engine, so there is no
+  /// widget here to rebuild: "preview" means pushing the value down the panel
+  /// protocol, and the panel that is sitting on top of the chat repaints from it.
+  void _previewOpacity(double value) {
+    final int percent = value.round();
+    setState(() => _opacity = percent);
+    widget.panel.publishAppearance(PanelAppearance.percent(percent));
+  }
+
+  /// Letting go writes it.
+  ///
+  /// Deliberately its own write rather than a trip through [_save]. That path
+  /// rebuilds a [ModelSettings] from `defaults`, so a slider that went through it
+  /// would blank `goal`, `tone`, `length` and `candidateCount` on the way past;
+  /// the panel's settings are a separate type under a separate prefix for exactly
+  /// that reason (ADR-0020 decision 4).
+  Future<void> _commitOpacity(double value) async {
+    try {
+      await PanelSettings.saveAppearance(
+        widget.preferences,
+        PanelAppearance.percent(value.round()),
+      );
+    } on Object {
+      if (mounted) {
+        _show(CopyKey.settingsSaveFailed);
+      }
+    }
   }
 
   @override
@@ -196,6 +244,43 @@ class _SettingsPageState extends State<SettingsPage> {
             onPressed: _save,
             child: Text(copy.text(CopyKey.settingsSave)),
           ),
+        ),
+        AppSpacing.gapL,
+        Text(
+          copy.text(CopyKey.settingsPanelSection),
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: Text(
+                copy.text(CopyKey.settingsPanelOpacity),
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ),
+            Text(
+              copy
+                  .text(CopyKey.settingsPanelOpacityValue)
+                  .replaceAll('{value}', '$_opacity'),
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
+        ),
+        Slider(
+          key: const Key('settings-panel-opacity'),
+          value: _opacity.toDouble(),
+          min: PanelAppearance.minOpacity.toDouble(),
+          max: PanelAppearance.maxOpacity.toDouble(),
+          divisions: PanelAppearance.maxOpacity - PanelAppearance.minOpacity,
+          label: copy
+              .text(CopyKey.settingsPanelOpacityValue)
+              .replaceAll('{value}', '$_opacity'),
+          onChanged: _previewOpacity,
+          onChangeEnd: _commitOpacity,
+        ),
+        Text(
+          copy.text(CopyKey.settingsPanelOpacityHint),
+          style: Theme.of(context).textTheme.bodySmall,
         ),
         AppSpacing.gapL,
         ListTile(

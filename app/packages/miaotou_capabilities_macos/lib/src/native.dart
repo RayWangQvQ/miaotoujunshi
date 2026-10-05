@@ -283,12 +283,23 @@ final class MethodChannelMacosNative implements MacosNative {
       'anchor': placement.anchor.name,
       'dx': placement.dx,
       'dy': placement.dy,
-      if (at != null) ...<String, Object?>{
-        'left': at.left,
-        'top': at.top,
-        'width': at.width,
-        'height': at.height,
-      },
+      // The size is stated even when the anchor is a corner, because the panel
+      // starts collapsed and the native side has no way to know that: its own
+      // default is the expanded window, and a first show that left it at
+      // 420x620 would be a transparent rectangle over the chat taking clicks
+      // meant for it (ADR-0020 decision 6).
+      if (placement.width != null) 'width': placement.width,
+      if (placement.height != null) 'height': placement.height,
+      // `at` is a rectangle, and it crosses as one. It used to cross as four
+      // loose numbers that the Swift then looked for under `window` and never
+      // found, so a resolved free placement was silently dropped.
+      if (at != null)
+        'window': <String, Object?>{
+          'left': at.left,
+          'top': at.top,
+          'right': at.right,
+          'bottom': at.bottom,
+        },
     });
   }
 

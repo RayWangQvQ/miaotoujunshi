@@ -59,3 +59,20 @@ Future<void> main() async {
 
   runApp(MiaotouApp(session: session, window: window));
 }
+
+/// The panel engine's entry point **on macOS**.
+///
+/// `FloatingPanelHost.entrypoint` names it, because the macOS host starts the
+/// second engine itself and has to name a function. Android and Windows start
+/// their panel engine on the default `main`; all three roads arrive at the same
+/// detection in [attachPanelWindowForCurrentPlatform], so this is an alias and
+/// nothing else — a second implementation here would be a second answer to
+/// "which side am I".
+///
+/// **The annotation is load-bearing.** The name is looked up at runtime in a
+/// release build, so an unannotated top-level function is tree-shaken away and
+/// the panel engine then starts with no Dart at all.
+@pragma('vm:entry-point')
+void panelMain() {
+  main();
+}
