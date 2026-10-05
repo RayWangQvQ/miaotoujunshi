@@ -98,6 +98,10 @@
 | 面板设置 | 面板自己的偏好：不透明度与停靠位置。存在 `Preferences`，键前缀 `panel.`，**由主窗读写**；面板引擎不读它（见 `docs/adr/0020`） |
 | 面板不透明度 | 面板**填充色**的 alpha：球、面板外框、候选回复卡共用同一个值。40–100，默认 80。**文字与只读横幅不受它影响** |
 | 窗口透明度 | 原生整窗的 alpha（Android `window.alpha`、macOS `NSWindow.alphaValue`、Windows 分层窗口）。**面板不使用它**：它连文字一起压淡，且与截屏时的 0f/1f 相撞 |
+| 权限接口 | 契约里唯一一个**只读状态、只跳系统页、不代为授权**的成员（`Permissions` 的 `read()` 与 `openSettings(kind)`）。没有 `request`：系统页跳完不给结果，接口不许假装它是请求（`docs/adr/0021`） |
+| 权限三态 | 一项权限的可用状态：`off`（未授权）/ `inactive`（系统里已授权，但当前不生效）/ `ready`（生效中）。悬浮窗只会有 `off` 与 `ready` |
+| 已勾选 / 已绑定 | 无障碍的两件不同事实：系统设置里勾了本应用的采集服务（读 `Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES`）与采集服务真的被平台绑定（活服务引用非空）。**只有「已绑定」算就绪**，「已勾选未绑定」是独立状态 |
+| 自启动提示 | 设置页权限节里那行纯文字说明：讲 ROM 的自启动与省电限制会冻结采集服务。**不读状态、不跳转**——按厂商跳自启动页的那张表是评估后延后的备选（`docs/adr/0021`） |
 
 ## 边界规则
 
@@ -142,3 +146,10 @@
   一起压淡，并与 `hideForCapture()` 的 0f/1f 相撞（`docs/adr/0020`）。
 - 面板位置只有一个形状：`PanelPlacement{anchor, dx, dy}`，三端读同一个值。**不要**按端各存一份——Android 的
   `edge` 就是 `topLeft`/`topRight`，`y_dp` 就是 `dy`。
+- 权限的可用状态一律**读**出来，不得从界面配置反推；无障碍只有「已绑定」才算就绪，「已勾选未绑定」必须能单独表达。
+  用户刚在系统设置里勾上、服务还没绑定的那一两秒显示「未开启」是可以接受的，把「勾了没起来」报成已就绪不可以
+  （`docs/adr/0021`）。
+- `Permissions` 只读状态、只跳系统页，**不得**演变成代为授权：Android 的系统页跳完不给结果，接口不许把自己包装成
+  `request`（`docs/adr/0021`；macOS 的 `requestPermissions` 是另一件事，见 `docs/adr/0016`）。
+- 无障碍服务的组件名只留在 Android 实现包里，**不得**进契约或 Dart——Dart 只拿到 `PermissionKind` 与
+  `PermissionState`，拿不到包名或类名（`docs/adr/0021`）。

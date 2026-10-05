@@ -38,7 +38,11 @@ implementation packages are the only code that differs per platform.**
    group is `Preferences`, `SecretStore`, `KnowledgeStore` and `MemoryStore`.
    `miaotou_capabilities` holds the interfaces, `miaotou_capabilities_<platform>`
    holds the implementations, and `miaotou_domain` depends on neither platform
-   package.
+   package. **Amended (2026-10-06, [ADR-0021](0021-carry-the-android-permissions-in-the-contract-and-open-their-system-pages.md)):**
+   there are eleven. `Permissions` (`read()` / `openSettings(kind)`) joins the
+   platform group, Android implements it, and both desktop ports refuse it — which
+   is this decision's rule about declaring support, applied to a capability only
+   one port has.
 2. **Support is declared, never implied.** A port that cannot implement a member
    throws. No implementation returns an empty buffer, an empty list, an
    `UnsupportedError`-swallowing null, or an inlined fallback. `UiTreeReader` on
