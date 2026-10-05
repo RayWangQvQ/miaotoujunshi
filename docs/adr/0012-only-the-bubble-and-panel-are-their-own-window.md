@@ -33,6 +33,12 @@ route in the main window.**
 2. **The panel window is a view plus a command channel.** It receives a snapshot
    and sends commands — inject, copy, request detail, toggle read-only. It holds
    only transient view state: where it was dragged to, whether it is collapsed.
+
+   **Amended (2026-10-05, ADR-0020):** the panel is also *fed* its own appearance —
+   the fill alpha of the surface it draws — on a second down-stream beside the
+   frame. "Only transient view state" is about what the panel *owns*, and it still
+   owns nothing: the value is pushed by the main window, which is the only holder
+   of `Preferences`, and the panel reads no store to render its surface.
 3. **The read-only state is derived in the main window, not in the panel.** ADR-0002
    puts the derivation where the conversation identity is known and leaves the
    renderer with nothing to decide; on desktop that owner is the main window, the
