@@ -6,7 +6,7 @@
       "type": "shell",
       "command": "flutter test",
       "options": {
-        "cwd": "${workspaceFolder}/integrations/jev_flutter/apps/miaotou_app"
+        "cwd": "${workspaceFolder}/app/apps/miaotou_app"
       },
       "group": "test",
       "problemMatcher": []
@@ -22,7 +22,7 @@
       "type": "shell",
       "command": "export ANDROID_SERIAL=\"$(\"${workspaceFolder}/.vscode/adb_target.sh\")\"; [ -n \"$ANDROID_SERIAL\" ] || { echo '无法确定唯一调试设备，已中止'; exit 1; }; flutter build apk --debug && adb -s \"$ANDROID_SERIAL\" install -r build/app/outputs/flutter-apk/app-debug.apk",
       "options": {
-        "cwd": "${workspaceFolder}/integrations/jev_flutter/apps/miaotou_app"
+        "cwd": "${workspaceFolder}/app/apps/miaotou_app"
       },
       "group": {
         "kind": "build",

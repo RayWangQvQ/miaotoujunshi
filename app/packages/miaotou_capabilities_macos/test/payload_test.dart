@@ -340,7 +340,7 @@ void main() {
         repository = repository.parent;
       }
       final Directory app = Directory(
-        '${repository.path}/integrations/jev_flutter/apps/miaotou_app',
+        '${repository.path}/app/apps/miaotou_app',
       );
       srcroot = Directory('${app.path}/macos');
       script = File('${app.path}/$runner/sync_shared_payload.sh');
@@ -861,7 +861,7 @@ class _EmptyRoot implements MacosNative {
 ///
 /// Everything *except* the two payload trees is symlinked, because the assertion
 /// does not only read the payload: it derives its key set from the domain layer's
-/// own Dart constants, under `integrations/jev_flutter/packages/…`. A mirror of
+/// own Dart constants, under `app/packages/…`. A mirror of
 /// the payload alone therefore fails with `missing domain source` — a correct
 /// refusal about the wrong thing, and one that would have made these tests pass
 /// while asserting nothing about the key that was removed.
@@ -965,7 +965,7 @@ List<File> _pubspecs(Directory repository) => <File>[
 /// The shipping sources of the macOS port, plus the Swift beside them.
 List<File> _portSources(Directory repository) {
   final Directory package = Directory(
-    '${repository.path}/integrations/jev_flutter/packages/miaotou_capabilities_macos',
+    '${repository.path}/app/packages/miaotou_capabilities_macos',
   );
   return <File>[
     for (final FileSystemEntity entity

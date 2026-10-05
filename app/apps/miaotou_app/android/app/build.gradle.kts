@@ -8,7 +8,7 @@ plugins {
 // retained Android pipeline: Sync removes stale files, and AGP packages the
 // source directory recursively without a Flutter assets declaration.
 val repoRoot = rootProject.projectDir.parentFile.parentFile.parentFile
-    .parentFile.parentFile
+    .parentFile
 val sharedAssets = layout.buildDirectory.dir("sharedAssets")
 val copySharedMaterial by tasks.registering(Sync::class) {
     description = "Copies the shared payload material into assets, paths unchanged"
@@ -23,7 +23,7 @@ val validateSharedPayload by tasks.registering(Exec::class) {
         "python3",
         File(
             repoRoot,
-            "integrations/jev_flutter/apps/miaotou_app/macos/Runner/validate_payload_keys.py",
+            "app/apps/miaotou_app/macos/Runner/validate_payload_keys.py",
         ),
         repoRoot,
         sharedAssets.get().asFile,

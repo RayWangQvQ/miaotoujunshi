@@ -1,7 +1,7 @@
 # Miaotoujunshi (喵头军师)
 
 Jev Chat's "chat co-pilot" idea, rebuilt as two layers: an independently
-distributable AI Skill, plus three app entries — Android, Windows and macOS.
+distributable AI Skill, plus one application built for Android, Windows and macOS.
 
 The floating ball reads the screen → you confirm the transcript → analysis →
 candidate replies → **copy, or verified one-tap fill where supported; never
@@ -12,14 +12,16 @@ auto-send**. Android one-tap fill is currently tracked in #29.
 | Layer | Location | What it is |
 | --- | --- | --- |
 | Upstream payload | `goutoujunshi/` | The `goutoujunshi` / 狗头军师 payload — `SKILL.md`, `references/`, `agents/`, `assets/`, `scripts/`. A maintained fork of the upstream skill, kept byte-identical; `scripts/check_upstream.py` reports the drift |
-| Own payload | `miaotoujunshi/` | This repository's own payload: the shared tone rules (`references/knowledge/`), the structured data (`references/data/`) and the demo cases (`examples/`) all three ports read at runtime. See `docs/adr/0006` |
-| Apps | `integrations/jev_flutter` | One Flutter app for the promoted Android, macOS and Windows ports |
+| Own payload | `miaotoujunshi/` | This repository's own payload: the shared tone rules (`references/knowledge/`), the structured data (`references/data/`) and the demo cases (`examples/`) the application reads at runtime. See `docs/adr/0006` |
+| App | `app/` | One Flutter pub workspace — a single application, one app directory and the capability packages, built for Android, macOS and Windows. See `docs/adr/0017` |
 | Repo tooling | `scripts/` | `validate_layout.py` (root-entry allowlist), `check_upstream.py` (upstream drift) |
 
 Every entry at the repository root is registered with the layer it belongs to in
 `scripts/validate_layout.py`; an unregistered entry fails the build. The app layer
-has two registered root-level exceptions — `documentation/` and `PRIVACY.md` —
-each with its reason recorded there.
+has one registered root-level exception — `PRIVACY.md` — with its reason recorded
+there. The application's design notes and screenshots live under `docs/design/`
+and `docs/screenshots/`; `docs/` therefore carries both governance records and
+app-layer material, a deliberate exception recorded in `docs/adr/0017`.
 
 The repository deliberately carries `miaotoujunshi` / 喵头军师 at three places — the
 app display name, the technical identifier prefix and the own-payload directory —
@@ -56,8 +58,8 @@ recorded there with its licence, and `PRIVACY.md` must state the memory-store
 bounds the code enforces.
 
 The application's own suite — every package's tests plus the widget tests — lives
-in the Flutter workspace and needs Flutter 3.47 or newer; see
-[`integrations/jev_flutter/README.md`](integrations/jev_flutter/README.md).
+in the Flutter workspace under `app/` and needs Flutter 3.47 or newer; see
+[`app/README.md`](app/README.md).
 
 > `validate_skill.py` ships inside the payload directory, so it needs `--runtime`:
 > without it the script demands the repository-level `README.md` and `LICENSE` in

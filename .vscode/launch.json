@@ -5,8 +5,8 @@
       "name": "① Flutter · macOS",
       "type": "dart",
       "request": "launch",
-      "program": "${workspaceFolder}/integrations/jev_flutter/apps/miaotou_app/lib/main.dart",
-      "cwd": "${workspaceFolder}/integrations/jev_flutter/apps/miaotou_app",
+      "program": "${workspaceFolder}/app/apps/miaotou_app/lib/main.dart",
+      "cwd": "${workspaceFolder}/app/apps/miaotou_app",
       "deviceId": "macos"
     },
     {
@@ -15,7 +15,7 @@
       "request": "attach",
       "hostName": "localhost",
       "port": 5005,
-      "projectName": "jev-android",
+      "projectName": "android",
       "preLaunchTask": "android: 单元测试挂起等待调试器"
     },
     {
@@ -24,7 +24,7 @@
       "request": "attach",
       "hostName": "localhost",
       "port": 8700,
-      "projectName": "jev-android",
+      "projectName": "android",
       "preLaunchTask": "android: 构建安装并建好调试通道"
     }
   ]

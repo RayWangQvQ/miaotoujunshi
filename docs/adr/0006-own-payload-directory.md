@@ -68,6 +68,9 @@ rule as the upstream one.**
   `documentation/` would join it, leaving two content trees plus governance. Cleanest
   on paper, but it rewrites every test `sys.path`, both packaging manifests and the
   CI triggers for tidiness alone, and it is not needed to state the member rule.
+  **Partly superseded by [ADR-0017](0017-retire-the-integrations-wrapper.md):** the app
+  layer did move, to `app/`, once the three ports were gone. `documentation/` was folded
+  into `docs/` rather than joining it, and the member rule is unchanged.
 - **Move only `references/`, leave `examples/` at the root.** The member rule would
   then need a named exception for a directory that satisfies it, which is how the
   hand-copied lists drifted in the first place.

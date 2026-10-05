@@ -3,13 +3,13 @@ name: Flutter
 # Builds nothing and checks everything. See #27.
 #
 # The paths below are a list and not a wildcard, which is how
-# platform-build.yml already does it: a push that only touches the old ports
-# should not pay for a Flutter SDK download.
+# platform-build.yml already does it: a push that only touches the repository
+# tooling or the ADRs should not pay for a Flutter SDK download.
 on:
   workflow_dispatch:
   push:
     paths:
-      - "integrations/jev_flutter/**"
+      - "app/**"
       # The payload belongs in the trigger. The domain's tests load the **real**
       # payload off disk — packages/miaotou_domain/test/support/repo_payload.dart
       # walks up to a directory holding both goutoujunshi/ and miaotoujunshi/ —
@@ -21,7 +21,7 @@ on:
       - ".github/workflows/flutter.yml"
   pull_request:
     paths:
-      - "integrations/jev_flutter/**"
+      - "app/**"
       - "miaotoujunshi/**"
       - "goutoujunshi/**"
       - ".github/workflows/flutter.yml"
@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: integrations/jev_flutter
+        working-directory: app
     steps:
       - uses: actions/checkout@v4
 
@@ -96,5 +96,5 @@ jobs:
       # The application is a Flutter package — its tests are widget tests — so
       # it needs the flutter tool rather than `dart test`.
       - name: Test the application
-        working-directory: integrations/jev_flutter/apps/miaotou_app
+        working-directory: app/apps/miaotou_app
         run: flutter test

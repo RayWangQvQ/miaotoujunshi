@@ -59,7 +59,7 @@ _DIRECTORY_LITERAL_READ = re.compile(
 # Relative to the **pub workspace root**, not the repository root: that is where
 # the Dart sources live, and `findRepositoryRoot`-style walking up from the build
 # directory would have to know how deep the app sits inside the repository.
-_WORKSPACE = "integrations/jev_flutter"
+_WORKSPACE = "app"
 
 _DOMAIN_SOURCES = (
     f"{_WORKSPACE}/packages/miaotou_domain/lib/src/shared_material.dart",

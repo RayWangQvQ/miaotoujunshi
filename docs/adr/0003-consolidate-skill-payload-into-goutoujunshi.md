@@ -74,7 +74,10 @@ decidable.**
 
 - **Rename `integrations/` to `apps/`.** Clearer word, but it rewrites CI, test
   `sys.path` entries, packaging and docs for readability alone, and drops the
-  "upstream port" meaning that `integrations/` carries.
+  "upstream port" meaning that `integrations/` carries. **Superseded by
+  [ADR-0017](0017-retire-the-integrations-wrapper.md):** the rename was made once the last
+  port was deleted and both premises of this rejection had expired. It was named `app/`,
+  not `apps/`, and the "upstream port" meaning was not dropped but spent.
 - **Two top-level trees, `skill/` plus `apps/`, root left to governance only.**
   Cleanest on paper. Rejected because it discards the repository-root-is-the-skill
   distribution surface, and because every `parents[2]` path, the upstream path

@@ -6,14 +6,14 @@ This file records the provenance and the licence layering of this repository.
 ## What the root LICENSE covers
 
 The root LICENSE (MIT, Copyright (c) 2026 powerycy) covers only the code written
-in this repository — the Skill layer and the glue code of the integrations.
+in this repository — the Skill layer and the glue code of the application.
 The promoted Flutter implementation translates derived logic from all three
 upstream ports, including retained Kotlin from the Android assistant; the
 obligations those ports imposed are carried in this `NOTICE` — listed under
 "The three upstream attribution obligations" — rather than lapsing.
 
-Written in this repository: the repository tooling under `scripts/`, the ports
-under `integrations/`, the root governance files (`README.md`, `NOTICE`,
+Written in this repository: the repository tooling under `scripts/`, the
+application under `app/`, the root governance files (`README.md`, `NOTICE`,
 `LICENSE`, `GLOSSARY.md`, `AGENTS.md`, `PRIVACY.md`, `docs/`, `.github/`), and the
 local additions inside the skill payload directory described below.
 
@@ -30,12 +30,13 @@ licence as the root `LICENSE`, so the root licence covers it.
 Upstream's own governance files (`README.md`, `README_EN.md`, `LICENSE`,
 `LICENSE.zh-CN.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`,
 `SECURITY.md`, `.gitignore`, `.github/*`) and its `documentation/` development
-notes are deliberately **not** imported. The root `documentation/` in this
-repository is app-layer material, not upstream's documentation directory.
+notes are deliberately **not** imported. This repository has no `documentation/`
+directory at all: its app-layer design notes and screenshots sit under `docs/`,
+which is unrelated to upstream's directory of that name.
 
 ## Provenance and attribution for the Flutter implementation
 
-`integrations/jev_flutter` is the single Flutter codebase that carries all three
+`app/` is the single Flutter codebase that carries all three
 ports. The three old port directories, and the attribution file each of them
 carried — a `LICENSE` and a `NOTICE` for the Android and Windows ports, and the
 vendored upstream `LICENSE` credited by the macOS port's `README.md` — were
@@ -45,7 +46,7 @@ archive tags `archive/jev-android-kotlin-final`,
 attribution obligations those files imposed are carried here instead — none was
 dropped together with them.
 
-| Upstream | What it contributes to `integrations/jev_flutter` | Copyright | Attribution files |
+| Upstream | What it contributes to `app/` | Copyright | Attribution files |
 | --- | --- | --- | --- |
 | [jev-chat/jev-chat-jarvis](https://github.com/jev-chat/jev-chat-jarvis) | The Android reading shape, including the retained Kotlin accessibility and capture service | Finderchangchang and the jev-chat contributors | This `NOTICE` and the root `LICENSE` |
 | [jev-chat/jev-chat-windows](https://github.com/jev-chat/jev-chat-windows) | The Windows capture, OCR and injection shape; the judging kernel and its question wording stay Finderchangchang's | rezoch340 and the jev-chat contributors | This `NOTICE` and the root `LICENSE` |

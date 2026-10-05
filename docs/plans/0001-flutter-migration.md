@@ -2,6 +2,12 @@
 
 Date: 2026-10-03 · Scope: the three ports under `integrations/` → one Flutter codebase, three target platforms
 
+> **Closed out 2026-10-05.** All three ports were replaced, tagged and deleted, and the
+> wrapper itself was then retired: the codebase lives at `app/`, not
+> `integrations/jev_flutter/`. See [ADR-0017](../adr/0017-retire-the-integrations-wrapper.md)
+> and §14. The body below is left exactly as written — it records what was planned, and two
+> of its details did not survive contact.
+
 This plan supersedes the pre-decision design draft. It is the input to the `to-spec` / `to-tickets`
 stage, so it is deliberately written in a shape that can be cut into tickets.
 
@@ -59,6 +65,9 @@ criteria only.
 
 **Placement: `integrations/jev_flutter/`.** `integrations` is already registered as the `app` layer,
 so a new directory there needs **zero changes to `validate_layout.py`** and no fifth layer name.
+**Superseded by [ADR-0017](../adr/0017-retire-the-integrations-wrapper.md):** the directory is now
+`app/`, one level shallower. The reasoning — no new layer name, no new allowlist entry — held, and
+still holds.
 
 ```
 integrations/jev_flutter/
@@ -437,6 +446,31 @@ so a reader can tell settled from pending without re-reading the commit history.
    pushed to the remote. `archive/` reads as "this is history" rather than "still
    supported somewhere", and the language is part of the name because what was
    archived is an implementation, not the platform: the platform outlives it.*
+
+---
+
+## 14. Closed out — 2026-10-05
+
+All three ports were replaced, tagged and deleted — macOS (`f54ef25`), Windows (`0579ea8`),
+Android (`9629f3b`) — which is this plan's own exit condition: [ADR-0014](../adr/0014-declare-a-port-replaced-only-after-device-acceptance.md)'s
+three acceptance criteria passed per port, each archive tag was pushed in the same change that
+deleted its directory, and the dual-track CI entries went with it. [`integrations/` has since been
+retired](../adr/0017-retire-the-integrations-wrapper.md).
+
+Two details did not survive contact, and the record is more useful for saying so than for looking
+tidy:
+
+- **The placement moved.** `integrations/jev_flutter/` is now `app/`. Every path this plan spells
+  out, and every `paths` filter specified in §9, is one level deeper than the tree that exists.
+- **Two directories this plan allocated were never created.** `fixtures/` and
+  `tool/sync_shared_payload.dart` at the workspace root: ADR-0011's synthetic material landed
+  beside the packages that use it (`miaotou_capabilities_android/test/fixtures/`, plus the
+  `testing/` seam in `miaotou_capabilities`), and the payload sync became a shell script inside
+  the macOS runner, wired into the Xcode build phase rather than into Dart. Both were scaffolding
+  the plan predicted and the implementation did not need.
+
+What stayed true: the ten interfaces, the package split and the dependency direction in §3, the
+platform-free domain, the union feature baseline of §5, and the out-of-scope list in §12.
 
 ---
 

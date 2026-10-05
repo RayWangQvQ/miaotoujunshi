@@ -33,7 +33,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-FLUTTER = ROOT / "integrations" / "jev_flutter"
+FLUTTER = ROOT / "app"
 NOTICE_PATH = ROOT / "NOTICE"
 PRIVACY_PATH = ROOT / "PRIVACY.md"
 

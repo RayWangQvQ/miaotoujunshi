@@ -35,6 +35,11 @@ SKILL_DIR = "goutoujunshi"
 # Directory holding this repository's own payload; the second layer boundary.
 OWN_PAYLOAD_DIR = "miaotoujunshi"
 
+# Directory holding the application; the app layer's only directory, and the one
+# whose name deliberately equals the layer name registered below. See
+# docs/adr/0017.
+APP_DIR = "app"
+
 # Every entry allowed at the repository root: name -> (layer, why it sits here).
 # Adding a file to the root means registering it here in the same commit.
 ALLOWED: dict[str, tuple[str, str]] = {
@@ -47,19 +52,27 @@ ALLOWED: dict[str, tuple[str, str]] = {
     OWN_PAYLOAD_DIR: (
         MIAOTOU_SKILL,
         "this repository's own payload directory: the shared tone rules, the "
-        "structured data and the demo cases all three ports read at runtime; it "
-        "belongs to no single port, so no integrations/<port>/ directory can "
+        "structured data and the demo cases the application reads at runtime; it "
+        "belongs to no single build target, so no directory under app/ can "
         "hold it",
     ),
-    # App layer. `integrations/` holds the three ports; the rest are app-layer
-    # content that has to sit at the root for a concrete reason. Do not count
-    # them here: this dict is the count.
-    "integrations": (APP, "the three platform ports"),
-    "documentation": (APP, "app screenshots and design notes"),
+    # App layer. `app/` holds the one Flutter workspace; the remaining app-layer
+    # entry is material that has to sit at the root for a concrete reason.
+    # Do not count the app-layer entries here: this dict is the count.
+    APP_DIR: (
+        APP,
+        "the application: one Flutter pub workspace, one app directory and the "
+        "capability packages, built for Android, macOS and Windows",
+    ),
     "PRIVACY.md": (APP, "app data-use notes; root placement is a GitHub convention"),
     # Governance: neither skill nor app.
     "scripts": (GOVERNANCE, "repository-level tooling"),
-    "docs": (GOVERNANCE, "ADRs and agent working notes"),
+    "docs": (
+        GOVERNANCE,
+        "ADRs, agent working notes, and — under design/ and screenshots/ — the "
+        "app-layer design notes and screenshots; carrying both is a deliberate "
+        "exception recorded in docs/adr/0017",
+    ),
     ".github": (GOVERNANCE, "CI workflows"),
     ".vscode": (
         GOVERNANCE,

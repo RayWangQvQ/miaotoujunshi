@@ -47,6 +47,9 @@ Windows and macOS from a single codebase.**
 1. **Location.** The project lives at `integrations/jev_flutter/`, which the
    root allowlist already registers as the `app` layer, so
    `scripts/validate_layout.py` needs no new entry and no new layer name.
+   **Superseded by [ADR-0017](0017-retire-the-integrations-wrapper.md):** the project
+   now lives at `app/`. The reasoning here still holds — the allowlist needed no new
+   entry and no new layer name — and the directory is now spelled that way.
 2. **Structure.** A Dart 3.13+ / Flutter 3.47+ **pub workspace** (a root
    `pubspec.yaml` with `workspace:` and per-package `resolution: workspace`), with
    `apps/miaotou_app/` as the only Flutter application and `packages/` holding a
@@ -138,4 +141,6 @@ Windows and macOS from a single codebase.**
   derived logic into Dart is still a derivative work; the new `NOTICE` must cover
   all three upstreams plus the Flutter dependency tree.
 - **`integrations/` grows by one directory before it shrinks by three.** The old
-  and new trees coexist until the last port is replaced.
+  and new trees coexist until the last port is replaced. **Spent, and the wrapper then
+  retired by [ADR-0017](0017-retire-the-integrations-wrapper.md):** all three deletions
+  landed, and `integrations/` itself is gone.

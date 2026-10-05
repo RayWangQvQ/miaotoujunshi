@@ -73,7 +73,7 @@ if [ -z "${SRCROOT:-}" ]; then
 fi
 
 # The repository root. Four levels up from `apps/miaotou_app/macos`, and walked
-# rather than hard-coded as `../../../../..` so a moved checkout does not silently
+# rather than hard-coded as `../../../..` so a moved checkout does not silently
 # sync the wrong tree — or, worse, an empty one.
 #
 # The walk is kept, unlike the `SRCROOT` fallback above, and the difference is the

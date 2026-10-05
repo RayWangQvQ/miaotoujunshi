@@ -51,7 +51,7 @@ void main() {
       //
       // The CI case prints its own reason. `flutter.yml` runs on
       // `ubuntu-latest`, where there is no `xcrun` and no macOS SDK at all, and
-      // any push touching `integrations/jev_flutter/**` reaches this file.
+      // any push touching `app/**` reaches this file.
       debugPrint('skipping the Swift module typecheck: $because');
       markTestSkipped('no macOS SDK or Flutter framework to typecheck against '
           '($because)');
