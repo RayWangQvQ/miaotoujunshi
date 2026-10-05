@@ -2,16 +2,6 @@
   "python.analysis.exclude": [
     "**/.venv"
   ],
-  "python.testing.unittestEnabled": true,
-  "python.testing.pytestEnabled": false,
-  "python.testing.cwd": "${workspaceFolder}",
-  "python.testing.unittestArgs": [
-    "-v",
-    "-s",
-    "tests",
-    "-p",
-    "test_*.py"
-  ],
   "java.jdt.ls.java.home": "/Users/raywang/dev/jdk/Contents/Home",
   "java.configuration.runtimes": [
     {

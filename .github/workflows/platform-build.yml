@@ -13,9 +13,6 @@ on:
       - "miaotoujunshi/**"
       - "goutoujunshi/**"
       - "PRIVACY.md"
-      - "tests/test_android_release.py"
-      - "tests/test_macos_release.py"
-      - "tests/test_windows_release.py"
       - ".github/workflows/platform-build.yml"
   pull_request:
     paths:
@@ -23,9 +20,6 @@ on:
       - "miaotoujunshi/**"
       - "goutoujunshi/**"
       - "PRIVACY.md"
-      - "tests/test_android_release.py"
-      - "tests/test_macos_release.py"
-      - "tests/test_windows_release.py"
       - ".github/workflows/platform-build.yml"
 
 permissions:

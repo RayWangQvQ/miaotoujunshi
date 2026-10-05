@@ -7,7 +7,7 @@
 
 用户可见、可安装、可打包的桌面与移动应用。
 
-主体在 `integrations/`，另有若干根级例外——`tests/`（只测应用集成）、`documentation/`（应用截图与设计稿）、
+主体在 `integrations/`，另有若干根级例外——`documentation/`（应用截图与设计稿）、
 `PRIVACY.md`（数据使用说明，根级是 GitHub 惯例）。三端在运行期共读的材料不在这里，属于下面的自有载荷层。
 根级例外逐项登记在 `scripts/validate_layout.py` 的白名单里，以那里为准。
 
@@ -27,7 +27,7 @@
 
 成员判据：**三端在运行期读取，且不属于上游 skill 载荷**。按此判据收入 `references/`
 （`knowledge/` 放给模型读的散文，`data/` 放给代码读的结构化数据）与 `examples/`（演示案例）；
-`integrations/`、`tests/`、`documentation/` 只被单端或构建链使用，留在应用层。
+`integrations/`、`documentation/` 只被单端或构建链使用，留在应用层。
 决策、被取代的旧结构与已知代价见 `docs/adr/0006`。
 
 | 术语 | 含义 |

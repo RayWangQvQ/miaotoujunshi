@@ -18,8 +18,8 @@ auto-send**. Android one-tap fill is currently tracked in #29.
 
 Every entry at the repository root is registered with the layer it belongs to in
 `scripts/validate_layout.py`; an unregistered entry fails the build. The app layer
-has three registered root-level exceptions — `tests/`, `documentation/` and
-`PRIVACY.md` — each with its reason recorded there.
+has two registered root-level exceptions — `documentation/` and `PRIVACY.md` —
+each with its reason recorded there.
 
 The repository deliberately carries `miaotoujunshi` / 喵头军师 at three places — the
 app display name, the technical identifier prefix and the own-payload directory —
@@ -43,11 +43,14 @@ live in [NOTICE](NOTICE); privacy notes in [PRIVACY.md](PRIVACY.md).
 ## Validation
 
 ```bash
-python -B -m unittest discover -s tests
 python -B scripts/validate_layout.py
 python -B goutoujunshi/scripts/validate_skill.py --runtime
 python -B scripts/check_upstream.py    # network required; read-only drift report
 ```
+
+The application's own suite — every package's tests plus the widget tests — lives
+in the Flutter workspace and needs Flutter 3.47 or newer; see
+[`integrations/jev_flutter/README.md`](integrations/jev_flutter/README.md).
 
 > `validate_skill.py` ships inside the payload directory, so it needs `--runtime`:
 > without it the script demands the repository-level `README.md` and `LICENSE` in

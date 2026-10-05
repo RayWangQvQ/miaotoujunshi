@@ -55,7 +55,6 @@ ALLOWED: dict[str, tuple[str, str]] = {
     # content that has to sit at the root for a concrete reason. Do not count
     # them here: this dict is the count.
     "integrations": (APP, "the three platform ports"),
-    "tests": (APP, "tests for the app integrations"),
     "documentation": (APP, "app screenshots and design notes"),
     "PRIVACY.md": (APP, "app data-use notes; root placement is a GitHub convention"),
     # Governance: neither skill nor app.
