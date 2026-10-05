@@ -1,7 +1,8 @@
 /// The Android answer to every member of the capability contract.
 ///
 /// The package declares all ten capabilities, and every member of each. Every one
-/// of them refuses for now — the work is in #21, #22 and #23 — and every refusal
+/// The ingest and control members are backed by the retained Kotlin layer; the
+/// remaining storage members name their owning ticket in every refusal.
 /// is a "not yet" rather than a "never": Android is the one port that can reach
 /// all ten, because it is the one with an accessibility service behind it.
 ///
@@ -12,4 +13,5 @@ library;
 
 export 'src/bundle.dart';
 export 'src/capabilities.dart';
+export 'src/ingest_native.dart';
 export 'src/panel_native.dart';

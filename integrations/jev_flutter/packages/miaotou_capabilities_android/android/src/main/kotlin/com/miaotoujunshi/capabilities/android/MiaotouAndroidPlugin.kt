@@ -24,6 +24,8 @@ class MiaotouAndroidPlugin :
         const val EVENT_CHANNEL = "miaotoujunshi/android/panel/events"
         const val BOOTSTRAP_CHANNEL = "miaotoujunshi/android/panel-bootstrap"
         const val PROTOCOL_CHANNEL = "miaotoujunshi/android/panel-protocol"
+        const val CONTROL_CHANNEL = "miaotou/control"
+        const val INGEST_CHANNEL = "miaotou/ingest"
         private const val OVERLAY_PERMISSION_REQUEST = 41021
     }
 
@@ -31,6 +33,8 @@ class MiaotouAndroidPlugin :
     private lateinit var eventChannel: EventChannel
     private lateinit var bootstrapChannel: MethodChannel
     private lateinit var mainProtocol: MethodChannel
+    private lateinit var controlChannel: MethodChannel
+    private lateinit var ingestChannel: EventChannel
     private lateinit var host: AndroidOverlayHost
 
     private var activity: Activity? = null
@@ -75,6 +79,105 @@ class MiaotouAndroidPlugin :
                 else -> result.notImplemented()
             }
         }
+        controlChannel = MethodChannel(binding.binaryMessenger, CONTROL_CHANNEL).also {
+            it.setMethodCallHandler(::onControlCall)
+        }
+        ingestChannel = EventChannel(binding.binaryMessenger, INGEST_CHANNEL).also {
+            it.setStreamHandler(object : EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink) {
+                    RetainedAndroidBridge.listen(events::success)
+                }
+
+                override fun onCancel(arguments: Any?) {
+                    RetainedAndroidBridge.listen(null)
+                }
+            })
+        }
+        RetainedAndroidBridge.overlay(
+            hide = { host.hide() },
+            restore = { host.restore() },
+        )
+    }
+
+    private fun onControlCall(call: MethodCall, result: MethodChannel.Result) {
+        try {
+            when (call.method) {
+                "setOverlayFlag" -> setOverlayFlag(call.arguments.asArguments(), result)
+                "hideForCapture" -> {
+                    host.hide()
+                    result.success(null)
+                }
+                "restore" -> {
+                    host.restore()
+                    result.success(null)
+                }
+                else -> withCaptureService(result) { service ->
+                    when (call.method) {
+                        "readActiveChat" -> result.success(service.readActiveChat())
+                        "bindConversation" -> {
+                            service.bindConversation(call.arguments.asArguments())
+                            result.success(null)
+                        }
+                        "findTargetWindow" -> result.success(service.findTargetWindow())
+                        "capture" -> service.capture(
+                            call.arguments.asArguments()["targetWindowId"] as? String,
+                            result::success,
+                        )
+                        "recognize" -> service.recognize(
+                            call.arguments.asArguments(),
+                            result::success,
+                            { message ->
+                                result.error("android_ocr_decode_failed", message, null)
+                            },
+                        )
+                        "inject" -> service.inject(
+                            call.arguments.asArguments(),
+                            result::success,
+                        )
+                        else -> result.notImplemented()
+                    }
+                }
+            }
+        } catch (error: Throwable) {
+            result.error(
+                "android_control_${call.method}_failed",
+                error.message ?: error.javaClass.simpleName,
+                null,
+            )
+        }
+    }
+
+    private fun setOverlayFlag(arguments: Map<*, *>, result: MethodChannel.Result) {
+        val enabled = arguments.boolean("value")
+        when (arguments["flag"] as? String) {
+            "visible" -> if (enabled) host.restore() else host.hide()
+            "focusable" -> host.setFocusable(enabled)
+            else -> {
+                result.error(
+                    "unknown_overlay_flag",
+                    "Unknown overlay flag ${arguments["flag"]}.",
+                    null,
+                )
+                return
+            }
+        }
+        result.success(null)
+    }
+
+    private fun withCaptureService(
+        result: MethodChannel.Result,
+        action: (RetainedCaptureService) -> Unit,
+    ) {
+        val service = RetainedAndroidBridge.service()
+        if (service == null) {
+            result.error(
+                "accessibility_service_unavailable",
+                "Enable the Miaotou accessibility service before using Android capture.",
+                null,
+            )
+            return
+        }
+        action(service)
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -212,6 +315,10 @@ class MiaotouAndroidPlugin :
         eventChannel.setStreamHandler(null)
         bootstrapChannel.setMethodCallHandler(null)
         mainProtocol.setMethodCallHandler(null)
+        controlChannel.setMethodCallHandler(null)
+        ingestChannel.setStreamHandler(null)
+        RetainedAndroidBridge.listen(null)
+        RetainedAndroidBridge.overlay(null, null)
         host.destroy()
     }
 

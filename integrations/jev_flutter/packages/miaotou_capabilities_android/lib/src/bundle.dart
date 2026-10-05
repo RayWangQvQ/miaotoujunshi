@@ -1,6 +1,7 @@
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 
 import 'capabilities.dart';
+import 'ingest_native.dart';
 import 'panel_native.dart';
 
 /// Every capability this port answers for, together.
@@ -8,16 +9,22 @@ import 'panel_native.dart';
 /// Passing all ten to [CapabilitySet] is what makes "every port answers for every
 /// member" a compile-time property: leaving one out does not produce a partial
 /// set, it produces a file that does not build.
-CapabilitySet androidCapabilities({AndroidPanelNative? panelNative}) =>
-    CapabilitySet(
-      screenCapture: AndroidScreenCapture(),
-      uiTreeReader: AndroidUiTreeReader(),
-      ocr: AndroidOcr(),
-      textInject: AndroidTextInject(),
-      floatingPanel: AndroidFloatingPanel(native: panelNative),
-      sharedPayload: AndroidSharedPayload(),
-      preferences: AndroidPreferences(),
-      secretStore: AndroidSecretStore(),
-      knowledgeStore: AndroidKnowledgeStore(),
-      memoryStore: AndroidMemoryStore(),
-    );
+CapabilitySet androidCapabilities({
+  AndroidPanelNative? panelNative,
+  AndroidIngestNative? ingestNative,
+}) {
+  final AndroidIngestNative ingest =
+      ingestNative ?? MethodChannelAndroidIngestNative();
+  return CapabilitySet(
+    screenCapture: AndroidScreenCapture(ingest),
+    uiTreeReader: AndroidUiTreeReader(ingest),
+    ocr: AndroidOcr(ingest),
+    textInject: AndroidTextInject(ingest),
+    floatingPanel: AndroidFloatingPanel(native: panelNative),
+    sharedPayload: AndroidSharedPayload(),
+    preferences: AndroidPreferences(),
+    secretStore: AndroidSecretStore(),
+    knowledgeStore: AndroidKnowledgeStore(),
+    memoryStore: AndroidMemoryStore(),
+  );
+}

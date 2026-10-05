@@ -16,6 +16,7 @@ import 'package:test/test.dart';
 void main() {
   final CapabilitySet capabilities = androidCapabilities(
     panelNative: _ProbePanelNative(),
+    ingestNative: _ProbeIngestNative(),
   );
 
   test('every member of the contract answers for itself', () async {
@@ -29,6 +30,7 @@ void main() {
           outcome is UnimplementedError) {
         continue;
       }
+
       defects.add('${entry.key} threw ${outcome.runtimeType}: $outcome');
     }
 
@@ -98,6 +100,46 @@ void main() {
           'would still compile',
     );
   });
+}
+
+final class _ProbeIngestNative implements AndroidIngestNative {
+  @override
+  Stream<AndroidIngestEvent> get events =>
+      const Stream<AndroidIngestEvent>.empty();
+
+  @override
+  Future<void> bindConversation(ConversationRef conversation) async {}
+
+  @override
+  Future<CaptureOutcome> capture({String? targetWindowId}) async =>
+      const CaptureFailed(code: -1, message: 'test');
+
+  @override
+  Future<String?> findTargetWindow() async => null;
+
+  @override
+  Future<void> hideForCapture() async {}
+
+  @override
+  Future<InjectResult> inject(
+    String text, {
+    required InjectTarget target,
+  }) async => const InjectResult.unverified('test');
+
+  @override
+  Future<ChatUiSnapshot?> readActiveChat() async => null;
+
+  @override
+  Future<List<OcrLine>> recognize(
+    CaptureFrame frame, {
+    required List<String> languages,
+  }) async => const <OcrLine>[];
+
+  @override
+  Future<void> restoreAfterCapture() async {}
+
+  @override
+  Future<void> setOverlayFlag(AndroidOverlayFlag flag, bool value) async {}
 }
 
 final class _ProbePanelNative implements AndroidPanelNative {

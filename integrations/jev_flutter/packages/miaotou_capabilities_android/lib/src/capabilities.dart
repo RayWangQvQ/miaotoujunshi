@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 
+import 'ingest_native.dart';
 import 'panel_native.dart';
 
 /// Android's answer for screen capture.
@@ -13,23 +14,16 @@ import 'panel_native.dart';
 /// A frame here is a *window*, not the screen, which is why CaptureFrame carries
 /// the origin and the scale that map it back.
 final class AndroidScreenCapture implements ScreenCapture {
-  const AndroidScreenCapture();
+  AndroidScreenCapture(this._native);
 
-  static const String _platform = 'Android';
-
-  @override
-  Future<String?> findTargetWindow() async => notYetBuilt(
-    platform: _platform,
-    member: 'ScreenCapture.findTargetWindow',
-    ticket: '#22',
-  );
+  final AndroidIngestNative _native;
 
   @override
-  Future<CaptureOutcome> capture({String? targetWindowId}) async => notYetBuilt(
-    platform: _platform,
-    member: 'ScreenCapture.capture',
-    ticket: '#22',
-  );
+  Future<String?> findTargetWindow() => _native.findTargetWindow();
+
+  @override
+  Future<CaptureOutcome> capture({String? targetWindowId}) =>
+      _native.capture(targetWindowId: targetWindowId);
 }
 
 /// Android's answer for reading the foreground application's own view of itself.
@@ -41,23 +35,18 @@ final class AndroidScreenCapture implements ScreenCapture {
 /// (ADR-0009 decision 2). The service itself stays Kotlin: it is a system-bound
 /// component that Flutter neither can nor needs to host (ADR-0007 decision 5).
 final class AndroidUiTreeReader implements UiTreeReader {
-  const AndroidUiTreeReader();
+  AndroidUiTreeReader(this._native);
 
-  static const String _platform = 'Android';
-
-  @override
-  Future<ChatUiSnapshot?> readActiveChat() async => notYetBuilt(
-    platform: _platform,
-    member: 'UiTreeReader.readActiveChat',
-    ticket: '#22',
-  );
+  final AndroidIngestNative _native;
 
   @override
-  Stream<ChatUiSnapshot> get snapshots => notYetBuilt(
-    platform: _platform,
-    member: 'UiTreeReader.snapshots',
-    ticket: '#22',
-  );
+  Future<ChatUiSnapshot?> readActiveChat() => _native.readActiveChat();
+
+  @override
+  late final Stream<ChatUiSnapshot> snapshots = _native.events
+      .where((AndroidIngestEvent event) => event is AndroidSnapshotEvent)
+      .cast<AndroidSnapshotEvent>()
+      .map((AndroidSnapshotEvent event) => event.snapshot);
 }
 
 /// Android's answer for OCR.
@@ -66,16 +55,15 @@ final class AndroidUiTreeReader implements UiTreeReader {
 /// already offers — the one endpoint that sends a screenshot anywhere, and the
 /// reason the visibility question in PRIVACY.md stays open.
 final class AndroidOcr implements Ocr {
-  const AndroidOcr();
+  AndroidOcr(this._native);
 
-  static const String _platform = 'Android';
+  final AndroidIngestNative _native;
 
   @override
   Future<List<OcrLine>> recognize(
     CaptureFrame frame, {
     required List<String> languages,
-  }) async =>
-      notYetBuilt(platform: _platform, member: 'Ocr.recognize', ticket: '#22');
+  }) => _native.recognize(frame, languages: languages);
 }
 
 /// Android's answer for injecting text.
@@ -83,19 +71,13 @@ final class AndroidOcr implements Ocr {
 /// Owned by #22. `ACTION_SET_TEXT` or `ACTION_PASTE`, and the landing is verified
 /// by reading the node's text back.
 final class AndroidTextInject implements TextInject {
-  const AndroidTextInject();
+  AndroidTextInject(this._native);
 
-  static const String _platform = 'Android';
+  final AndroidIngestNative _native;
 
   @override
-  Future<InjectResult> inject(
-    String text, {
-    required InjectTarget target,
-  }) async => notYetBuilt(
-    platform: _platform,
-    member: 'TextInject.inject',
-    ticket: '#22',
-  );
+  Future<InjectResult> inject(String text, {required InjectTarget target}) =>
+      _native.inject(text, target: target);
 }
 
 /// Android's answer for the floating window.

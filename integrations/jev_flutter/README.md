@@ -4,11 +4,13 @@ The three platform ports are being replaced by one Flutter application built for
 Android, Windows and macOS from a single codebase. The decisions behind that are
 `docs/adr/0007` onwards; this file is how to build and test what is here today.
 
-**Status: macOS promoted; Windows bridge and panel implemented.** The shared
+**Status: macOS promoted; Windows bridge and panel implemented; Android ingest
+and control implemented.** The shared
 workspace and contract are live, the macOS port is the promoted implementation,
-and Windows has its process-isolated capture/OCR/input bridge plus a second-engine
-frameless floating panel. General storage, release packaging and all Android
-native capabilities are still pending — see *What is not here yet* below.
+Windows has its process-isolated capture/OCR/input bridge plus a second-engine
+frameless floating panel, and Android pushes accessibility snapshots through its
+retained Kotlin service. General storage and release packaging are still pending
+— see *What is not here yet* below.
 
 ## Layout
 
@@ -99,6 +101,20 @@ of it runs in a widget test against the in-memory implementation — see
 `apps/miaotou_app/test/capability_report_test.dart`. No device, no window server
 and no chat application are involved.
 
+### Android retained Kotlin bridge
+
+Android remains event-driven. The Kotlin `AccessibilityService` is woken by
+window-content changes and pushes snapshots, conversation changes and capture
+errors over `miaotou/ingest`; Dart sends binding, overlay, capture, OCR and
+verified draft-injection commands over `miaotou/control`. The Gradle plugin syncs
+the measured adapter, screenshot and ML Kit sources directly from
+`integrations/jev_android` before compilation, so capture pacing and per-app node
+paths are not rewritten in Dart.
+
+Conversation read-only state is computed by the service and sent as presentation
+state. Either identity half may be absent, and Kotlin supplies the display label
+so the panel never falls back to rendering a raw package name.
+
 ## The shared payload does not travel through Flutter assets
 
 `goutoujunshi/` and `miaotoujunshi/` are read from disk at runtime on all three
@@ -123,6 +139,6 @@ fails if anyone declares the payload as an asset.
 | Panel content and the read-only derivation | #12 |
 | The macOS implementations | #14, #15 |
 | Windows general storage and packaged bridge/models | #19 |
-| The Android overlay plugin and implementations | #21–#23 |
+| Android persistence and payload reads | #23 |
 | A `tool/` directory and a `fixtures/` directory | #15, #19 — written together with the build step that calls them and the fixtures that use them, so that neither is scaffolding nothing invokes |
 | The `flutter-*` CI jobs | the packaging ticket; until then this tree is built by hand |
