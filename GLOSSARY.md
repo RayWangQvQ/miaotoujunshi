@@ -66,7 +66,7 @@
 | 只读态 | 分析所属会话与当前会话不一致时，面板进入的状态 |
 | 未识别会话 | 拿不到会话标题时的占位显示 |
 
-## Flutter 迁移层（目标态，`integrations/jev_flutter/`）
+## Flutter 迁移层（macOS 与 Windows 已替换，`integrations/jev_flutter/`）
 
 三端合并为一份 Flutter 代码库后的词汇。决策见 `docs/adr/0007`、`docs/adr/0008`。
 
@@ -93,8 +93,9 @@
   `miaotoujunshi/references/` 是本仓自有的参考材料（本仓所有；给模型读的散文放 `knowledge/`，
   给代码读的结构化数据放 `data/`）。跨端共用的材料一律放自有载荷，**不要放进某个单端目录**。
 - **跨端公用材料三端一律在运行期读文件**：不得在任一端内联副本，不得放在 `integrations/<port>/` 下。
-  各端打包必须**按目录整体**纳入自有载荷（Windows `jev.spec` 的 `datas`、Android 的 `assets`、
-  macOS Flutter runner 的 `sync_shared_payload.sh` 都登记 `miaotoujunshi/` 本身，不逐文件列）；读不到即报错，不降级回内联副本。
+  各端打包必须**按目录整体**纳入自有载荷（Windows Flutter runner 的 CMake install、Android 的
+  `assets`、macOS Flutter runner 的 `sync_shared_payload.sh` 都登记 `miaotoujunshi/` 本身，
+  不逐文件列）；读不到即报错，不降级回内联副本。
   取舍与代价见 `docs/adr/0005`（读文件不内联）与 `docs/adr/0006`（材料放在哪）。
 - 上游载荷目录 `goutoujunshi/` 必须与上游**逐字节一致**：`check_upstream.py` 的 `drifted` 与
   `only this repo has` 两行都必须恒为 0。本仓对 skill 内容的任何意见一律落在自有载荷或应用层，
@@ -107,4 +108,4 @@
 - 跨端公用材料**不得经 Flutter assets 装载**（Flutter 的 assets 目录声明不递归，会破坏「新增文件零改动」）。
   各平台构建期按目录整体复制，Dart 统一经 `SharedPayload` 接口读；读不到即报错，不降级（`docs/adr/0008`）。
 - 能力契约的每个方法在任何平台都必须表态：能实现就实现，不能实现就抛错。**不得**静默返回空值、空集合或默认值。
-- 迁移期间旧三端**冻结**：只修阻塞级缺陷，不接新功能；每端被 Flutter 版替换并验收后才删除，删除前先打 git tag。
+- 迁移期间尚未替换的旧端**冻结**：只修阻塞级缺陷，不接新功能；每端被 Flutter 版替换并验收后才删除，删除前先打 git tag。

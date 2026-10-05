@@ -12,7 +12,7 @@ candidate replies → **one-tap fill, never auto-send**.
 | --- | --- | --- |
 | Upstream payload | `goutoujunshi/` | The `goutoujunshi` / 狗头军师 payload — `SKILL.md`, `references/`, `agents/`, `assets/`, `scripts/`. A maintained fork of the upstream skill, kept byte-identical; `scripts/check_upstream.py` reports the drift |
 | Own payload | `miaotoujunshi/` | This repository's own payload: the shared tone rules (`references/knowledge/`), the structured data (`references/data/`) and the demo cases (`examples/`) all three ports read at runtime. See `docs/adr/0006` |
-| Apps | `integrations/jev_flutter`, `integrations/jev_android`, `integrations/jev_windows` | One Flutter app for promoted macOS plus the Windows replacement candidate; frozen Windows and Android remain active until device acceptance |
+| Apps | `integrations/jev_flutter`, `integrations/jev_android` | One Flutter app for the promoted macOS and Windows ports; frozen Android remains active until device acceptance |
 | Repo tooling | `scripts/` | `validate_layout.py` (root-entry allowlist), `check_upstream.py` (upstream drift) |
 
 Every entry at the repository root is registered with the layer it belongs to in
@@ -29,15 +29,13 @@ UI element is 「喵球」. **They are layered on purpose — do not mix them.**
 ## Origin, attribution and licensing
 
 All three application implementations contain derivative logic from the
-upstream Jev Chat assistants. The frozen Android and Windows ports ship their
-own LICENSE and attribution files; the promoted Flutter macOS implementation's
-translated attribution is retained in the root `NOTICE`. See that file for the
-MIT/GPL split that applies to each artifact.
+upstream Jev Chat assistants. The frozen Android port ships its own LICENSE and
+attribution files; the promoted Flutter macOS and Windows implementation's
+translated attribution is retained in the root `NOTICE`.
 
-**Mind the licence split**: the root is MIT. The new Windows preview artifact is
-the Flutter replacement candidate and no longer bundles PySide6-Fluent-Widgets;
-the still-tested frozen `integrations/jev_windows` port retains its own licence
-notices until device acceptance permits deletion.
+The root and the promoted Windows and macOS preview artifacts are MIT. Their
+third-party notices remain in `NOTICE`, but no release artifact carries a
+repository-wide copyleft constraint.
 
 The full provenance table, the attribution obligations and the licence split
 live in [NOTICE](NOTICE); privacy notes in [PRIVACY.md](PRIVACY.md).

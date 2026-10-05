@@ -10,25 +10,21 @@ on:
   push:
     paths:
       - "integrations/jev_android/**"
-      - "integrations/jev_windows/**"
       - "integrations/jev_flutter/**"
       - "miaotoujunshi/**"
       - "goutoujunshi/**"
       - "PRIVACY.md"
       - "tests/test_macos_release.py"
-      - "tests/test_platform_integrations.py"
       - "tests/test_windows_release.py"
       - ".github/workflows/platform-build.yml"
   pull_request:
     paths:
       - "integrations/jev_android/**"
-      - "integrations/jev_windows/**"
       - "integrations/jev_flutter/**"
       - "miaotoujunshi/**"
       - "goutoujunshi/**"
       - "PRIVACY.md"
       - "tests/test_macos_release.py"
-      - "tests/test_platform_integrations.py"
       - "tests/test_windows_release.py"
       - ".github/workflows/platform-build.yml"
 
@@ -54,29 +50,6 @@ jobs:
         with:
           name: miaotoujunshi-android-debug
           path: integrations/jev_android/app/build/outputs/apk/debug/*.apk
-
-  windows-legacy:
-    runs-on: windows-latest
-    defaults:
-      run:
-        working-directory: integrations/jev_windows
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - run: python -m pip install -r requirements.txt pyinstaller
-      - run: python -m compileall -q app core main.py
-      - run: python -m core.draft
-      - run: python -c "import app.overlay, app.review, app.trend_ui, app.cloud_ocr, core.experience"
-      - run: python check_ui.py
-        env:
-          QT_QPA_PLATFORM: offscreen
-      - run: pyinstaller --noconfirm --clean jev.spec
-      - uses: actions/upload-artifact@v4
-        with:
-          name: miaotoujunshi-windows-legacy-preview
-          path: integrations/jev_windows/dist/miaotoujunshi-windows
 
   flutter-windows:
     runs-on: windows-latest
@@ -225,11 +198,9 @@ jobs:
           ## Mac、Windows 与 Android 预览包 / Preview packages
 
           - **macOS:** `miaotoujunshi-mac.zip` — the accepted Flutter `.app`, signed with Developer ID and notarised by Apple. Extract it before launching.
-          - **Windows:** `miaotoujunshi-windows-preview.zip` — extract the complete directory before launching the executable. Automated build passes; physical-device validation is pending.
+          - **Windows:** `miaotoujunshi-windows-preview.zip` — the accepted Flutter application. Extract the complete directory before launching the executable.
           - **Android:** `miaotoujunshi-android-debug.apk` — Android 11+ debug preview. An older debug APK may have a different signing certificate; uninstall it first if Android rejects the update (this clears local app data). **WeChat is currently unsupported because this Android build cannot capture WeChat chat screenshots.** Other chat-app paths still need device-level validation.
 
           Transcript review, Jev/DeepSeek strategy selection, ranked drafts, detailed analysis, style rewrite, relationship stage/goal, and example/CSV K-line views are included across the three platforms. UI layouts and capture support differ; the screenshots in the README show Mac. Check `SHA256SUMS.txt` after downloading. See the README and PRIVACY.md for setup, feature scope, and data use.
-
-          The Windows package is the Flutter application and no longer includes the retired PySide6-Fluent-Widgets UI toolkit.
           EOF
           gh release create "$RELEASE_TAG" publish/* --target "$GITHUB_SHA" --latest --title "喵头军师 $RELEASE_TAG" --notes-file release-notes.md

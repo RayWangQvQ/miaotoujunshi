@@ -5,10 +5,6 @@ __pycache__/
 .venv/
 .env
 .env.*
-integrations/jev_windows/config.json
-integrations/jev_windows/build/
-integrations/jev_windows/dist/
-integrations/jev_windows/*.spec.bak
 integrations/jev_android/.gradle/
 integrations/jev_android/local.properties
 integrations/jev_android/app/build/

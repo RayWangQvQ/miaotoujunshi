@@ -36,8 +36,8 @@ import 'snapshot.dart';
 ///
 /// ## Source
 ///
-/// Ported from `integrations/jev_windows/core/draft.py` (`_INJECT`, `_LAUGH`,
-/// `_norm`, `_suspects`, `_her_recent`, `_sanitize`). The behaviour is identical
+/// Ported from `archive/jev-windows-python-final:core/draft.py` (`_INJECT`,
+/// `_LAUGH`, `_norm`, `_suspects`, `_her_recent`, `_sanitize`). The behaviour is identical
 /// because the attacks are identical; the filter has to drop the same
 /// candidates the Windows port did or the migration regressed a security
 /// property.
@@ -79,10 +79,7 @@ final RegExp _normalisePattern = RegExp(r'[^\p{L}\p{N}]', unicode: true);
 /// trade are taken from the Windows implementation; the test for "not the
 /// latest line" is here because the model reads a long context and an old
 /// instruction stays in force for it.
-List<String> suspectInjectionTexts(
-  List<CapturedLine> lines, {
-  int keep = 10,
-}) {
+List<String> suspectInjectionTexts(List<CapturedLine> lines, {int keep = 10}) {
   final List<String> out = <String>[];
   final int start = lines.length > keep ? lines.length - keep : 0;
   for (int i = start; i < lines.length; i++) {
@@ -100,10 +97,7 @@ List<String> suspectInjectionTexts(
 /// what the other side just said. The renderer marks low-confidence OCR lines
 /// `[OCR待核对]`; the filter reads the raw [CapturedLine.text] so the marker
 /// never reaches the comparison.
-List<String> otherRecentTexts(
-  List<CapturedLine> lines, {
-  int keep = 5,
-}) {
+List<String> otherRecentTexts(List<CapturedLine> lines, {int keep = 5}) {
   final List<String> out = <String>[];
   for (int i = lines.length - 1; i >= 0 && out.length < keep; i--) {
     final CapturedLine line = lines[i];

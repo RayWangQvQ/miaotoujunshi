@@ -1,5 +1,0 @@
-{
-  "csv_grid/empty-fields": "The same rule, seen from the writer: a grid whose row is all empty fields does not survive a round trip through `parseCsvGrid`, because the row is not a row. Python's `csv` module returns it. This is the only fixture where the two sides' CSV layers disagree, and it is the one the domain chose deliberately — the alternative is the 存在空消息 refusal above. No candle or chat row is all-empty: a candle always carries a date and a chat row always carries a timestamp.",
-
-  "update/current-shorter-than-latest": "Two-digit versus three-digit version tags. Python compares tuples, where `(1, 2) < (1, 2, 0)`, so a build running `1.2` is told that `1.2.0` is an update. The domain compares segment by segment and treats the shorter form as the missing-zero form, so `1.2` and `1.2.0` are the same release and nothing is reported — see `Version.isStrictlyOlderThan`. This is a deliberate correction made while converging three ports: the Windows port is the only one that compared versions, it has only ever tagged `x.y.z`, and the domain's reading is the one that cannot announce a release the user is already running."
-}
