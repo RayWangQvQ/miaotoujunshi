@@ -1,6 +1,6 @@
 name: miaotou_capabilities
 description: >-
-  The ten capability interfaces that form the only boundary between the three
+  The eleven capability interfaces that form the only boundary between the three
   platform implementations and everything above them.
 publish_to: "none"
 

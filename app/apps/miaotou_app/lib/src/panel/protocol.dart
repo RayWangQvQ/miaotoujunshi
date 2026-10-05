@@ -52,7 +52,10 @@ final class PanelFrame {
 
   /// A caveat about how the analysed snapshot was produced, shown verbatim —
   /// an OCR capture cannot tell who said what, and that belongs on the panel.
-  final String? note;
+  ///
+  /// It carries a possible remedy as well as words, because one of the notes the
+  /// panel shows is a refusal the user can act on (ADR-0021 decision 8).
+  final PanelNote? note;
 
   /// What the last whole-frame capture read off the screen, in the order it
   /// appeared, and empty for every other source.
@@ -91,6 +94,32 @@ final class PanelLine {
 
   @override
   String toString() => 'PanelLine(${speaker.name}, $text)';
+}
+
+/// Something the panel has to say, and what the user can do about it.
+///
+/// A note is nearly always only words. One is not: when the platform refuses
+/// because a system permission is off, the sentence names the cause and the user
+/// still has to go and switch it on, and a sentence that says "去系统设置里打开"
+/// without being able to take them there is what cost ADR-0018's first device run
+/// a code-reading session.
+///
+/// The remedy is a [PermissionKind] rather than a flag or a boolean, so the panel
+/// neither knows nor names the system page it is asking for — it reports which
+/// permission the user needs and the main engine, which owns the capabilities,
+/// decides what that means on this port.
+final class PanelNote {
+  const PanelNote(this.text, {this.remedy});
+
+  final String text;
+
+  /// The permission whose system page fixes this, or null when the note is only
+  /// something to read.
+  final PermissionKind? remedy;
+
+  @override
+  String toString() =>
+      'PanelNote($text${remedy == null ? '' : ', remedy: ${remedy!.name}'})';
 }
 
 /// How the panel paints its own fill.
@@ -165,11 +194,24 @@ enum PanelCommandKind {
   /// and the OS gives the old ports no chrome to do it with — they draw their
   /// own close button. It is here so the panel has exactly one way to ask.
   close,
+
+  /// Takes the user to the system page for the permission a note named
+  /// (ADR-0021).
+  ///
+  /// The panel does not open it and does not know which page it is: the note
+  /// carries a [PermissionKind] and the main engine holds the capability. That
+  /// is the same split every other command here follows.
+  openPermissionSettings,
 }
 
 /// A command going up.
 final class PanelCommand {
-  const PanelCommand(this.kind, {this.candidateIndex, this.text});
+  const PanelCommand(
+    this.kind, {
+    this.candidateIndex,
+    this.text,
+    this.permission,
+  });
 
   final PanelCommandKind kind;
 
@@ -179,10 +221,14 @@ final class PanelCommand {
   /// The user-edited draft for fill/copy commands.
   final String? text;
 
+  /// Which system page, for [PanelCommandKind.openPermissionSettings].
+  final PermissionKind? permission;
+
   @override
   String toString() =>
       'PanelCommand(${kind.name}${candidateIndex == null ? '' : ', $candidateIndex'}'
-      '${text == null ? '' : ', edited'})';
+      '${text == null ? '' : ', edited'}'
+      '${permission == null ? '' : ', ${permission!.name}'})';
 }
 
 /// The one seam between the two windows.

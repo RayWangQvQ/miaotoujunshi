@@ -8,6 +8,7 @@ import '../panel/session.dart';
 import '../runtime/model_settings.dart';
 import '../runtime/panel_settings.dart';
 import 'destination.dart';
+import 'permission_section.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({
@@ -16,6 +17,7 @@ class SettingsPage extends StatefulWidget {
     required this.preferences,
     required this.secrets,
     required this.panel,
+    required this.permissions,
   });
 
   final void Function(ShellDestination destination) onOpen;
@@ -29,6 +31,14 @@ class SettingsPage extends StatefulWidget {
   /// main engine's holder of what the panel should look like, and the panel
   /// protocol carries it from there (ADR-0020).
   final PanelSession panel;
+
+  /// The two system permissions, read and jumped by [PermissionSection].
+  ///
+  /// A capability rather than a callback pair: the section is the only surface
+  /// that both states the state and owns the remedy, and handing it the object
+  /// that answers both is what keeps «which page does this button open» out of
+  /// the UI (ADR-0021).
+  final Permissions permissions;
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
@@ -171,6 +181,11 @@ class _SettingsPageState extends State<SettingsPage> {
     return ListView(
       padding: AppSpacing.page,
       children: <Widget>[
+        // First, and above the storage line, because it is not a preference
+        // (ADR-0021 decision 7): with neither permission granted the
+        // application cannot read a conversation or draw a card, so it is a
+        // precondition for everything the rest of this page configures.
+        PermissionSection(permissions: widget.permissions),
         Text(
           copy.text(CopyKey.settingsStorage),
           style: Theme.of(context).textTheme.bodySmall,

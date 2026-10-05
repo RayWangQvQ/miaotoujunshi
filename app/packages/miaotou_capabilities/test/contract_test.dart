@@ -21,7 +21,7 @@ void main() {
         answers[entry.key] = await askCapability(() => entry.value(capabilities.toSet()));
       }
 
-      expect(answers, hasLength(42));
+      expect(answers, hasLength(44));
       expect(
         answers.entries.where((MapEntry<String, SupportAnswer> e) =>
             e.value != SupportAnswer.answered),
@@ -57,10 +57,10 @@ void main() {
       );
     });
 
-    test('a capability set names all ten capabilities', () {
+    test('a capability set names all eleven capabilities', () {
       final InMemoryCapabilities capabilities = InMemoryCapabilities();
       addTearDown(capabilities.dispose);
-      expect(capabilities.toSet().describe().keys, hasLength(10));
+      expect(capabilities.toSet().describe().keys, hasLength(11));
     });
   });
 
@@ -137,6 +137,23 @@ void main() {
         const MemoryStatus(consentEnabled: true, paused: false, atCapacity: true)
             .acceptsWrites,
         isFalse,
+      );
+    });
+
+    test('a permission report answers for both kinds, and inactive is one of them', () {
+      const PermissionReport report = PermissionReport(
+        accessibility: PermissionState.inactive,
+        overlay: PermissionState.ready,
+      );
+
+      expect(report.stateOf(PermissionKind.accessibility), PermissionState.inactive);
+      expect(report.stateOf(PermissionKind.overlay), PermissionState.ready);
+      expect(
+        PermissionState.values,
+        contains(PermissionState.inactive),
+        reason:
+            'the whole point of three values: 勾了但没绑定 is a state a user can '
+            'be looking at, and a boolean would report it as off (ADR-0021)',
       );
     });
 
@@ -221,6 +238,24 @@ void main() {
       expect(
         panel.calls,
         <String>['show', 'hideForCapture', 'restoreAfterCapture', 'hide'],
+      );
+    });
+
+    test('a permission double records the pages it was asked to open', () async {
+      final InMemoryPermissions permissions = InMemoryPermissions();
+      expect((await permissions.read()).overlay, PermissionState.ready);
+
+      permissions.report = const PermissionReport(
+        accessibility: PermissionState.off,
+        overlay: PermissionState.off,
+      );
+      await permissions.openSettings(PermissionKind.accessibility);
+
+      expect((await permissions.read()).accessibility, PermissionState.off);
+      expect(
+        permissions.opened,
+        <PermissionKind>[PermissionKind.accessibility],
+        reason: 'opening a page is the only observable effect the contract has',
       );
     });
   });

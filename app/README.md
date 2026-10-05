@@ -31,7 +31,7 @@ app/
     lib/src/capability_report.dart     what this build target can do, asked not assumed
     android/ macos/ windows/    the three runners
   packages/
-    miaotou_capabilities/       the ten interfaces. Pure Dart, no platform
+    miaotou_capabilities/       the eleven interfaces. Pure Dart, no platform
     miaotou_capabilities_<platform>/   one per build target; every member answered for
     miaotou_domain/            pure Dart; platform-free business logic (#7–#10)
 ```
@@ -144,6 +144,30 @@ The same plugin exposes one storage channel. Preferences use private
 `SharedPreferences`; credentials are AES-GCM encrypted with an Android Keystore
 key; knowledge and memory documents use atomic app-private file writes. The
 payload is read through `AssetManager`.
+
+### The two Android permissions are stated, and their pages are one tap away
+
+无障碍权限 and 悬浮窗权限 both have to be granted in the system settings before
+this application can read a conversation or draw a card, and neither of them is a
+setting the application can apply itself. So they are the first thing on the
+settings page: each is a row stating its real state with a 去开启 button that opens
+its own system page, and a third row explains 自启动 + 省电无限制 in prose, because
+no portable API reads it (ADR-0021; ADR-0016 owes macOS the equivalent surface for
+its own two grants).
+
+The state is three-valued rather than a boolean, and the middle value is the one
+users actually get stuck in: 无障碍 has two separate facts behind it — the switch
+in the system settings, and whether the platform has actually bound the service —
+so 「已勾选，但服务未运行」 is a state the app can be in while the switch on screen
+says on. It is re-read when the section is built and again whenever the app comes
+back to the foreground, because leaving for a system page is the only way either
+value ever changes.
+
+`Permissions` is the contract's eleventh interface and the only one that both
+reads state and opens a system page; it deliberately has no `request`, since
+Android's pages report nothing back. macOS and Windows refuse both members
+permanently through `UnsupportedError` and the section says so in one line instead
+of drawing two rows that will never change.
 
 ## The shared payload does not travel through Flutter assets
 

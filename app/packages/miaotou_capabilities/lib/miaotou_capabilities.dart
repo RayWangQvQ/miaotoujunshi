@@ -1,4 +1,4 @@
-/// The ten capability interfaces, and nothing that talks to a platform.
+/// The eleven capability interfaces, and nothing that talks to a platform.
 ///
 /// ADR-0009 makes this package the only boundary between the platform
 /// implementations and everything above them. Two properties follow from that
@@ -22,6 +22,7 @@ export 'src/model/speaker.dart';
 export 'src/platform/floating_panel.dart';
 export 'src/platform/panel_placement.dart';
 export 'src/platform/ocr.dart';
+export 'src/platform/permissions.dart';
 export 'src/platform/screen_capture.dart';
 export 'src/platform/text_inject.dart';
 export 'src/platform/ui_tree_reader.dart';

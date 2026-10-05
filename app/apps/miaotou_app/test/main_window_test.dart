@@ -128,7 +128,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(harness.session.running, isTrue);
     expect(harness.endCount, 0);
-    expect(harness.session.capabilities.describe().length, 10,
+    expect(harness.session.capabilities.describe().length, 11,
         reason: 'the capability set is still whole');
 
     // The one path that does end it.

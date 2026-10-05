@@ -1,6 +1,7 @@
 import 'material/shared_payload.dart';
 import 'platform/floating_panel.dart';
 import 'platform/ocr.dart';
+import 'platform/permissions.dart';
 import 'platform/screen_capture.dart';
 import 'platform/text_inject.dart';
 import 'platform/ui_tree_reader.dart';
@@ -9,17 +10,18 @@ import 'storage/memory_store.dart';
 import 'storage/preferences.dart';
 import 'storage/secret_store.dart';
 
-/// The ten capabilities a port answers for, in the four groups ADR-0009 names.
+/// The eleven capabilities a port answers for, in the four groups ADR-0009
+/// names.
 ///
-/// The value of this type is the constructor: it takes all ten by name and has
-/// no defaults, so a platform implementation package cannot compile while it is
-/// missing one. That is the property the three-stack layout has no equivalent
+/// The value of this type is the constructor: it takes all eleven by name and
+/// has no defaults, so a platform implementation package cannot compile while it
+/// is missing one. That is the property the three-stack layout has no equivalent
 /// for — a new capability cannot be added without all three ports answering for
 /// it, because the compiler asks each of them.
 ///
 /// It is deliberately a plain record and not an interface: the *interfaces* are
-/// the ten above, and a fourth "capability set interface" would only be a place
-/// for a platform to opt out of the rule.
+/// the eleven above, and a fourth "capability set interface" would only be a
+/// place for a platform to opt out of the rule.
 final class CapabilitySet {
   const CapabilitySet({
     required this.screenCapture,
@@ -27,6 +29,7 @@ final class CapabilitySet {
     required this.ocr,
     required this.textInject,
     required this.floatingPanel,
+    required this.permissions,
     required this.sharedPayload,
     required this.preferences,
     required this.secretStore,
@@ -39,6 +42,13 @@ final class CapabilitySet {
   final Ocr ocr;
   final TextInject textInject;
   final FloatingPanel floatingPanel;
+
+  /// The system permissions this port can read and take the user to.
+  ///
+  /// In the platform group, and the only member of it that both desktop ports
+  /// refuse: neither has an accessibility service to bind or a foreign window to
+  /// be drawn over (ADR-0021).
+  final Permissions permissions;
 
   final SharedPayload sharedPayload;
 
@@ -58,6 +68,7 @@ final class CapabilitySet {
         'ocr': ocr.runtimeType.toString(),
         'textInject': textInject.runtimeType.toString(),
         'floatingPanel': floatingPanel.runtimeType.toString(),
+        'permissions': permissions.runtimeType.toString(),
         'sharedPayload': sharedPayload.runtimeType.toString(),
         'preferences': preferences.runtimeType.toString(),
         'secretStore': secretStore.runtimeType.toString(),

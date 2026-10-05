@@ -65,7 +65,7 @@ final class ConversationRuntime {
     _snapshotSubscription = capabilities.uiTreeReader.snapshots.listen(
       _acceptSnapshot,
       onError: (_) {
-        _publish(note: copy.text(CopyKey.runtimeNoConversation));
+        _publish(note: _note(CopyKey.runtimeNoConversation));
       },
     );
     _commandSubscription = panel.commands.listen(_handleCommand);
@@ -76,7 +76,7 @@ final class ConversationRuntime {
         _acceptSnapshot(initial);
       }
     } on Object {
-      _publish(note: copy.text(CopyKey.runtimeNoConversation));
+      _publish(note: _note(CopyKey.runtimeNoConversation));
     }
   }
 
@@ -90,7 +90,7 @@ final class ConversationRuntime {
     _publish(
       analysed: _analysedSnapshot == null ? snapshot.conversation : null,
       live: snapshot.conversation,
-      note: snapshot.note,
+      note: _caveat(snapshot.note),
     );
     if (snapshot.signature() == previousSignature) {
       return;
@@ -122,6 +122,30 @@ final class ConversationRuntime {
       case PanelCommandKind.details:
       case PanelCommandKind.close:
         break;
+      case PanelCommandKind.openPermissionSettings:
+        if (command.permission case final PermissionKind kind) {
+          unawaited(_openPermissionSettings(kind));
+        }
+    }
+  }
+
+  /// The panel asking to be taken to a system page (ADR-0021 decision 8).
+  ///
+  /// The panel knows a [PermissionKind] and nothing else — which is what keeps
+  /// `ACTION_ACCESSIBILITY_SETTINGS` and `ACTION_MANAGE_OVERLAY_PERMISSION` out
+  /// of the panel engine entirely, exactly as every other command here keeps a
+  /// platform detail on this side of the window boundary.
+  ///
+  /// A failure is swallowed, and deliberately rather than by omission: the panel
+  /// that asked is the only surface that could report it, it asked *because* it
+  /// is stuck, and turning a failed jump into a second note would replace one
+  /// dead end with another. The settings section reads the same state and is the
+  /// surface that can say the jump did not happen.
+  Future<void> _openPermissionSettings(PermissionKind kind) async {
+    try {
+      await capabilities.permissions.openSettings(kind);
+    } on Object {
+      // Nothing to do with it here — see the note above.
     }
   }
 
@@ -156,7 +180,7 @@ final class ConversationRuntime {
       return;
     }
     _recognising = true;
-    _publish(note: copy.text(CopyKey.runtimeRecognising));
+    _publish(note: _note(CopyKey.runtimeRecognising));
     try {
       switch (await capabilities.screenCapture.capture()) {
         case CaptureFailed(:final String message):
@@ -170,7 +194,7 @@ final class ConversationRuntime {
       // The platform declining to answer at all — a channel that is gone, a
       // bridge that never attached — rather than declining this particular
       // frame.
-      _publish(note: copy.text(CopyKey.runtimeCaptureFailed));
+      _publish(note: _note(CopyKey.runtimeCaptureFailed));
     } finally {
       _recognising = false;
     }
@@ -189,7 +213,7 @@ final class ConversationRuntime {
         languages: const <String>['zh-Hans'],
       );
     } on Object {
-      _publish(note: copy.text(CopyKey.runtimeRecogniseFailed));
+      _publish(note: _note(CopyKey.runtimeRecogniseFailed));
       return;
     }
     final RecognisedCapture capture = groupRecognisedLines(
@@ -197,7 +221,7 @@ final class ConversationRuntime {
       frame: frame,
     );
     if (capture.lines.isEmpty) {
-      _publish(note: copy.text(CopyKey.runtimeNothingRecognised));
+      _publish(note: _note(CopyKey.runtimeNothingRecognised));
       return;
     }
     final ChatUiSnapshot snapshot = ChatUiSnapshot(
@@ -215,7 +239,7 @@ final class ConversationRuntime {
     _publish(
       analysed: snapshot.conversation,
       live: snapshot.conversation,
-      note: snapshot.note,
+      note: _caveat(snapshot.note),
       transcript: <PanelLine>[
         for (final ChatLine line in capture.lines)
           PanelLine(speaker: line.speaker, text: line.text),
@@ -230,9 +254,9 @@ final class ConversationRuntime {
   /// deliberately untranslated, so passing the sentence through keeps both the
   /// taxonomy and the advice. A sentence of our own here would be the only thing
   /// standing between the user and the reason.
-  String _refusal(String reason) => copy
-      .text(CopyKey.runtimeCaptureRefused)
-      .replaceAll('{reason}', reason);
+  PanelNote _refusal(String reason) => PanelNote(
+    copy.text(CopyKey.runtimeCaptureRefused).replaceAll('{reason}', reason),
+  );
 
   /// The one platform error that has a remedy of its own.
   ///
@@ -244,12 +268,21 @@ final class ConversationRuntime {
   /// when the panel cannot tell them *that* is what is wrong), which is what
   /// cost a code-reading session the first time this happened.
   ///
+  /// Since ADR-0021 decision 8 the sentence is not the end of it: the note names
+  /// [PermissionKind.accessibility], so the panel draws a button that opens the
+  /// page rather than printing a description of it. That is the second half of
+  /// the same repair — the first was saying which thing was off, this is taking
+  /// the user there.
+  ///
   /// Every other platform error keeps the generic sentence: the bridge's
   /// messages are written for a developer, not for the panel.
-  String _platformRefusal(PlatformException failure) =>
+  PanelNote _platformRefusal(PlatformException failure) =>
       failure.code == _serviceUnavailable
-          ? copy.text(CopyKey.runtimeCaptureServiceOff)
-          : copy.text(CopyKey.runtimeCaptureFailed);
+          ? PanelNote(
+              copy.text(CopyKey.runtimeCaptureServiceOff),
+              remedy: PermissionKind.accessibility,
+            )
+          : _note(CopyKey.runtimeCaptureFailed);
 
   /// `MiaotouAndroidPlugin.withCaptureService`, which is the only place in the
   /// three ports that raises it.
@@ -272,7 +305,7 @@ final class ConversationRuntime {
       // whatever produced it — including a manual capture.
       _sourceOfCurrent = read == null ? _latestSource : 'accessibility';
       if (current == null || current.lines.isEmpty) {
-        _publish(note: copy.text(CopyKey.runtimeNoConversation));
+        _publish(note: _note(CopyKey.runtimeNoConversation));
         return;
       }
       _latest = current;
@@ -285,7 +318,7 @@ final class ConversationRuntime {
       _publish(
         analysed: current.conversation,
         live: current.conversation,
-        note: copy.text(CopyKey.runtimeAnalysing),
+        note: _note(CopyKey.runtimeAnalysing),
       );
       final ModelSettings settings = await ModelSettings.load(
         capabilities.preferences,
@@ -295,7 +328,7 @@ final class ConversationRuntime {
         _publish(
           analysed: current.conversation,
           live: current.conversation,
-          note: copy.text(CopyKey.runtimeConfigureModels),
+          note: _note(CopyKey.runtimeConfigureModels),
         );
         return;
       }
@@ -310,12 +343,12 @@ final class ConversationRuntime {
         analysed: current.conversation,
         live: _latest?.conversation ?? current.conversation,
         advice: result,
-        note: current.note,
+        note: _caveat(current.note),
       );
     } on DomainException catch (error) {
-      _publish(note: error.message);
+      _publish(note: PanelNote(error.message));
     } on Object {
-      _publish(note: copy.text(CopyKey.runtimeAnalysisFailed));
+      _publish(note: _note(CopyKey.runtimeAnalysisFailed));
     } finally {
       _analysing = false;
       if (_pendingAutomaticAnalysis) {
@@ -403,7 +436,7 @@ final class ConversationRuntime {
       return;
     }
     await clipboardWrite(text);
-    _publish(note: copy.text(CopyKey.runtimeCopied));
+    _publish(note: _note(CopyKey.runtimeCopied));
   }
 
   Future<void> _fill(String? text) async {
@@ -418,13 +451,13 @@ final class ConversationRuntime {
         current.signature() != analysed.signature()) {
       _publish(
         live: current?.conversation ?? _latest?.conversation,
-        note: copy.text(CopyKey.runtimeConversationChanged),
+        note: _note(CopyKey.runtimeConversationChanged),
       );
       return;
     }
     final String? target = await capabilities.screenCapture.findTargetWindow();
     if (target == null) {
-      _publish(note: copy.text(CopyKey.runtimeConversationChanged));
+      _publish(note: _note(CopyKey.runtimeConversationChanged));
       return;
     }
     final InjectResult result = await capabilities.textInject.inject(
@@ -432,18 +465,18 @@ final class ConversationRuntime {
       target: InjectTarget(windowId: target),
     );
     if (result.verifiedLanding && result.observedText == text) {
-      _publish(note: copy.text(CopyKey.runtimeFilled));
+      _publish(note: _note(CopyKey.runtimeFilled));
       return;
     }
     await clipboardWrite(text);
-    _publish(note: copy.text(CopyKey.runtimeFillUnverified));
+    _publish(note: _note(CopyKey.runtimeFillUnverified));
   }
 
   void _publish({
     ConversationRef? analysed,
     ConversationRef? live,
     Advice? advice,
-    String? note,
+    PanelNote? note,
     List<PanelLine>? transcript,
   }) {
     final PanelFrame current = panel.current;
@@ -458,6 +491,22 @@ final class ConversationRuntime {
       ),
     );
   }
+
+  /// A note that is only words, which is nearly all of them.
+  ///
+  /// The frame carries a [PanelNote] rather than a string since ADR-0021: one
+  /// note has a way out of it and has to name the permission it is for, and a
+  /// type that can carry a remedy is the only shape that lets the panel draw a
+  /// button without the panel knowing which system page it is. The notes that
+  /// carry nothing stay one line at the call site because of this.
+  PanelNote _note(CopyKey key) => PanelNote(copy.text(key));
+
+  /// A snapshot's own caveat, as the panel takes it.
+  ///
+  /// Never a remedy: this is what the snapshot says about how it was produced —
+  /// "this one was read off a screenshot, check the sides" — and that is
+  /// something to read before filling a reply in, not a permission to grant.
+  PanelNote? _caveat(String? note) => note == null ? null : PanelNote(note);
 
   Future<void> dispose() async {
     if (_disposed) {

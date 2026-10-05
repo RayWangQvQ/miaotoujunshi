@@ -9,13 +9,13 @@
 /// trick: the logic stays a pure function of its inputs, and its tests run with
 /// no socket, no key and no clock.
 ///
-/// **This is not an eleventh capability.** ADR-0009 fixes the platform contract
-/// at ten interfaces, and every one of them is a thing one platform can do and
-/// another cannot — a window, a keystroke, a keychain. An HTTPS request is not:
-/// Dart does it identically on all three ports, so there is nothing for a
-/// platform package to answer. Putting it behind the contract would make all
-/// three ports write the same HTTP client and answer for a member none of them
-/// differ on. It belongs to the application, behind this port.
+/// **This is not a capability.** ADR-0009 fixes the membership of the platform
+/// contract, and every member of it is a thing one platform can do and
+/// another cannot — a window, a keystroke, a keychain, a system page. An HTTPS
+/// request is not: Dart does it identically on all three ports, so there is
+/// nothing for a platform package to answer. Putting it behind the contract would
+/// make all three ports write the same HTTP client and answer for a member none of
+/// them differ on. It belongs to the application, behind this port.
 library;
 
 /// Which configured route a chat request travels.

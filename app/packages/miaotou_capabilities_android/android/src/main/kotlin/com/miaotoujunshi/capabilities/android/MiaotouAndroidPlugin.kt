@@ -27,6 +27,7 @@ class MiaotouAndroidPlugin :
         const val CONTROL_CHANNEL = "miaotou/control"
         const val INGEST_CHANNEL = "miaotou/ingest"
         const val STORAGE_CHANNEL = "miaotoujunshi/android/storage"
+        const val PERMISSION_CHANNEL = "miaotoujunshi/android/permissions"
         private const val OVERLAY_PERMISSION_REQUEST = 41021
     }
 
@@ -37,6 +38,7 @@ class MiaotouAndroidPlugin :
     private lateinit var controlChannel: MethodChannel
     private lateinit var ingestChannel: EventChannel
     private lateinit var storageChannel: MethodChannel
+    private lateinit var permissionChannel: MethodChannel
     private lateinit var host: AndroidOverlayHost
 
     private var activity: Activity? = null
@@ -108,6 +110,13 @@ class MiaotouAndroidPlugin :
         )
         storageChannel = MethodChannel(binding.binaryMessenger, STORAGE_CHANNEL).also {
             it.setMethodCallHandler(AndroidStorageHost(binding.applicationContext))
+        }
+        // Its own channel rather than a member of the control channel: the
+        // control channel answers "read the chat" and refuses outright when the
+        // accessibility service is off, which is precisely the moment this one
+        // has to keep answering (ADR-0021).
+        permissionChannel = MethodChannel(binding.binaryMessenger, PERMISSION_CHANNEL).also {
+            it.setMethodCallHandler(AndroidPermissionsHost(binding.applicationContext))
         }
     }
 
@@ -330,6 +339,7 @@ class MiaotouAndroidPlugin :
         controlChannel.setMethodCallHandler(null)
         ingestChannel.setStreamHandler(null)
         storageChannel.setMethodCallHandler(null)
+        permissionChannel.setMethodCallHandler(null)
         RetainedAndroidBridge.listen(null)
         RetainedAndroidBridge.overlay(null, null)
         host.destroy()

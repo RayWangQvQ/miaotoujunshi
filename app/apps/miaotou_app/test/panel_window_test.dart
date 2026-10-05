@@ -38,7 +38,7 @@ void main() {
       analysed: conversation,
       live: conversation,
       advice: advice,
-      note: 'OCR 待核对',
+      note: PanelNote('OCR 待核对', remedy: PermissionKind.accessibility),
       transcript: <PanelLine>[
         PanelLine(speaker: Speaker.me, text: '在吗'),
         PanelLine(speaker: Speaker.other, text: '在的'),
@@ -55,7 +55,14 @@ void main() {
     expect(after.live, conversation);
     expect(after.advice?.candidates.single.text, '那你先忙');
     expect(after.advice?.rankingStatus, RankingStatus.single);
-    expect(after.note, 'OCR 待核对');
+    expect(after.note?.text, 'OCR 待核对');
+    expect(
+      after.note?.remedy,
+      PermissionKind.accessibility,
+      reason: 'the remedy is the whole reason a note is a PanelNote rather than a '
+          'string; losing it on the wire leaves the panel with a sentence and no '
+          'button (ADR-0021 decision 8)',
+    );
     expect(
       after.transcript.map((PanelLine line) => line.speaker),
       <Speaker>[Speaker.me, Speaker.other, Speaker.unknown],
@@ -69,12 +76,33 @@ void main() {
     expect(after.appNames, <String, String>{'com.tencent.mm': '微信'});
   });
 
+  test('a note with nothing to press crosses without a remedy', () {
+    const PanelFrame before = PanelFrame(
+      analysed: conversation,
+      note: PanelNote('OCR 未分边，把全部消息当作对方所说'),
+    );
+
+    final PanelFrame after = PanelWireCodec.decodeFrame(
+      PanelWireCodec.encodeFrame(before),
+    );
+
+    expect(after.note?.text, 'OCR 未分边，把全部消息当作对方所说');
+    expect(
+      after.note?.remedy,
+      isNull,
+      reason: 'the remedy is optional on the wire, and a decoder that invented '
+          'one would put a 去开启 button under a caveat about OCR',
+    );
+  });
+
   test('every shared command survives the window wire codec', () {
     for (final PanelCommandKind kind in PanelCommandKind.values) {
+      final bool opensAPage = kind == PanelCommandKind.openPermissionSettings;
       final PanelCommand before = PanelCommand(
         kind,
         candidateIndex: kind == PanelCommandKind.fill ? 2 : null,
         text: kind == PanelCommandKind.fill ? '改过的回复' : null,
+        permission: opensAPage ? PermissionKind.overlay : null,
       );
       final PanelCommand after = PanelWireCodec.decodeCommand(
         PanelWireCodec.encodeCommand(before),
@@ -82,6 +110,11 @@ void main() {
       expect(after.kind, kind);
       expect(after.candidateIndex, before.candidateIndex);
       expect(after.text, before.text);
+      expect(
+        after.permission,
+        before.permission,
+        reason: 'a command to open a page that arrives without one opens nothing',
+      );
     }
   });
 

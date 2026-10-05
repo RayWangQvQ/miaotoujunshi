@@ -95,6 +95,25 @@ enum CopyKey {
   settingsPanelOpacityValue,
   settingsPanelOpacityHint,
 
+  // The permission section (ADR-0021). It sits at the top of settings because it
+  // is a precondition for the application working rather than a preference, and
+  // these strings are the whole of what the section says: the state of each
+  // permission, and the one row that is text alone.
+  settingsPermissionSection,
+  settingsPermissionAccessibility,
+  settingsPermissionAccessibilityHint,
+  settingsPermissionOverlay,
+  settingsPermissionOverlayHint,
+  settingsPermissionStateOff,
+  settingsPermissionStateInactive,
+  settingsPermissionStateReady,
+  settingsPermissionOpen,
+  settingsPermissionAutostart,
+  settingsPermissionAutostartHint,
+  settingsPermissionUnavailable,
+  settingsPermissionReadFailed,
+  settingsPermissionOpenFailed,
+
   galleryTitle,
   galleryIntro,
   galleryCandidateCard,
@@ -157,6 +176,9 @@ enum CopyKey {
   panelActionClose,
   panelPreviewCurrent,
   panelPreviewBrowsing,
+  // The label on the button a note carries when the note names a permission the
+  // user can go and switch on (ADR-0021 decision 8).
+  panelActionOpenSettings,
 
   runtimeAnalysing,
   runtimeConfigureModels,
@@ -170,6 +192,13 @@ enum CopyKey {
   runtimeCaptureFailed,
   runtimeCaptureRefused,
   runtimeCaptureServiceOff,
+  // The floating panel's own refusals, named at last (ADR-0021 decision 10).
+  // The Android plugin has raised these five codes since the panel was written
+  // and nothing caught any of them, so a user who declined the overlay
+  // permission got a panel that never appeared and no explanation of why.
+  runtimePanelPermissionDenied,
+  runtimePanelPermissionPending,
+  runtimePanelShowFailed,
   runtimeRecogniseFailed,
   runtimeNothingRecognised,
   runtimeHttpStatus,
@@ -294,6 +323,31 @@ final class AppCopy {
     CopyKey.settingsPanelOpacityValue: '{value}%',
     CopyKey.settingsPanelOpacityHint: '只改面板自己的底色，球、外框和候选卡片一起变；上面的文字始终是实的。',
 
+    // The permission section (ADR-0021). The three row titles are the names the
+    // system settings themselves use, because the user has to find the same words
+    // two screens later; the hints say what the application loses without them.
+    CopyKey.settingsPermissionSection: '权限',
+    CopyKey.settingsPermissionAccessibility: '无障碍权限',
+    CopyKey.settingsPermissionAccessibilityHint: '读取聊天窗口里的消息文字',
+    CopyKey.settingsPermissionOverlay: '悬浮窗权限',
+    CopyKey.settingsPermissionOverlayHint: '把分析卡片显示在聊天窗口上方',
+    CopyKey.settingsPermissionStateOff: '未开启',
+    // "Ticked but not bound": the switch is on in the settings list and the
+    // service still is not running. A boolean cannot say this, and it is the
+    // state people actually get stuck in (ADR-0021 decision 4).
+    CopyKey.settingsPermissionStateInactive: '已勾选，但服务未运行',
+    CopyKey.settingsPermissionStateReady: '已开启',
+    CopyKey.settingsPermissionOpen: '去开启',
+    // The one row that is text alone. It is here rather than in a stored string
+    // because it is the section's own sentence, and it is deliberately a hint and
+    // not a button: reading the vendor's auto-start switch is not portable.
+    CopyKey.settingsPermissionAutostart: '自启动 + 省电无限制',
+    CopyKey.settingsPermissionAutostartHint:
+        '厂商的省电策略会随时杀掉后台进程，让悬浮球和识别服务一起失效。请在系统设置里允许本应用自启动，并把省电策略设为「无限制」；入口各厂商不同，一般在「设置 → 应用 → 本应用」里。这一项不读取状态，也不会替你打开。',
+    CopyKey.settingsPermissionUnavailable: '本端没有这两项系统权限，无需开启。',
+    CopyKey.settingsPermissionReadFailed: '读不到权限状态，请直接去系统设置里确认。',
+    CopyKey.settingsPermissionOpenFailed: '没能打开系统设置，请手动前往。',
+
     CopyKey.galleryTitle: '组件陈列',
     CopyKey.galleryIntro: '主窗口各页与悬浮面板复用同一套组件，这里把它们单独摆出来。',
     CopyKey.galleryCandidateCard: '候选卡片',
@@ -315,7 +369,7 @@ final class AppCopy {
 
     CopyKey.diagnosticsTitle: '能力自检',
     CopyKey.diagnosticsIntro: '这一版在所在端能做什么，是问出来的，不是猜出来的。',
-    CopyKey.capabilitySummaryPrefix: '十项能力：',
+    CopyKey.capabilitySummaryPrefix: '十一项能力：',
     CopyKey.supportAnswered: '已应答',
     CopyKey.supportUnsupported: '永久不支持',
     CopyKey.supportNotYetBuilt: '尚未实现',
@@ -337,6 +391,7 @@ final class AppCopy {
     CopyKey.panelActionFill: '填入',
     CopyKey.panelActionDetails: '详情',
     CopyKey.panelActionRecognise: '识别一次',
+    CopyKey.panelActionOpenSettings: '去开启',
     CopyKey.panelNoteSidesGuessed: '这一屏是截图识别的，左右按位置推定，可能有误；填入前请核对。',
     CopyKey.panelNoteSidesNotSplit: 'OCR 未分边，把全部消息当作对方所说',
     CopyKey.panelTranscriptLabel: '识别到的原文',
@@ -363,6 +418,10 @@ final class AppCopy {
     CopyKey.runtimeCaptureRefused: '拿不到画面。{reason}',
     CopyKey.runtimeCaptureServiceOff:
         '拿不到画面。无障碍服务未开启：去系统设置 → 无障碍里打开本应用的采集服务，再回来重试。',
+    // The panel's own refusals, which had no reader until ADR-0021 decision 10.
+    CopyKey.runtimePanelPermissionDenied: '悬浮面板没能显示：系统拒绝了悬浮窗权限。',
+    CopyKey.runtimePanelPermissionPending: '悬浮面板没能显示：请等系统确认悬浮窗权限后重试。',
+    CopyKey.runtimePanelShowFailed: '悬浮面板没能显示，请重试。',
     CopyKey.runtimeRecogniseFailed: '拿到了画面，但没能读出上面的文字，请重试或换一屏。',
     CopyKey.runtimeNothingRecognised: '这一屏没有识别到可用的文字。',
     CopyKey.runtimeHttpStatus: '模型请求失败（HTTP {status}），请检查地址、模型和密钥。',

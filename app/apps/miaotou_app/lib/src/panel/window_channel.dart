@@ -390,7 +390,7 @@ final class PanelWireCodec {
         'analysed': _encodeReference(frame.analysed),
         if (frame.live != null) 'live': _encodeReference(frame.live!),
         if (frame.advice != null) 'advice': frame.advice!.toJson(),
-        if (frame.note != null) 'note': frame.note,
+        if (frame.note != null) 'note': _encodeNote(frame.note!),
         if (frame.transcript.isNotEmpty)
           'transcript': <Map<String, Object?>>[
             for (final PanelLine line in frame.transcript)
@@ -408,9 +408,28 @@ final class PanelWireCodec {
       analysed: _decodeReference(map['analysed']),
       live: map['live'] == null ? null : _decodeReference(map['live']),
       advice: map['advice'] == null ? null : _decodeAdvice(map['advice']),
-      note: map['note'] as String?,
+      note: map['note'] == null ? null : _decodeNote(map['note']),
       transcript: _decodeTranscript(map['transcript']),
       appNames: _stringMap(map['appNames'], 'appNames'),
+    );
+  }
+
+  /// The note and its optional remedy, as one value.
+  ///
+  /// A map rather than two keys, so a note without a remedy crosses as a note
+  /// rather than as a note plus an absent field the far side has to remember to
+  /// read.
+  static Map<String, Object?> _encodeNote(PanelNote note) => <String, Object?>{
+    'text': note.text,
+    if (note.remedy != null) 'remedy': note.remedy!.name,
+  };
+
+  static PanelNote _decodeNote(Object? value) {
+    final Map<Object?, Object?> map = _map(value, 'panel note');
+    final Object? remedy = map['remedy'];
+    return PanelNote(
+      _string(map, 'text'),
+      remedy: remedy == null ? null : _decodeKind(remedy),
     );
   }
 
@@ -459,6 +478,7 @@ final class PanelWireCodec {
         if (command.candidateIndex != null)
           'candidateIndex': command.candidateIndex,
         if (command.text != null) 'text': command.text,
+        if (command.permission != null) 'permission': command.permission!.name,
       };
 
   static PanelCommand decodeCommand(Object? value) {
@@ -476,12 +496,26 @@ final class PanelWireCodec {
     if (rawText != null && rawText is! String) {
       throw const FormatException('text must be a string');
     }
+    final Object? rawPermission = map['permission'];
     return PanelCommand(
       commandKind,
       candidateIndex: rawIndex as int?,
       text: rawText as String?,
+      permission: rawPermission == null ? null : _decodeKind(rawPermission),
     );
   }
+
+  /// A permission kind by name, either on the way down or on the way back up.
+  ///
+  /// Shared because the same vocabulary crosses in both directions: a note says
+  /// which page would fix it, and the command that opens the page names the same
+  /// one. An unknown name is an error rather than a null, so a build that has
+  /// drifted from its neighbour says so instead of opening nothing.
+  static PermissionKind _decodeKind(Object? value) =>
+      PermissionKind.values.firstWhere(
+        (PermissionKind candidate) => candidate.name == value,
+        orElse: () => throw FormatException('unknown permission kind $value'),
+      );
 
   static Map<String, Object?> _encodeReference(ConversationRef reference) =>
       <String, Object?>{

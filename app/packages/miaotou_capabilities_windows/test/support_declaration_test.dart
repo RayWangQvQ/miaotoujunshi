@@ -104,9 +104,27 @@ void main() {
     }
   });
 
-  test('the bundle is wired to this package and covers all ten', () {
+  test('the Android permissions are refused permanently, not for now', () async {
+    for (final String member in const <String>[
+      'permissions.read',
+      'permissions.openSettings',
+    ]) {
+      final Object outcome =
+          await runProbe(() => capabilityProbes[member]!(capabilities));
+      expect(outcome, isA<UnsupportedError>());
+      expect(
+        outcome,
+        isNot(isA<UnimplementedError>()),
+        reason: 'this port owns its own windows and reads pixels rather than an '
+            'accessibility tree, so it has neither a floating grant to request '
+            'nor a service to bind (ADR-0021)',
+      );
+    }
+  });
+
+  test('the bundle is wired to this package and covers all eleven', () {
     final Map<String, String> report = capabilities.describe();
-    expect(report, hasLength(10));
+    expect(report, hasLength(11));
     expect(
       report.values,
       everyElement(startsWith('Windows')),

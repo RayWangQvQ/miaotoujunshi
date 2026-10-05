@@ -63,6 +63,42 @@ final class WindowsUiTreeReader implements UiTreeReader {
   );
 }
 
+/// Windows's answer for the system permissions.
+///
+/// **Permanent refusal.** The two permissions in the contract are Android's: a
+/// foreign window is drawn over only on Android because only Android has a
+/// floating overlay to grant, and the accessibility service has no desktop
+/// equivalent. This port owns its own windows outright, so the first has nothing
+/// to ask for. The second is refusable for a sharper reason than "not needed":
+/// Windows' accessibility API *could* answer, and the port deliberately reads
+/// pixels instead (Windows Graphics Capture, ADR-0009 decision 6) so that the
+/// three ports share one perception path — promising a grant this port would
+/// then never consult would be the worse answer.
+final class WindowsPermissions implements Permissions {
+  const WindowsPermissions();
+
+  static const String _platform = 'Windows';
+  static const String _reason =
+      'this port owns its own windows and reads pixels rather than an '
+      'accessibility tree, so it has neither a floating grant to request nor a '
+      'service to bind';
+
+  @override
+  Future<PermissionReport> read() async => unsupportedOnThisPlatform(
+    platform: _platform,
+    member: 'Permissions.read',
+    reason: _reason,
+  );
+
+  @override
+  Future<void> openSettings(PermissionKind kind) async =>
+      unsupportedOnThisPlatform(
+        platform: _platform,
+        member: 'Permissions.openSettings(${kind.name})',
+        reason: _reason,
+      );
+}
+
 /// Windows's answer for OCR.
 ///
 /// Owned by #17. The recognition runs inside the same native bridge as capture —

@@ -2,6 +2,7 @@ import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 
 import 'ingest_native.dart';
 import 'panel_native.dart';
+import 'permission_native.dart';
 
 /// Android's answer for screen capture.
 ///
@@ -97,6 +98,32 @@ final class AndroidTextInject implements TextInject {
   @override
   Future<InjectResult> inject(String text, {required InjectTarget target}) =>
       _native.inject(text, target: target);
+}
+
+/// Android's answer for the system permissions.
+///
+/// Owned by ADR-0021. The only port that implements this: the overlay permission
+/// exists because Android draws this application's panel over another
+/// application's window, and the accessibility state exists because the capture
+/// path runs through a service the user has to switch on. Both are read from the
+/// system and neither is cached — a value read once at start-up would be stale
+/// in exactly the case the surface exists for, a user coming back from the
+/// settings page they were just sent to.
+///
+/// The component name this compares against never reaches Dart: it stays in
+/// `AndroidPermissionsHost.kt`, so a caller receives values rather than a class
+/// name it would then have to keep in step.
+final class AndroidPermissions implements Permissions {
+  AndroidPermissions(this._native);
+
+  final AndroidPermissionNative _native;
+
+  @override
+  Future<PermissionReport> read() => _native.readPermissions();
+
+  @override
+  Future<void> openSettings(PermissionKind kind) =>
+      _native.openPermissionSettings(kind);
 }
 
 /// Android's answer for the floating window.

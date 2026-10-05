@@ -11,7 +11,7 @@ import 'secrets.dart';
 
 /// Every capability this port answers for, together.
 ///
-/// Passing all ten to [CapabilitySet] is what makes "every port answers for every
+/// Passing all eleven to [CapabilitySet] is what makes "every port answers for every
 /// member" a compile-time property: leaving one out does not produce a partial
 /// set, it produces a file that does not build.
 ///
@@ -43,6 +43,7 @@ CapabilitySet macosCapabilities({
     ocr: MacosOcr(seam),
     textInject: MacosTextInject(seam),
     floatingPanel: panel,
+    permissions: const MacosPermissions(),
     sharedPayload: MacosSharedPayload(seam),
     preferences: MacosPreferences.inContainer(seam),
     secretStore: MacosSecretStore(seam),

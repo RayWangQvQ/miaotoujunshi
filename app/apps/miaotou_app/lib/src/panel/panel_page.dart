@@ -1,7 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:miaotou_capabilities/miaotou_capabilities.dart' show Speaker;
+import 'package:miaotou_capabilities/miaotou_capabilities.dart'
+    show PermissionKind, Speaker;
 import 'package:miaotou_domain/miaotou_domain.dart';
 
 import '../design/colors.dart';
@@ -138,7 +139,7 @@ class _PanelPageState extends State<PanelPage> {
       live: widget.frame.live,
       advice: widget.frame.advice,
       appName: widget.frame.appNameFor,
-      note: widget.frame.note,
+      note: widget.frame.note?.text,
     );
     final Advice? advice = view.advice;
 
@@ -166,14 +167,7 @@ class _PanelPageState extends State<PanelPage> {
     final List<Widget> fixed = <Widget>[
       _header(context, copy, theme, view),
       if (view.readOnly) _banner(copy, colors, theme),
-      if (widget.frame.note != null)
-        Padding(
-          padding: AppSpacing.card,
-          child: Text(
-            widget.frame.note!,
-            style: theme.textTheme.bodySmall?.copyWith(color: colors.textMuted),
-          ),
-        ),
+      if (widget.frame.note != null) _note(copy, colors, theme),
     ];
     final Widget body = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -394,6 +388,49 @@ class _PanelPageState extends State<PanelPage> {
       ),
     ),
   );
+
+  /// The note, and the way out of it when there is one.
+  ///
+  /// A note is usually only something to read, and this renders exactly as it did
+  /// before for those: one line of muted text. One note is not — the platform
+  /// refusing because a system permission is off — and for that one the sentence
+  /// alone leaves the user to find the right page of the system settings from a
+  /// description of it. That is what made the first device run of ADR-0018
+  /// unreadable, so the note carries the [PermissionKind] it needs and this draws
+  /// a button for it.
+  ///
+  /// The panel does not open anything: it asks, and the main engine — which holds
+  /// the capabilities and is the only side that has them — does the opening.
+  Widget _note(AppCopy copy, AppColors colors, ThemeData theme) {
+    final PanelNote note = widget.frame.note!;
+    final PermissionKind? remedy = note.remedy;
+    return Padding(
+      padding: AppSpacing.card,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            note.text,
+            style: theme.textTheme.bodySmall?.copyWith(color: colors.textMuted),
+          ),
+          if (remedy != null)
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.s),
+              child: OutlinedButton(
+                key: const Key('panel-note-remedy'),
+                onPressed: () => widget.onCommand(
+                  PanelCommand(
+                    PanelCommandKind.openPermissionSettings,
+                    permission: remedy,
+                  ),
+                ),
+                child: Text(copy.text(CopyKey.panelActionOpenSettings)),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 
   /// What the last whole-frame capture read, in place of the empty state.
   ///

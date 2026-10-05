@@ -9,6 +9,7 @@ import '../model/screen_rect.dart';
 import '../model/speaker.dart';
 import '../platform/floating_panel.dart';
 import '../platform/ocr.dart';
+import '../platform/permissions.dart';
 import '../platform/screen_capture.dart';
 import '../platform/text_inject.dart';
 import '../platform/ui_tree_reader.dart';
@@ -17,7 +18,7 @@ import '../storage/memory_store.dart';
 import '../storage/preferences.dart';
 import '../storage/secret_store.dart';
 
-/// A complete implementation of the ten capabilities that touches nothing.
+/// A complete implementation of the eleven capabilities that touches nothing.
 ///
 /// It exists for two reasons. ADR-0009 makes `miaotou_domain` platform-free, and
 /// a platform-free package cannot be tested at all without a platform-free
@@ -46,6 +47,7 @@ final class InMemoryCapabilities {
     List<KnowledgeNote>? notes,
     List<KnowledgeContact>? contacts,
     MemoryStatus? memoryStatus,
+    PermissionReport? permissionReport,
   })  : screenCapture = InMemoryScreenCapture(
           targetWindow: targetWindow,
           outcome: captureOutcome,
@@ -55,6 +57,7 @@ final class InMemoryCapabilities {
         ocr = InMemoryOcr(lines: ocrLines),
         textInject = InMemoryTextInject(verify: verifyInjection),
         floatingPanel = InMemoryFloatingPanel(),
+        permissions = InMemoryPermissions(report: permissionReport),
         payload = InMemorySharedPayload(files: files),
         preferences = InMemoryPreferences(values: preferences),
         secretStore = InMemorySecretStore(secrets: secrets),
@@ -66,19 +69,21 @@ final class InMemoryCapabilities {
   final InMemoryOcr ocr;
   final InMemoryTextInject textInject;
   final InMemoryFloatingPanel floatingPanel;
+  final InMemoryPermissions permissions;
   final InMemorySharedPayload payload;
   final InMemoryPreferences preferences;
   final InMemorySecretStore secretStore;
   final InMemoryKnowledgeStore knowledgeStore;
   final InMemoryMemoryStore memoryStore;
 
-  /// The ten as a [CapabilitySet], ready to hand to the application.
+  /// The eleven as a [CapabilitySet], ready to hand to the application.
   CapabilitySet toSet() => CapabilitySet(
         screenCapture: screenCapture,
         uiTreeReader: uiTreeReader,
         ocr: ocr,
         textInject: textInject,
         floatingPanel: floatingPanel,
+        permissions: permissions,
         sharedPayload: payload,
         preferences: preferences,
         secretStore: secretStore,
@@ -277,6 +282,39 @@ final class InMemoryFloatingPanel implements FloatingPanel {
   void emit(PanelEvent event) => _events.add(event);
 
   void dispose() => _events.close();
+}
+
+/// A device that grants everything, until a test says otherwise.
+///
+/// The default is the granted report for the same reason every other double here
+/// answers: this is the reference for what a member that works looks like, and a
+/// double that started out refusing would make a page look broken for reasons
+/// that have nothing to do with the page.
+final class InMemoryPermissions implements Permissions {
+  InMemoryPermissions({PermissionReport? report})
+      : report = report ?? _granted;
+
+  static const PermissionReport _granted = PermissionReport(
+    accessibility: PermissionState.ready,
+    overlay: PermissionState.ready,
+  );
+
+  /// What [read] answers. Assign to move the device into another state — this is
+  /// how a test reproduces 「勾了但没绑定」, which needs no device to describe.
+  PermissionReport report;
+
+  /// Every page [openSettings] was asked to open, in order.
+  ///
+  /// Recorded rather than acted on: opening a page changes nothing the caller can
+  /// observe, which is the whole reason the contract has no `request` — see
+  /// [Permissions].
+  final List<PermissionKind> opened = <PermissionKind>[];
+
+  @override
+  Future<PermissionReport> read() async => report;
+
+  @override
+  Future<void> openSettings(PermissionKind kind) async => opened.add(kind);
 }
 
 final class InMemorySharedPayload implements SharedPayload {

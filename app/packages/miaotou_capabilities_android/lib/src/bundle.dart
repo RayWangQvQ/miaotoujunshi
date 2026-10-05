@@ -6,19 +6,21 @@ import 'knowledge.dart';
 import 'memory.dart';
 import 'panel_native.dart';
 import 'payload.dart';
+import 'permission_native.dart';
 import 'preferences.dart';
 import 'secrets.dart';
 import 'storage_native.dart';
 
 /// Every capability this port answers for, together.
 ///
-/// Passing all ten to [CapabilitySet] is what makes "every port answers for every
-/// member" a compile-time property: leaving one out does not produce a partial
-/// set, it produces a file that does not build.
+/// Passing all eleven to [CapabilitySet] is what makes "every port answers for
+/// every member" a compile-time property: leaving one out does not produce a
+/// partial set, it produces a file that does not build.
 CapabilitySet androidCapabilities({
   AndroidPanelNative? panelNative,
   AndroidIngestNative? ingestNative,
   AndroidStorageNative? storageNative,
+  AndroidPermissionNative? permissionNative,
 }) {
   final AndroidIngestNative ingest =
       ingestNative ?? MethodChannelAndroidIngestNative();
@@ -30,6 +32,9 @@ CapabilitySet androidCapabilities({
     ocr: AndroidOcr(ingest),
     textInject: AndroidTextInject(ingest),
     floatingPanel: AndroidFloatingPanel(native: panelNative),
+    permissions: AndroidPermissions(
+      permissionNative ?? MethodChannelAndroidPermissionNative(),
+    ),
     sharedPayload: AndroidSharedPayload(storage),
     preferences: AndroidPreferences(storage),
     secretStore: AndroidSecretStore(storage),

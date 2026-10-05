@@ -17,6 +17,7 @@ const List<String> startupProbeNames = <String>[
   'uiTreeReader.snapshots',
   'ocr.recognize',
   'floatingPanel.events',
+  'permissions.read',
   'sharedPayload.list',
   'preferences.keys',
   'secretStore.keys',
@@ -31,6 +32,27 @@ const List<String> startupProbeNames = <String>[
 /// may be added — so every member it has writes into another application's input
 /// field. That is a thing the user asks for, never a thing start-up does.
 const String unaskedMember = 'textInject.inject';
+
+/// The other member the report deliberately accounts for by name.
+///
+/// `Permissions.openSettings` opens a system page, which is a thing the user asks
+/// for exactly as an injection is, so start-up never calls it. It is reported as
+/// unasked for the same reason [unaskedMember] is: [startupProbeNames] and these
+/// two together have to name every member of the contract, or a member added
+/// tomorrow would be missing from the one screen that exists to show the contract,
+/// and nothing would say so.
+const String unaskedSettingsMember = 'permissions.openSettings';
+
+/// Every member the report either asks or accounts for by name.
+///
+/// Read by the test that checks the three lists against the manifest. A member
+/// that is in none of them is invisible on the diagnostics page, which is a hole
+/// rather than a decision — the decision has to be written down here.
+const List<String> reportedMemberNames = <String>[
+  ...startupProbeNames,
+  unaskedMember,
+  unaskedSettingsMember,
+];
 
 /// One line of the report.
 final class CapabilityReportRow {
@@ -59,7 +81,7 @@ final class CapabilityReport {
   int count(SupportAnswer? answer) =>
       rows.where((CapabilityReportRow row) => row.answer == answer).length;
 
-  /// The one line at the top: ten capabilities, and how each of them answered.
+  /// The one line at the top: eleven capabilities, and how each of them answered.
   ///
   /// Built from copy keys rather than written here, even though the row labels
   /// below are the same words: a screen that spells a state two ways is how the
@@ -99,13 +121,15 @@ Future<CapabilityReport> buildCapabilityReport(CapabilitySet capabilities) async
     );
   }
 
-  rows.add(
-    CapabilityReportRow(
-      member: unaskedMember,
-      implementation: implementations[unaskedMember.split('.').first] ?? '',
-      answer: null,
-    ),
-  );
+  for (final String member in <String>[unaskedMember, unaskedSettingsMember]) {
+    rows.add(
+      CapabilityReportRow(
+        member: member,
+        implementation: implementations[member.split('.').first] ?? '',
+        answer: null,
+      ),
+    );
+  }
 
   return CapabilityReport(rows);
 }
@@ -126,7 +150,7 @@ String describeAnswer(AppCopy copy, SupportAnswer? answer) => switch (answer) {
 /// What this build can do, asked rather than assumed.
 ///
 /// A placeholder screen in the sense that #11 replaced the shell around it, but
-/// not a throwaway: it is the migration's own answer to "which of the ten does
+/// not a throwaway: it is the migration's own answer to "which of the eleven does
 /// this port answer for", and after promotion it is what tells a user why a
 /// button does nothing.
 ///

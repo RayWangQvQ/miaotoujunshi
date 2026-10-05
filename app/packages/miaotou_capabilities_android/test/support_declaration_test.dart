@@ -10,16 +10,17 @@ import 'package:test/test.dart';
 /// What the Android implementation package promises.
 ///
 /// ADR-0009 decision 2 requires every port to answer for every member of the
-/// contract. Android is the one port where the answer for all ten can eventually
-/// be "yes" — it is the only one with an accessibility service behind it — so its
-/// refusals are all of one kind, and the test below says so. The compiler
-/// enforces that no member is missing; these tests are what make the *kind* of
-/// answer observable.
+/// contract. Android is the one port where the answer for all eleven can
+/// eventually be "yes" — it is the only one with an accessibility service behind
+/// it — so its refusals are all of one kind, and the test below says so. The
+/// compiler enforces that no member is missing; these tests are what make the
+/// *kind* of answer observable.
 void main() {
   final CapabilitySet capabilities = androidCapabilities(
     panelNative: _ProbePanelNative(),
     ingestNative: _ProbeIngestNative(),
     storageNative: _probeStorage(),
+    permissionNative: _ProbePermissionNative(),
   );
 
   test('every member of the contract answers for itself', () async {
@@ -68,7 +69,7 @@ void main() {
     );
   });
 
-  test('no member is refused permanently: this is the port that can reach all ten', () async {
+  test('no member is refused permanently: this is the port that can reach all eleven', () async {
     final List<String> permanent = <String>[];
 
     for (final MapEntry<String, Future<Object?> Function(CapabilitySet)> entry
@@ -92,9 +93,9 @@ void main() {
     );
   });
 
-  test('the bundle is wired to this package and covers all ten', () {
+  test('the bundle is wired to this package and covers all eleven', () {
     final Map<String, String> report = capabilities.describe();
-    expect(report, hasLength(10));
+    expect(report, hasLength(11));
     expect(
       report.values,
       everyElement(startsWith('Android')),
@@ -171,4 +172,21 @@ final class _ProbePanelNative implements AndroidPanelNative {
   @override
   Stream<AndroidPanelEvent> get panelEvents =>
       const Stream<AndroidPanelEvent>.empty();
+}
+
+/// A device that grants everything.
+///
+/// The three permission states are not equally interesting to a support test, so
+/// this answers the state that proves the member did the work rather than
+/// refusing: `inactive` would be the most informative value here, and it is
+/// exercised where it belongs, in `permission_test.dart`.
+final class _ProbePermissionNative implements AndroidPermissionNative {
+  @override
+  Future<PermissionReport> readPermissions() async => const PermissionReport(
+    accessibility: PermissionState.ready,
+    overlay: PermissionState.ready,
+  );
+
+  @override
+  Future<void> openPermissionSettings(PermissionKind kind) async {}
 }

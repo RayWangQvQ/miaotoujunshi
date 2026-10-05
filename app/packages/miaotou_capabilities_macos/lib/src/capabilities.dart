@@ -74,6 +74,42 @@ final class MacosUiTreeReader implements UiTreeReader {
       );
 }
 
+/// macOS's answer for the system permissions.
+///
+/// **Permanent refusal, and not a contradiction of ADR-0016.** That ADR promises
+/// the macOS port a permission affordance in its UI and it still owes one — but
+/// what macOS asks for is Screen Recording and the Accessibility API, asked for
+/// through `requestPermissions` and *reported back as flags*. Neither is a
+/// [PermissionKind]: the panel is a window macOS owns rather than one it draws
+/// over somebody else's, and there is no service to switch on. This refusal says
+/// the port has no member of this contract to answer for; it says nothing about
+/// the grant the capture path preflights for itself (ADR-0021).
+final class MacosPermissions implements Permissions {
+  const MacosPermissions();
+
+  static const String _platform = 'macOS';
+  static const String _reason =
+      'the two permissions in this contract are Android-specific: macOS owns '
+      'the panel window instead of drawing over a foreign one, and it has no '
+      'accessibility service to bind. Its own two grants are screen recording '
+      'and the Accessibility API, which requestPermissions asks for directly';
+
+  @override
+  Future<PermissionReport> read() async => unsupportedOnThisPlatform(
+        platform: _platform,
+        member: 'Permissions.read',
+        reason: _reason,
+      );
+
+  @override
+  Future<void> openSettings(PermissionKind kind) async =>
+      unsupportedOnThisPlatform(
+        platform: _platform,
+        member: 'Permissions.openSettings(${kind.name})',
+        reason: _reason,
+      );
+}
+
 /// macOS's answer for OCR.
 ///
 /// Owned by #14. Backed by Apple Vision.

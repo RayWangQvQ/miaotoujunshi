@@ -483,7 +483,7 @@ void main() {
         PanelFrame(
           analysed: wechat,
           live: wechat,
-          note: AppCopy.zh.text(CopyKey.panelNoteSidesGuessed),
+          note: PanelNote(AppCopy.zh.text(CopyKey.panelNoteSidesGuessed)),
           transcript: const <PanelLine>[
             PanelLine(speaker: Speaker.me, text: '在吗'),
             PanelLine(speaker: Speaker.other, text: '在的'),

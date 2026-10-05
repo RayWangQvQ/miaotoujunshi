@@ -1,5 +1,5 @@
-/// The in-memory implementation of the ten capabilities, and the tool that keeps
-/// what a member threw.
+/// The in-memory implementation of the eleven capabilities, and the tool that
+/// keeps what a member threw.
 ///
 /// This library is the reason the seam can be tested at all: ADR-0009 makes
 /// `miaotou_domain` platform-free, so nothing above the contract can be exercised

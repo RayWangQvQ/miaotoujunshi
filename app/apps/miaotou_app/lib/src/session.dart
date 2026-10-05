@@ -10,7 +10,7 @@ import 'shell/destination.dart';
 /// What the process is doing, as opposed to what the window is showing.
 ///
 /// ADR-0012 gives the main window two jobs that pull in opposite directions: it
-/// is the sole holder of the ten capabilities, and it must survive being closed.
+/// is the sole holder of the eleven capabilities, and it must survive being closed.
 /// It can only do both if the two halves are separate objects, so this type is
 /// the half that is *not* a widget. Nothing in the tree owns it, nothing in the
 /// tree disposes it, and closing the window cannot reach it — which is exactly
@@ -24,7 +24,7 @@ final class Session extends ChangeNotifier {
   Session({required this.capabilities, this.onEnd, PanelSession? panel})
     : panel = panel ?? PanelSession();
 
-  /// The ten capabilities this port answers for. Read by the diagnostics page,
+  /// The eleven capabilities this port answers for. Read by the diagnostics page,
   /// and by nothing that could mistake a hidden window for a dead one.
   final CapabilitySet capabilities;
   final PanelSession panel;

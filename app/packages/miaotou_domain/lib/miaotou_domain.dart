@@ -53,10 +53,10 @@
 /// test in `test/` is what makes it more than a comment.
 ///
 /// There is **one** exception, and it is deliberate: [ModelTransport]. It is not
-/// an eleventh capability — it is not something one platform can do and another
-/// cannot — so it is declared here and implemented by the application, which is
-/// what keeps the network, the credentials and the redirect policy out of this
-/// package while still letting [analyzeSnapshot] run the whole judgement. See
+/// a capability — it is not something one platform can do and another cannot — so
+/// it is declared here and implemented by the application, which is what keeps the
+/// network, the credentials and the redirect policy out of this package while
+/// still letting [analyzeSnapshot] run the whole judgement. See
 /// `src/model_gateway.dart`.
 library;
 

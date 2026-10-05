@@ -128,7 +128,7 @@ void main() {
 
     expect(capabilities.textInject.injected, isEmpty);
     expect(
-      panel.current.note,
+      panel.current.note?.text,
       AppCopy.zh.text(CopyKey.runtimeConversationChanged),
     );
   });
@@ -163,7 +163,7 @@ void main() {
       await _until(() => panel.current.advice != null);
 
       panel.receive(const PanelCommand(PanelCommandKind.reanalyse));
-      await _until(() => panel.current.note == 'failed');
+      await _until(() => panel.current.note?.text == 'failed');
 
       expect(panel.current.advice, isNull);
       expect(published, hasLength(2));
@@ -181,6 +181,7 @@ void main() {
       ocr: memory.ocr,
       textInject: memory.textInject,
       floatingPanel: memory.floatingPanel,
+      permissions: memory.permissions,
       sharedPayload: memory.payload,
       preferences: memory.preferences,
       secretStore: memory.secretStore,
@@ -201,7 +202,7 @@ void main() {
     await expectLater(runtime.start(), completes);
 
     expect(panel.current.analysed, ConversationRef.none);
-    expect(panel.current.note, AppCopy.zh.text(CopyKey.runtimeNoConversation));
+    expect(panel.current.note?.text, AppCopy.zh.text(CopyKey.runtimeNoConversation));
   });
 
   test('recogniseOnce asks for the screen, not for a window handle', () async {
@@ -315,12 +316,12 @@ void main() {
     await _until(
       () =>
           panel.current.note != null &&
-          panel.current.note != AppCopy.zh.text(CopyKey.runtimeRecognising),
+          panel.current.note?.text != AppCopy.zh.text(CopyKey.runtimeRecognising),
     );
 
-    expect(panel.current.note, contains('window is not visible'));
+    expect(panel.current.note?.text, contains('window is not visible'));
     expect(
-      panel.current.note,
+      panel.current.note?.text,
       isNot(AppCopy.zh.text(CopyKey.runtimeCaptureFailed)),
       reason: 'the platform said why; repeating a generic sentence buries it',
     );
@@ -361,10 +362,14 @@ void main() {
     await _until(
       () =>
           panel.current.note != null &&
-          panel.current.note != AppCopy.zh.text(CopyKey.runtimeRecognising),
+          panel.current.note?.text != AppCopy.zh.text(CopyKey.runtimeRecognising),
     );
 
-    expect(panel.current.note, AppCopy.zh.text(CopyKey.runtimeCaptureServiceOff));
+    expect(panel.current.note?.text, AppCopy.zh.text(CopyKey.runtimeCaptureServiceOff));
+    // And the way out of it. ADR-0021 decision 8: naming the cause was the first
+    // half of the repair, and a note that names it without carrying the
+    // permission is a sentence the user still has to translate into a page.
+    expect(panel.current.note?.remedy, PermissionKind.accessibility);
     expect(
       capabilities.ocr.languageCalls,
       isEmpty,
@@ -395,10 +400,16 @@ void main() {
     await _until(
       () =>
           panel.current.note != null &&
-          panel.current.note != AppCopy.zh.text(CopyKey.runtimeRecognising),
+          panel.current.note?.text != AppCopy.zh.text(CopyKey.runtimeRecognising),
     );
 
-    expect(panel.current.note, AppCopy.zh.text(CopyKey.runtimeCaptureFailed));
+    expect(panel.current.note?.text, AppCopy.zh.text(CopyKey.runtimeCaptureFailed));
+    expect(
+      panel.current.note?.remedy,
+      isNull,
+      reason: 'a defect has no page to open; offering one would send the user to '
+          'a setting that is already correct',
+    );
   });
 }
 

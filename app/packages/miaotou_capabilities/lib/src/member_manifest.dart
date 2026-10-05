@@ -3,13 +3,15 @@ import 'dart:typed_data';
 import 'capability_set.dart';
 import 'model/speaker.dart';
 import 'platform/floating_panel.dart';
+import 'platform/permissions.dart';
 import 'platform/screen_capture.dart';
 import 'platform/text_inject.dart';
 import 'storage/knowledge_store.dart';
 
-/// Every member of the ten interfaces, named, as a call that must go somewhere.
+/// Every member of the eleven interfaces, named, as a call that must go
+/// somewhere.
 ///
-/// One entry per member — forty-two of them — so that a port's test can drive the
+/// One entry per member — forty-four of them — so that a port's test can drive the
 /// whole contract and assert, member by member, that it answered or refused. A
 /// member that returned null, an empty list or a default comes back as
 /// `SupportAnswer.answered` from `askCapability`, which is exactly why the
@@ -52,6 +54,10 @@ final Map<String, Future<Object?> Function(CapabilitySet)> capabilityProbes =
   'floatingPanel.setFocusable': (CapabilitySet c) =>
       c.floatingPanel.setFocusable(true),
   'floatingPanel.events': (CapabilitySet c) async => c.floatingPanel.events,
+
+  'permissions.read': (CapabilitySet c) => c.permissions.read(),
+  'permissions.openSettings': (CapabilitySet c) =>
+      c.permissions.openSettings(PermissionKind.accessibility),
 
   'sharedPayload.read': (CapabilitySet c) =>
       c.sharedPayload.read('miaotoujunshi/references/data/trend-rules.json'),
