@@ -71,6 +71,8 @@ endif()
 
 set(INSTALL_BUNDLE_DATA_DIR "${CMAKE_INSTALL_PREFIX}/data")
 set(INSTALL_BUNDLE_LIB_DIR "${CMAKE_INSTALL_PREFIX}")
+get_filename_component(MIAOTOU_REPOSITORY_ROOT
+  "${CMAKE_CURRENT_SOURCE_DIR}/../../../../.." ABSOLUTE)
 
 install(TARGETS ${BINARY_NAME} RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}"
   COMPONENT Runtime)
@@ -101,6 +103,29 @@ install(CODE "
   " COMPONENT Runtime)
 install(DIRECTORY "${PROJECT_BUILD_DIR}/${FLUTTER_ASSET_DIR_NAME}"
   DESTINATION "${INSTALL_BUNDLE_DATA_DIR}" COMPONENT Runtime)
+
+# The payload remains a real repository-shaped file tree beside the executable.
+# Name the directories, not their current members, so a new nested file ships
+# without a CMake edit.
+install(DIRECTORY "${MIAOTOU_REPOSITORY_ROOT}/miaotoujunshi"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}" COMPONENT Runtime)
+install(DIRECTORY "${MIAOTOU_REPOSITORY_ROOT}/goutoujunshi"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}" COMPONENT Runtime)
+
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+install(CODE "
+  execute_process(
+    COMMAND \"${Python3_EXECUTABLE}\"
+      \"${CMAKE_CURRENT_SOURCE_DIR}/../macos/Runner/validate_payload_keys.py\"
+      \"${MIAOTOU_REPOSITORY_ROOT}\"
+      \"${CMAKE_INSTALL_PREFIX}\"
+    RESULT_VARIABLE payload_validation
+  )
+  if(NOT payload_validation EQUAL 0)
+    message(FATAL_ERROR
+      \"Windows payload assertion failed with exit code \${payload_validation}\")
+  endif()
+" COMPONENT Runtime)
 
 # Install the AOT library on non-Debug builds only.
 install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"

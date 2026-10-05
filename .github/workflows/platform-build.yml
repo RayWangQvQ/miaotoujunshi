@@ -17,6 +17,7 @@ on:
       - "PRIVACY.md"
       - "tests/test_macos_release.py"
       - "tests/test_platform_integrations.py"
+      - "tests/test_windows_release.py"
       - ".github/workflows/platform-build.yml"
   pull_request:
     paths:
@@ -28,6 +29,7 @@ on:
       - "PRIVACY.md"
       - "tests/test_macos_release.py"
       - "tests/test_platform_integrations.py"
+      - "tests/test_windows_release.py"
       - ".github/workflows/platform-build.yml"
 
 permissions:
@@ -53,7 +55,7 @@ jobs:
           name: miaotoujunshi-android-debug
           path: integrations/jev_android/app/build/outputs/apk/debug/*.apk
 
-  windows:
+  windows-legacy:
     runs-on: windows-latest
     defaults:
       run:
@@ -71,17 +73,36 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
       - run: pyinstaller --noconfirm --clean jev.spec
+      - uses: actions/upload-artifact@v4
+        with:
+          name: miaotoujunshi-windows-legacy-preview
+          path: integrations/jev_windows/dist/miaotoujunshi-windows
+
+  flutter-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: integrations/jev_flutter/apps/miaotou_app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.6"
+          channel: stable
+      - run: flutter pub get
+      - run: flutter build windows --release
       - name: Create Windows ZIP
         shell: pwsh
         run: |
-          Copy-Item README.md dist/miaotoujunshi-windows/README.md
-          Copy-Item LICENSE dist/miaotoujunshi-windows/LICENSE
-          Copy-Item NOTICE dist/miaotoujunshi-windows/NOTICE
-          Compress-Archive -Path dist/miaotoujunshi-windows -DestinationPath dist/miaotoujunshi-windows-preview.zip -Force
+          $release = "build/windows/x64/runner/Release"
+          Copy-Item "../../../../README.md" "$release/README.md"
+          Copy-Item "../../../../LICENSE" "$release/LICENSE"
+          Copy-Item "../../../../NOTICE" "$release/NOTICE"
+          Compress-Archive -Path "$release/*" -DestinationPath "build/miaotoujunshi-windows-preview.zip" -Force
       - uses: actions/upload-artifact@v4
         with:
           name: miaotoujunshi-windows-preview
-          path: integrations/jev_windows/dist/miaotoujunshi-windows-preview.zip
+          path: integrations/jev_flutter/apps/miaotou_app/build/miaotoujunshi-windows-preview.zip
 
   mac:
     runs-on: macos-latest
@@ -173,7 +194,7 @@ jobs:
 
   release:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag != '' }}
-    needs: [android, windows, mac]
+    needs: [android, flutter-windows, mac]
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
@@ -209,6 +230,6 @@ jobs:
 
           Transcript review, Jev/DeepSeek strategy selection, ranked drafts, detailed analysis, style rewrite, relationship stage/goal, and example/CSV K-line views are included across the three platforms. UI layouts and capture support differ; the screenshots in the README show Mac. Check `SHA256SUMS.txt` after downloading. See the README and PRIVACY.md for setup, feature scope, and data use.
 
-          Windows packages include PySide6-Fluent-Widgets; see `integrations/jev_windows/NOTICE` for redistribution terms.
+          The Windows package is the Flutter application and no longer includes the retired PySide6-Fluent-Widgets UI toolkit.
           EOF
           gh release create "$RELEASE_TAG" publish/* --target "$GITHUB_SHA" --latest --title "喵头军师 $RELEASE_TAG" --notes-file release-notes.md

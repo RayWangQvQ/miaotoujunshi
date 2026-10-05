@@ -5,6 +5,7 @@ import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 
 import '../native.dart';
 import '../panel_native.dart';
+import '../secrets.dart';
 
 final class FakeWindowsNative implements WindowsNative {
   FakeWindowsNative({
@@ -118,4 +119,24 @@ final class FakeWindowsPanelNative implements WindowsPanelNative {
   Future<void> setPanelFocusable(bool value) async {
     focusable = value;
   }
+}
+
+final class MemoryWindowsCredentialBackend implements WindowsCredentialBackend {
+  final Map<String, String> _values = <String, String>{};
+
+  @override
+  Future<String?> read(String key) async => _values[key];
+
+  @override
+  Future<void> write(String key, String value) async {
+    _values[key] = value;
+  }
+
+  @override
+  Future<void> delete(String key) async {
+    _values.remove(key);
+  }
+
+  @override
+  Future<Set<String>> keys() async => _values.keys.toSet();
 }

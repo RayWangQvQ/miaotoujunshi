@@ -1,9 +1,17 @@
+import 'dart:io';
+
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 
 import 'capabilities.dart';
+import 'json_file.dart';
 import 'native.dart';
+import 'knowledge.dart';
+import 'memory.dart';
 import 'panel.dart';
 import 'panel_native.dart';
+import 'payload.dart';
+import 'preferences.dart';
+import 'secrets.dart';
 
 /// Every capability this port answers for, together.
 ///
@@ -13,6 +21,9 @@ import 'panel_native.dart';
 CapabilitySet windowsCapabilities({
   WindowsNative? native,
   WindowsPanelNative? panelNative,
+  Directory? executableDirectory,
+  Directory? applicationDataDirectory,
+  WindowsCredentialBackend? credentialBackend,
 }) {
   final WindowsNative platform = native ?? ProcessWindowsNative();
   final WindowsFloatingPanel panel = WindowsFloatingPanel(
@@ -24,10 +35,22 @@ CapabilitySet windowsCapabilities({
     ocr: WindowsOcr(platform),
     textInject: WindowsTextInject(platform),
     floatingPanel: panel,
-    sharedPayload: const WindowsSharedPayload(),
-    preferences: const WindowsPreferences(),
-    secretStore: const WindowsSecretStore(),
-    knowledgeStore: const WindowsKnowledgeStore(),
-    memoryStore: const WindowsMemoryStore(),
+    sharedPayload: WindowsSharedPayload(executableDirectory),
+    preferences: applicationDataDirectory == null
+        ? WindowsPreferences.inApplicationData()
+        : WindowsPreferences(
+            WindowsJsonFile(applicationDataDirectory, 'preferences.json'),
+          ),
+    secretStore: WindowsSecretStore(credentialBackend),
+    knowledgeStore: applicationDataDirectory == null
+        ? WindowsKnowledgeStore.inApplicationData()
+        : WindowsKnowledgeStore(
+            WindowsJsonFile(applicationDataDirectory, 'knowledge.json'),
+          ),
+    memoryStore: applicationDataDirectory == null
+        ? WindowsMemoryStore.inApplicationData()
+        : WindowsMemoryStore(
+            WindowsJsonFile(applicationDataDirectory, 'memory.json'),
+          ),
   );
 }

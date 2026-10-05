@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 import 'package:miaotou_capabilities/testing.dart';
 import 'package:miaotou_capabilities_windows/miaotou_capabilities_windows.dart';
@@ -14,10 +16,27 @@ import 'package:test/test.dart';
 /// does not build while a member is missing — and these tests are what make the
 /// second half observable.
 void main() {
+  final Directory storage = Directory.systemTemp.createTempSync(
+    'miaotou-windows-contract-',
+  );
+  Directory(
+    '${storage.path}/miaotoujunshi/references/data',
+  ).createSync(recursive: true);
+  File(
+    '${storage.path}/miaotoujunshi/references/data/trend-rules.json',
+  ).writeAsStringSync('{}');
   final CapabilitySet capabilities = windowsCapabilities(
     native: FakeWindowsNative(),
     panelNative: FakeWindowsPanelNative(),
+    executableDirectory: storage,
+    applicationDataDirectory: storage,
+    credentialBackend: MemoryWindowsCredentialBackend(),
   );
+  final WindowsMemoryStore memory =
+      capabilities.memoryStore as WindowsMemoryStore;
+
+  setUpAll(() => memory.grantConsent(confirmed: true));
+  tearDownAll(() => storage.delete(recursive: true));
 
   test('every member of the contract answers for itself', () async {
     final List<String> defects = <String>[];

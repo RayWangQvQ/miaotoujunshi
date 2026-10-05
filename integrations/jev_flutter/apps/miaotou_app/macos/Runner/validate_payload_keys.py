@@ -49,6 +49,9 @@ _CONST_DECLARATION = re.compile(
     r"^const\s+String\s+(?P<name>\w*Path|\w*Dir)\s*=\s*'(?P<value>[^']+)'\s*;",
     re.MULTILINE,
 )
+_DIRECTORY_LITERAL_READ = re.compile(
+    r"\$(?P<name>\w*Dir)/(?P<file>[A-Za-z0-9_.-]+)"
+)
 
 # The files whose declarations are keys. Every one of them is a constant the
 # domain reads the payload through; a file not listed here contributes no keys,
@@ -156,6 +159,41 @@ def payload_map_keys(repository: Path) -> set[str]:
     return keys
 
 
+def directory_member_keys(repository: Path) -> set[str]:
+    """Files requested below a directory key, including manifest-driven names."""
+    keys: set[str] = set()
+    manifests: list[Path] = []
+    for relative in _DOMAIN_SOURCES:
+        text = (repository / relative).read_text(encoding="utf-8")
+        directories = {
+            match.group("name"): match.group("value")
+            for match in _CONST_DECLARATION.finditer(text)
+            if _KEY_IS_DIRECTORY.search(match.group("name"))
+        }
+        for match in _DIRECTORY_LITERAL_READ.finditer(text):
+            directory = directories.get(match.group("name"))
+            if directory is None:
+                continue
+            key = f"{directory}/{match.group('file')}"
+            keys.add(key)
+            if match.group("file") == "manifest.json":
+                manifests.append(repository / key)
+
+    for manifest in manifests:
+        document = json.loads(manifest.read_text(encoding="utf-8"))
+        cases = document.get("cases") if isinstance(document, dict) else None
+        if not isinstance(cases, list):
+            raise Failure(f"{manifest.relative_to(repository)} has no cases array")
+        for index, case in enumerate(cases):
+            csv = case.get("csv") if isinstance(case, dict) else None
+            if not isinstance(csv, str) or not csv:
+                raise Failure(
+                    f"{manifest.relative_to(repository)} case {index} names no csv"
+                )
+            keys.add(f"{manifest.parent.relative_to(repository).as_posix()}/{csv}")
+    return keys
+
+
 def required_keys(repository: Path) -> dict[str, bool]:
     """Every key the material interface can request, mapped to "is a directory".
 
@@ -171,6 +209,8 @@ def required_keys(repository: Path) -> dict[str, bool]:
                 f"{value} is declared as a directory constant and named by "
                 f"{PAYLOAD_MAP} as a document"
             )
+        keys[value] = False
+    for value in directory_member_keys(repository):
         keys[value] = False
     return keys
 

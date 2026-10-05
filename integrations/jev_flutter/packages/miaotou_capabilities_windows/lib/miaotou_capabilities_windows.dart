@@ -13,9 +13,15 @@ library;
 
 export 'src/bundle.dart';
 export 'src/capabilities.dart';
+export 'src/json_file.dart';
+export 'src/knowledge.dart';
+export 'src/memory.dart';
 export 'src/native.dart';
 export 'src/panel.dart';
 export 'src/panel_exclusion.dart';
 export 'src/panel_native.dart';
 export 'src/pacing.dart';
+export 'src/payload.dart';
+export 'src/preferences.dart';
+export 'src/secrets.dart';
 export 'src/shared_memory.dart' show SharedFrameReader;

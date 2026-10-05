@@ -2,4 +2,7 @@
 library;
 
 export 'src/testing/fake_native.dart'
-    show FakeWindowsNative, FakeWindowsPanelNative;
+    show
+        FakeWindowsNative,
+        FakeWindowsPanelNative,
+        MemoryWindowsCredentialBackend;
