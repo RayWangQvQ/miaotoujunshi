@@ -241,7 +241,7 @@ final class MacosFloatingPanel implements FloatingPanel {
           case NativePanelDragged(:final ScreenRect window, :final ScreenRect screen):
             final ScreenRect landed = EdgeSnap.snap(window, screen);
             _memory.remember(landed);
-            // The snap is applied by asking for the window again rather than by
+            // The clamp is applied by asking for the window again rather than by
             // telling Dart where it went: the window is the only thing that knows
             // where it actually is, and a report of where it *should* be is not
             // what the contract publishes.

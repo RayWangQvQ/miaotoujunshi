@@ -1,7 +1,12 @@
 import '../model/screen_rect.dart';
 import 'floating_panel.dart';
 
-/// Snaps a floating panel to its nearest vertical screen edge.
+/// Keeps a floating panel inside the screen without snapping it to an edge.
+///
+/// The panel used to snap to the nearest vertical edge on release, which the
+/// user rejected: a ball that jumps to a wall is not one they can place. What
+/// remains is the clamp — the horizontal and vertical bounds that stop a drag
+/// from carrying the window off-screen.
 final class EdgeSnap {
   const EdgeSnap._();
 
@@ -18,11 +23,15 @@ final class EdgeSnap {
     final double height = window.height > screen.height
         ? screen.height
         : window.height;
-    final double distanceToLeft = window.left - screen.left;
-    final double distanceToRight = screen.right - window.right;
-    final double left = distanceToLeft <= distanceToRight
-        ? screen.left + margin
-        : screen.right - margin - width;
+
+    double left = window.left;
+    if (left < screen.left + margin) {
+      left = screen.left + margin;
+    }
+    final double rightmost = screen.right - margin - width;
+    if (left > rightmost) {
+      left = rightmost;
+    }
 
     double top = window.top;
     if (top < screen.top + margin) {
@@ -37,7 +46,7 @@ final class EdgeSnap {
   }
 }
 
-/// Session-scoped memory for a floating panel's last snapped location.
+/// Session-scoped memory for a floating panel's last location.
 final class PanelPositionMemory {
   ScreenRect? _remembered;
 

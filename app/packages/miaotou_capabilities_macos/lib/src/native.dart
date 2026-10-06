@@ -43,8 +43,8 @@ abstract interface class MacosNative {
 
   /// Where the panel is, and how big the screen it is on is.
   ///
-  /// Needed before the panel can be placed from Dart: snapping a window to an
-  /// edge is arithmetic over a rectangle, and this is the only way to get one.
+  /// Needed before the panel can be placed from Dart: clamping a window to the
+  /// screen is arithmetic over a rectangle, and this is the only way to get one.
   Future<PanelGeometry> panelGeometry();
 
   /// Shows or re-places the panel. [at] wins over [placement] when it is given.
@@ -67,7 +67,7 @@ abstract interface class MacosNative {
   Future<void> setPanelFocusable(bool value);
 
   /// What the panel reports, richer than [PanelEvent] on purpose: the drag needs
-  /// the window's size to be snapped, and the contract's [PanelDragged] has no
+  /// the window's size to be clamped, and the contract's [PanelDragged] has no
   /// room for one.
   Stream<NativePanelEvent> get events;
 

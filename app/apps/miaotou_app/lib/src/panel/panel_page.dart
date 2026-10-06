@@ -195,6 +195,7 @@ class _PanelPageState extends State<PanelPage> {
           child: Card(
             margin: EdgeInsets.zero,
             shape: const CircleBorder(),
+            color: colors.accentMuted,
             child: IconButton(
               key: const Key('panel-ball'),
               onPressed: _toggleExpanded,

@@ -127,7 +127,7 @@ void main() {
     expect(native.injectedText, '好的，马上');
   });
 
-  test('a drag is snapped, remembered and put back where it belongs', () async {
+  test('a drag stays put and is remembered and reported', () async {
     native.panelUp = true;
     final Stream<PanelEvent> events = panel.events;
     final List<PanelEvent> seen = <PanelEvent>[];
@@ -143,11 +143,11 @@ void main() {
     await Future<void>.delayed(Duration.zero);
 
     expect(seen.single, isA<PanelDragged>());
-    expect((seen.single as PanelDragged).x, 1400, reason: '100 from the right edge');
+    expect((seen.single as PanelDragged).x, 1200, reason: 'the drop point is kept, not snapped to a wall');
     expect(
       native.log.last,
       'show:at',
-      reason: 'the snap has to be applied to the window, not merely reported',
+      reason: 'the clamped position is still applied back to the window',
     );
     await sub.cancel();
   });

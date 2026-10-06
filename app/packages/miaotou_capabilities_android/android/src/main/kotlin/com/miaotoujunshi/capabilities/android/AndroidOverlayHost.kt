@@ -373,7 +373,13 @@ internal class AndroidOverlayHost(
     }
 
     /**
-     * Snaps the window to the nearest edge and reports where it landed.
+     * Keeps the window where it was dropped, clamped to the screen, and reports
+     * where it landed.
+     *
+     * The panel used to snap to the nearest vertical edge on release, which the
+     * user rejected: a ball that jumps to a wall is not one they can place. The
+     * drag now ends where the finger left it, and only the clamp below keeps it
+     * from being dragged off-screen.
      *
      * The report is the whole of the persistence story now: the application
      * writes one `PanelPlacement` from this event and sends it back through
@@ -387,7 +393,6 @@ internal class AndroidOverlayHost(
         } else {
             "right"
         }
-        window.x = if (edge == "right") screenWidth - window.width else 0
         clamp(window)
         if (visible) {
             windowManager.updateViewLayout(container, window)

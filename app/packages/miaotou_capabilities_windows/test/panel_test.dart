@@ -7,7 +7,7 @@ import 'package:miaotou_capabilities_windows/testing.dart';
 
 void main() {
   test(
-    'an explicit free placement is restored inside the current screen',
+    'an explicit free placement is kept inside the current screen',
     () async {
       final FakeWindowsPanelNative native = FakeWindowsPanelNative();
       final WindowsFloatingPanel panel = WindowsFloatingPanel(native);
@@ -24,16 +24,17 @@ void main() {
 
       expect(
         native.shows.single.$2,
-        const ScreenRect(left: 1384, top: 100, right: 1440, bottom: 156),
+        const ScreenRect(left: 1350, top: 100, right: 1406, bottom: 156),
       );
     },
   );
 
-  test('a completed drag snaps and reports the landed point', () async {
+  test('a completed drag stays put and reports the dropped point', () async {
     final FakeWindowsPanelNative native = FakeWindowsPanelNative();
     final WindowsFloatingPanel panel = WindowsFloatingPanel(native);
     final Future<PanelEvent> event = panel.events.first;
 
+    // Dropped low and off the bottom: the clamp pulls it up, but the x is kept.
     native.drag(
       window: const ScreenRect(left: 1000, top: 920, right: 1056, bottom: 976),
       screen: const ScreenRect(left: 0, top: 0, right: 1440, bottom: 900),
@@ -42,12 +43,12 @@ void main() {
     expect(
       await event,
       isA<PanelDragged>()
-          .having((PanelDragged value) => value.x, 'x', 1384)
+          .having((PanelDragged value) => value.x, 'x', 1000)
           .having((PanelDragged value) => value.y, 'y', 844),
     );
     expect(
       native.shows.single.$2,
-      const ScreenRect(left: 1384, top: 844, right: 1440, bottom: 900),
+      const ScreenRect(left: 1000, top: 844, right: 1056, bottom: 900),
     );
   });
 
