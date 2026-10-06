@@ -392,7 +392,7 @@ final class AppCopy {
 
     CopyKey.panelLabelPair: '{app} · {title}',
     CopyKey.panelLabelTitleOnly: '{title}',
-    CopyKey.panelLabelUnrecognised: '未识别会话',
+    CopyKey.panelLabelUnrecognised: '未知应用',
     CopyKey.panelStatusNotAnalysed: '尚未分析',
     CopyKey.panelStatusViewing: '正在看',
     CopyKey.panelStatusBrowsing: '浏览中 · 只读',

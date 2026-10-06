@@ -1,6 +1,6 @@
 # Conversation identity is visible, and cross-conversation is read-only
 
-- Status: accepted
+- Status: superseded by [0026](./0026-fallback-to-the-package-name.md)
 - Date: 2026-10-02
 
 ## Context

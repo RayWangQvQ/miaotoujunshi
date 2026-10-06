@@ -21,10 +21,16 @@ class ConversationStateTest {
     }
 
     @Test
-    fun displayLabelNeverFallsBackToRawPackageName() {
+    fun displayLabelFallsBackToThePackageThenThePlaceholder() {
+        // No Context means PackageManager is unavailable, so the package name
+        // itself is the app label (ADR-0026). Only NONE drops to the placeholder.
+        assertEquals(
+            "com.example.private · ${ConversationRef.UNKNOWN_LABEL}",
+            ConversationRef("com.example.private", null).displayLabel(null),
+        )
         assertEquals(
             ConversationRef.UNKNOWN_LABEL,
-            ConversationRef("com.example.private", null).displayLabel(),
+            ConversationRef("", null).displayLabel(null),
         )
     }
 

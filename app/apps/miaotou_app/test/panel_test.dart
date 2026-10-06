@@ -17,11 +17,10 @@ import 'support/harness.dart';
 /// it loses when the user looks away (ADR-0002).
 ///
 /// The header rules are ADR-0002 decision 1 — a second line naming the analysed
-/// conversation, and **never a raw package name**. That last clause has no
-/// Android test to copy because Android enforces it by construction
-/// (`ChatApps.displayName` returning null), so it is enforced the same way here:
-/// [ConversationLabel] has no package field, and the assertions below check both
-/// halves — that the label is right, and that the package is nowhere on screen.
+/// conversation. ADR-0026 revised the fallback: an app with no resolved display
+/// name shows its package name rather than a placeholder, so a header is never
+/// empty while a window is in front. Only NONE (no window) drops to the
+/// placeholder 「未知应用」.
 void main() {
   const ConversationRef wechat = ConversationRef(
     packageName: 'com.tencent.mm',
@@ -100,7 +99,7 @@ void main() {
       expect(find.text('正在看'), findsOneWidget);
     });
 
-    testWidgets('and never shows the package it was told about', (
+    testWidgets('a resolved name is shown, not the package', (
       WidgetTester tester,
     ) async {
       await pumpPanel(
@@ -113,10 +112,9 @@ void main() {
         onScreen.where((String text) => text.contains('com.tencent.mm')),
         isEmpty,
         reason:
-            'ADR-0002 decision 1: a raw package name is never shown. The '
-            'frame does carry one — it has to, to tell two conversations apart '
-            '— which is exactly why the label is built before the header sees '
-            'anything: $onScreen',
+            'a package with a resolved name shows the name, not the package. '
+            'ADR-0026 falls back to the package only when no name was resolved: '
+            '$onScreen',
       );
     });
 
@@ -128,16 +126,9 @@ void main() {
         frame(analysed: stranger, live: stranger, advice: adviceWith('好')),
       );
 
-      // Android's own expectation: 「未识别会话」, not `com.example.unknown`.
-      expect(find.text('未识别会话'), findsOneWidget);
-      final List<String> onScreen = renderedTexts(tester);
-      expect(
-        onScreen.where((String text) => text.contains('com.example.unknown')),
-        isEmpty,
-        reason:
-            'the fallback for an unknown app is the neutral label, never '
-            'the package: $onScreen',
-      );
+      // ADR-0026: an app with no resolved name shows its package name, not a
+      // neutral placeholder. `com.example.unknown` is the label here.
+      expect(find.text('com.example.unknown · 未知应用'), findsOneWidget);
     });
 
     testWidgets('an unnamed thread is a state, not an error', (
@@ -151,7 +142,7 @@ void main() {
       );
 
       expect(tester.takeException(), isNull);
-      expect(find.text('微信 · 未识别会话'), findsOneWidget);
+      expect(find.text('微信 · 未知应用'), findsOneWidget);
       expect(
         find.byType(CandidateCard),
         findsOneWidget,

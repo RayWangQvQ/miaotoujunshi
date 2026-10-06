@@ -17,10 +17,10 @@ import 'review_block.dart';
 /// The conversation label as the header prints it, built out of copy.
 ///
 /// Four branches and not one interpolation, because the fallbacks are the rule:
-/// a thread whose title could not be read is named after the app and the
-/// placeholder, and a conversation we know nothing about is the placeholder
-/// alone. The domain decides *which* branch ([ConversationLabelKind]); only the
-/// words live in [AppCopy].
+/// a thread whose title could not be read is named after the app (its display
+/// name or, failing that, its package name — ADR-0026), and a conversation we
+/// know nothing about is the placeholder alone. The domain decides *which*
+/// branch ([ConversationLabelKind]); only the words live in [AppCopy].
 String panelLabelText(AppCopy copy, ConversationLabel label) {
   final String unrecognised = copy.text(CopyKey.panelLabelUnrecognised);
   return switch (label.kind) {

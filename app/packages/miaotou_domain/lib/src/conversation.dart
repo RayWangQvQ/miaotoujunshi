@@ -14,11 +14,11 @@ import 'advice.dart';
 ///
 /// Two decisions about where things live:
 ///
-/// * **The label carries no package name.** [ConversationLabel] has an
-///   `appName` and a `title` and nothing else, so the one thing ADR-0002
-///   forbids — printing `com.tencent.mm` where a person can read it — is not
-///   representable rather than merely discouraged. The package is resolved to a
-///   name *before* it reaches here, by whoever owns the platform.
+/// * **The label carries a resolved name, never a package.** [ConversationLabel]
+///   has an `appName` and a `title` and nothing else. The `appName` is resolved
+///   by whoever owns the platform — and, since ADR-0026, an app with no resolved
+///   display name falls back to its package name *as the name*, so the header is
+///   never empty while a window is in front.
 /// * **The derivation is a pure function of two refs and an advice.** ADR-0002
 ///   decision 2 puts the verdict on the side that knows which conversation the
 ///   user is looking at, and forbids the renderer from going and looking for
@@ -33,9 +33,9 @@ import 'advice.dart';
 ///
 /// Four cases and not a nullable string, because the fallbacks are the rule:
 /// Android's `ConversationRef.displayLabel()` goes `app · title` → `title` →
-/// `app · 未识别会话` → `未识别会话`, and the last one is the one that must
-/// never become a package name. The port keeps that order; only the words live
-/// in the application's copy file.
+/// `app · 未知应用` → `未知应用`, and the app half itself resolves display name
+/// → package name (ADR-0026). The port keeps that order; only the words live in
+/// the application's copy file.
 enum ConversationLabelKind {
   /// Both halves are known: `微信 · 张三`.
   appAndTitle,
@@ -43,10 +43,13 @@ enum ConversationLabelKind {
   /// The thread is known but this build has no name for the app behind it.
   titleOnly,
 
-  /// The app is known but the thread title could not be read.
+  /// The app is known but the thread title could not be read. [appName] here is
+  /// whatever names the app: the resolved display name, or the bare package
+  /// name when no display name was resolved (ADR-0026).
   appOnly,
 
-  /// Neither half is known.
+  /// Nothing at all is known — no chat window in front of the user ([NONE]).
+  /// This is the only case left after the package-name fallback.
   unrecognised,
 }
 
@@ -77,9 +80,15 @@ final class ConversationLabel {
     ConversationRef reference, {
     String? appName,
   }) {
-    final String? app = (appName == null || appName.trim().isEmpty) ? null : appName;
     final String? thread = reference.title?.trim();
     final String? name = (thread == null || thread.isEmpty) ? null : thread;
+
+    // The app half is whatever names the package to the user: the resolved
+    // display name when the platform has one, the bare package name when it
+    // does not (ADR-0026), or null when even the package is unknown (NONE).
+    final String? resolvedApp = (appName == null || appName.trim().isEmpty) ? null : appName;
+    final String package = reference.packageName.trim();
+    final String? app = resolvedApp ?? (package.isEmpty ? null : package);
 
     if (app != null && name != null) {
       return ConversationLabel._(kind: ConversationLabelKind.appAndTitle, appName: app, title: name);

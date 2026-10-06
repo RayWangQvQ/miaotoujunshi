@@ -103,7 +103,7 @@ class RetainedCaptureService : AccessibilityService() {
             "kind" to "conversation",
             "current" to currentConversation.toWire(),
             "bound" to boundConversation?.toWire(),
-            "displayLabel" to shown.displayLabel(),
+            "displayLabel" to shown.displayLabel(this),
             "readOnly" to (boundConversation != null && boundConversation != currentConversation),
         )
         if (force || event != lastConversationEvent) {

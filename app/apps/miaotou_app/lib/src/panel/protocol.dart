@@ -77,9 +77,9 @@ final class PanelFrame {
 
   /// Package name to display name, resolved by the side that owns the platform.
   ///
-  /// A package left out of this map has no known name, which is a real answer
-  /// and drives the 「未识别会话」 fallbacks. It is never a reason to print the
-  /// package.
+  /// A package left out of this map has no *resolved* name, which is a real
+  /// answer and drives the package-name fallback (ADR-0026). It is never a
+  /// reason to print a placeholder.
   final Map<String, String> appNames;
 
   /// True while the panel is asking the user to read the batch and confirm it

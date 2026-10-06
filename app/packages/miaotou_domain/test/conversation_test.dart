@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 import 'package:miaotou_domain/miaotou_domain.dart';
 import 'package:test/test.dart';
@@ -10,11 +8,9 @@ import 'package:test/test.dart';
 /// `ConversationRefTest.kt` and `ChatModels.displayLabel()`, so a unification
 /// that drops one of them goes red here rather than on a device.
 ///
-/// The one rule that has no Android test to copy is the one ADR-0002 states but
-/// cannot test: **a header must never print a package name.** It is enforced by
-/// [ConversationLabel] having no package field, and the test for it is the
-/// `appName == null` case — falling back to the package is the only tempting
-/// way to "improve" that fallback, and it fails the moment it is written.
+/// ADR-0026 revised the fallback: an app with no resolved display name now
+/// shows its package name rather than a placeholder, so a header is never empty
+/// while a window is in front. Only NONE (no window) drops to the placeholder.
 void main() {
   const ConversationRef qq = ConversationRef(packageName: 'com.tencent.mobileqq');
   const ConversationRef wechat = ConversationRef(packageName: 'com.tencent.mm');
@@ -55,10 +51,22 @@ void main() {
       expect(label.isIdentified, isTrue);
     });
 
-    test('the thread is named but this build has no name for the app', () {
-      // Android: `app == null && thread != null -> thread`.
+    test('the thread is named and the app falls back to its package', () {
+      // ADR-0026: an app with no resolved name is still named by its package, so
+      // a named thread shows `app · title` with the package as the app half.
       final ConversationLabel label = ConversationLabel.of(
         const ConversationRef(packageName: 'com.example.unknown', title: '张三'),
+      );
+      expect(label.kind, ConversationLabelKind.appAndTitle);
+      expect(label.appName, 'com.example.unknown');
+      expect(label.title, '张三');
+    });
+
+    test('a title with no package at all is title-only', () {
+      // The one case titleOnly survives: a title was read but even the package
+      // is unknown (NONE carries no title, so this is a synthetic edge).
+      final ConversationLabel label = ConversationLabel.of(
+        const ConversationRef(packageName: '', title: '张三'),
       );
       expect(label.kind, ConversationLabelKind.titleOnly);
       expect(label.appName, isNull);
@@ -66,7 +74,7 @@ void main() {
     });
 
     test('the app is named but the title could not be read', () {
-      // Android's own case: `QQ · 未识别会话`.
+      // Android's own case: `QQ · 未知应用`.
       final ConversationLabel label = ConversationLabel.of(qq, appName: appName(qq));
       expect(label.kind, ConversationLabelKind.appOnly);
       expect(label.appName, 'QQ');
@@ -86,32 +94,25 @@ void main() {
       expect(label.title, isNull);
     });
 
-    test('neither half known, and the package is not the fallback', () {
-      // Android: `ConversationRef("com.example.unknown", null)` is 「未识别会话」,
-      // not `com.example.unknown`. This assertion is the whole of ADR-0002's
-      // "a raw package name is never shown": the tempting repair is
-      // `appName ?? reference.packageName`, and it fails here.
+    test('neither half known falls back to the package, then the placeholder', () {
+      // ADR-0026: an app with no resolved name still shows its package name, so
+      // the header is never empty while a window is in front. Only when even the
+      // package is unknown (NONE) does it drop to the placeholder.
       final ConversationLabel label = ConversationLabel.of(stranger);
-      expect(label.kind, ConversationLabelKind.unrecognised);
-      expect(label.appName, isNull,
-          reason: 'an unknown package has no name; falling back to the package '
-              'is what ADR-0002 forbids');
+      expect(label.kind, ConversationLabelKind.appOnly);
+      expect(label.appName, 'com.example.unknown',
+          reason: 'with no resolved name, the package name names the app');
       expect(label.title, isNull);
     });
 
-    test('the label type has no package to print', () {
-      // The strongest form of the rule: it is not a convention that a header
-      // avoids the package, it is that the type handed to a header does not
-      // carry one. Scanned rather than asserted on an instance, because an
-      // instance cannot prove a field is absent.
-      final String source = _sourceOf('conversation.dart');
-      expect(
-        RegExp(r'\.packageName').allMatches(_stripComments(source)),
-        isEmpty,
-        reason: 'conversation.dart must never read packageName: the package is '
-            'resolved to a display name before it gets here, and reading it '
-            'back is how a raw package reaches a header',
-      );
+    test('nothing at all known is the placeholder', () {
+      // Android: `ConversationRef("", null)` (NONE) is 「未知应用」 — the one case
+      // left after the package fallback.
+      final ConversationLabel label =
+          ConversationLabel.of(const ConversationRef(packageName: ''));
+      expect(label.kind, ConversationLabelKind.unrecognised);
+      expect(label.appName, isNull);
+      expect(label.title, isNull);
     });
   });
 
@@ -287,18 +288,3 @@ void main() {
     });
   });
 }
-
-String _sourceOf(String fileName) {
-  Directory directory = Directory.current;
-  while (true) {
-    final File candidate = File('${directory.path}/lib/src/$fileName');
-    if (candidate.existsSync()) {
-      return candidate.readAsStringSync();
-    }
-    directory = directory.parent;
-  }
-}
-
-String _stripComments(String source) => source
-    .replaceAll(RegExp(r'//[^\n]*'), '')
-    .replaceAll(RegExp(r'/\*[\s\S]*?\*/'), '');

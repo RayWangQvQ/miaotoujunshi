@@ -1,5 +1,6 @@
 package com.jev.probe.core
 
+import android.content.Context
 import android.graphics.Rect
 
 /** One captured chat bubble. side is "me" (right) or "other" (left). */
@@ -57,15 +58,18 @@ data class ConversationRef(val pkg: String, val title: String?) {
      * Short label for the overlay header, e.g. `QQ · 张三`.
      *
      * Falls back through "we know the app but not the thread" to "we know
-     * neither" without ever printing a raw package name.
+     * neither" without ever printing a raw package name *when a name is
+     * resolvable*. The app half resolves through [ChatApps.displayName], which
+     * ends at the bare package name only when the system has no label either
+     * (ADR-0026).
      */
-    fun displayLabel(): String {
-        val app = ChatApps.displayName(pkg)
+    fun displayLabel(context: Context?): String {
+        val app = ChatApps.displayName(pkg, context)
         val thread = title?.takeIf { it.isNotBlank() }
         return when {
             app != null && thread != null -> "$app · $thread"
             thread != null -> thread
-            app != null -> "$app · 未识别会话"
+            app != null -> "$app · $UNKNOWN_LABEL"
             else -> UNKNOWN_LABEL
         }
     }
@@ -74,7 +78,7 @@ data class ConversationRef(val pkg: String, val title: String?) {
         /** No chat window is in front of the user. */
         val NONE = ConversationRef("", null)
 
-        const val UNKNOWN_LABEL = "未识别会话"
+        const val UNKNOWN_LABEL = "未知应用"
     }
 }
 

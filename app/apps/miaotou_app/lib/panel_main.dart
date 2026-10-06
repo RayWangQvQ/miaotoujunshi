@@ -27,9 +27,10 @@ void main() {
 
 /// The panel window's application.
 ///
-/// The frame it starts with is [ConversationRef.none] on purpose. The panel must
-/// never print a package name (ADR-0002), so the first thing worth seeing on
-/// screen is the 「未识别会话」 fallback rather than a plausible-looking name.
+/// The frame it starts with is [ConversationRef.none] on purpose. The panel
+/// resolves a package to a display name — or, failing that, shows the package
+/// name itself (ADR-0026) — so the first thing worth seeing on screen is the
+/// 「未知应用」 placeholder rather than a plausible-looking name.
 class PanelApp extends StatefulWidget {
   const PanelApp({
     super.key,
