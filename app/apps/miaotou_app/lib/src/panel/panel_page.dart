@@ -12,6 +12,7 @@ import '../widgets/candidate_card.dart';
 import '../widgets/empty_state.dart';
 import '../widgets/status_badge.dart';
 import 'protocol.dart';
+import 'review_block.dart';
 
 /// The conversation label as the header prints it, built out of copy.
 ///
@@ -77,7 +78,6 @@ class PanelPage extends StatefulWidget {
     this.onExpandedChanged,
     this.onDragStart,
     this.onInputFocusChanged,
-    this.onReviewChanged,
     this.initialExpanded = true,
   });
 
@@ -89,13 +89,6 @@ class PanelPage extends StatefulWidget {
   final ValueChanged<bool>? onExpandedChanged;
   final VoidCallback? onDragStart;
   final Future<void> Function(bool focusable)? onInputFocusChanged;
-
-  /// Asks the host for a taller window while the review is up.
-  ///
-  /// The panel does not resize itself and cannot: the window belongs to the
-  /// host, and on Android it is the host's own overlay. The review is a form,
-  /// and on a 380 dp window with no `adjustResize` the keyboard covers it.
-  final Future<void> Function(bool reviewing)? onReviewChanged;
   final bool initialExpanded;
 
   @override
@@ -108,41 +101,52 @@ class _PanelPageState extends State<PanelPage> {
 
   /// Transient: where the user dragged the panel to.
   Offset _landing = Offset.zero;
-  List<TextEditingController> _drafts = <TextEditingController>[];
-  List<FocusNode> _draftFocus = <FocusNode>[];
 
   /// Transient: the batch as the user is editing it, and nothing else.
   ///
   /// The review is a surface over a batch the main engine owns, so what lives
   /// here is only the edit in progress. Confirming sends it up; leaving the
-  /// state throws it away. [_reviewSource] is the batch these rows were built
-  /// from, which is how a republish of the same batch is told from a new one.
-  List<_ReviewRow> _review = <_ReviewRow>[];
+  /// state throws it away. The whole batch is one editable block (ADR-0025),
+  /// so the edit is a single controller; [_reviewSource] is the batch the block
+  /// was built from, which is how a republish of the same batch is told from a
+  /// new one.
+  final TextEditingController _reviewController = TextEditingController();
+  final FocusNode _reviewFocus = FocusNode();
   List<PanelLine> _reviewSource = const <PanelLine>[];
 
   @override
   void initState() {
     super.initState();
     _expanded = widget.initialExpanded;
-    _replaceDrafts();
-    _replaceReview();
-    // A panel engine that starts while a review is already up — the window was
-    // recreated — still has to ask for the taller window, and no frame change
-    // will come to tell it.
-    if (widget.frame.reviewing) {
-      _requestReviewSize(true);
+    // Only the source is recorded here: turning it into the block needs the
+    // copy, and an inherited widget cannot be read from `initState`. The block
+    // itself is written once the dependencies exist ([didChangeDependencies]).
+    _reviewSource = widget.frame.transcript;
+    // The speaker buttons gate on the block having a caret, and focus does not
+    // rebuild on its own, so a change to it has to ask for one.
+    _reviewFocus.addListener(() => setState(() {}));
+  }
+
+  bool _reviewLoaded = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // The first build of the block needs the copy, which is why it waits for
+    // this rather than `initState`. A republish that changed the batch still
+    // goes through [_replaceReview] below.
+    if (!_reviewLoaded) {
+      _reviewLoaded = true;
+      _reviewController.text = ReviewBlock.fromLines(
+        _reviewSource,
+        CopyScope.of(context),
+      );
     }
   }
 
   @override
   void didUpdateWidget(PanelPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!_sameDrafts(oldWidget.frame.advice, widget.frame.advice)) {
-      _replaceDrafts();
-    }
-    if (widget.frame.reviewing != oldWidget.frame.reviewing) {
-      _requestReviewSize(widget.frame.reviewing);
-    }
     // Entering the state, or being handed a different batch while in it. Both
     // are the same question — "are these rows still the batch on the panel?" —
     // and a frame that only repeated what is already loaded must not wipe an
@@ -156,15 +160,8 @@ class _PanelPageState extends State<PanelPage> {
 
   @override
   void dispose() {
-    for (final TextEditingController controller in _drafts) {
-      controller.dispose();
-    }
-    for (final FocusNode node in _draftFocus) {
-      node.dispose();
-    }
-    for (final _ReviewRow row in _review) {
-      row.dispose();
-    }
+    _reviewController.dispose();
+    _reviewFocus.dispose();
     super.dispose();
   }
 
@@ -172,7 +169,12 @@ class _PanelPageState extends State<PanelPage> {
   Widget build(BuildContext context) {
     final AppCopy copy = CopyScope.of(context);
     final AppColors colors = AppColors.of(context);
-    final ThemeData theme = Theme.of(context);
+    // The panel is a 300dp overlay, not a page, so its type is clamped a step
+    // down: no text on it may read larger than a body line. The clamp is applied
+    // *here*, on the panel's own theme, so the shared candidate card and labeled
+    // block — which read the theme off the context rather than a parameter — are
+    // the only copies that shrink, and the main window's pages keep their scale.
+    final ThemeData theme = _panelTheme(Theme.of(context));
     final PanelView view = derivePanel(
       analysed: widget.frame.analysed,
       live: widget.frame.live,
@@ -237,7 +239,7 @@ class _PanelPageState extends State<PanelPage> {
         else
           for (int i = 0; i < advice.candidates.length; i++)
             Padding(
-              padding: AppSpacing.card,
+              padding: AppSpacing.panel,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
@@ -245,30 +247,16 @@ class _PanelPageState extends State<PanelPage> {
                     candidate: advice.candidates[i],
                     rank: i + 1,
                     rankingStatus: advice.rankingStatus,
+                    dense: true,
                     onCopy: view.allows(PanelAction.copy)
                         ? () => widget.onCommand(
                             PanelCommand(
                               PanelCommandKind.copy,
                               candidateIndex: i,
-                              text: _drafts[i].text,
+                              text: advice.candidates[i].text,
                             ),
                           )
                         : null,
-                  ),
-                  Listener(
-                    onPointerDown: (_) async {
-                      await _takeInputFocus();
-                      _draftFocus[i].requestFocus();
-                    },
-                    child: TextField(
-                      key: ValueKey<String>('panel-draft-$i'),
-                      controller: _drafts[i],
-                      focusNode: _draftFocus[i],
-                      decoration: InputDecoration(
-                        labelText: copy.text(CopyKey.panelDraftLabel),
-                      ),
-                      onTapOutside: (_) => _releaseInputFocus(),
-                    ),
                   ),
                   if (view.allows(PanelAction.fill))
                     Padding(
@@ -278,7 +266,7 @@ class _PanelPageState extends State<PanelPage> {
                           PanelCommand(
                             PanelCommandKind.fill,
                             candidateIndex: i,
-                            text: _drafts[i].text,
+                            text: advice.candidates[i].text,
                           ),
                         ),
                         child: Text(copy.text(CopyKey.panelActionFill)),
@@ -291,31 +279,58 @@ class _PanelPageState extends State<PanelPage> {
       ],
     );
 
-    return Transform.translate(
-      // Keyed so a test can read the offset the user dragged to.
-      key: const Key('panel-landing'),
-      offset: _landing,
-      child: Card(
-        margin: EdgeInsets.zero,
-        child: LayoutBuilder(
-          builder: (BuildContext context, BoxConstraints constraints) => Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              ...fixed,
-              if (_expanded)
-                if (constraints.hasBoundedHeight)
-                  Expanded(
-                    child: SingleChildScrollView(
-                      key: const Key('panel-scroll'),
-                      child: body,
-                    ),
-                  )
-                else
-                  body,
-            ],
+    return Theme(
+      // The clamped type has to reach the shared widgets — the candidate card
+      // and the labeled block read `Theme.of(context)`, not a parameter — so the
+      // panel's own theme is pushed down the tree, not just handed to its own
+      // helpers.
+      data: theme,
+      child: Transform.translate(
+        // Keyed so a test can read the offset the user dragged to.
+        key: const Key('panel-landing'),
+        offset: _landing,
+        child: Card(
+          margin: EdgeInsets.zero,
+          child: LayoutBuilder(
+            builder: (BuildContext context, BoxConstraints constraints) =>
+                Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                ...fixed,
+                if (_expanded)
+                  if (constraints.hasBoundedHeight)
+                    Expanded(
+                      child: SingleChildScrollView(
+                        key: const Key('panel-scroll'),
+                        child: body,
+                      ),
+                    )
+                  else
+                    body,
+              ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+
+  /// A copy of [base] with the body type clamped down a step.
+  ///
+  /// A 300dp overlay is not a page, and no text on it should read larger than a
+  /// body line: `bodyLarge` is the one role that breaks that cap by default, and
+  /// the candidate card's draft reads it. `bodyMedium` follows it down so the
+  /// reason and tradeoff under a draft stay a step below the draft rather than
+  /// the same size. `bodySmall` is already the floor and is left alone — the
+  /// review block, the note and the header's conversation line all read it and
+  /// have nowhere lower to go.
+  ThemeData _panelTheme(ThemeData base) {
+    final TextTheme text = base.textTheme;
+    return base.copyWith(
+      textTheme: text.copyWith(
+        bodyLarge: text.bodyMedium,
+        bodyMedium: text.bodySmall,
       ),
     );
   }
@@ -339,7 +354,7 @@ class _PanelPageState extends State<PanelPage> {
         : (DragUpdateDetails details) =>
               setState(() => _landing += details.delta),
     child: Padding(
-      padding: AppSpacing.card,
+      padding: AppSpacing.panel,
       child: Row(
         children: <Widget>[
           Expanded(
@@ -407,7 +422,7 @@ class _PanelPageState extends State<PanelPage> {
     final PanelNote note = widget.frame.note!;
     final PanelRemedy? remedy = note.remedy;
     return Padding(
-      padding: AppSpacing.card,
+      padding: AppSpacing.panel,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -458,9 +473,9 @@ class _PanelPageState extends State<PanelPage> {
   /// it is the same one.
   Widget _bottomRow(AppCopy copy, PanelView view) {
     if (widget.frame.reviewing) {
-      final bool empty = _reviewIsEmpty;
+      final bool empty = _reviewIsEmpty(copy);
       return Padding(
-        padding: AppSpacing.card,
+        padding: AppSpacing.panel,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: <Widget>[
@@ -476,12 +491,14 @@ class _PanelPageState extends State<PanelPage> {
                 onPressed: () => widget.onCommand(
                   const PanelCommand(PanelCommandKind.cancelReview),
                 ),
+                style: _compactButtonStyle(),
                 child: Text(copy.text(CopyKey.panelActionCancelReview)),
               ),
               _recogniseButton(copy),
               FilledButton(
                 key: const Key('panel-review-confirm'),
-                onPressed: empty ? null : _confirmReview,
+                onPressed: empty ? null : () => _confirmReview(copy),
+                style: _compactButtonStyle(),
                 child: Text(copy.text(CopyKey.panelActionConfirmReview)),
               ),
             ]),
@@ -490,13 +507,14 @@ class _PanelPageState extends State<PanelPage> {
       );
     }
     return Padding(
-      padding: AppSpacing.card,
+      padding: AppSpacing.panel,
       child: _buttonWrap(<Widget>[
         if (view.allows(PanelAction.details))
           OutlinedButton(
             onPressed: () => widget.onCommand(
               const PanelCommand(PanelCommandKind.details),
             ),
+            style: _compactButtonStyle(),
             child: Text(copy.text(CopyKey.panelActionDetails)),
           ),
         // The way back into the review once the batch has been confirmed
@@ -508,6 +526,7 @@ class _PanelPageState extends State<PanelPage> {
             onPressed: () => widget.onCommand(
               const PanelCommand(PanelCommandKind.openReview),
             ),
+            style: _compactButtonStyle(),
             child: Text(copy.text(CopyKey.panelActionReview)),
           ),
         _recogniseButton(copy),
@@ -519,6 +538,7 @@ class _PanelPageState extends State<PanelPage> {
                   : PanelCommandKind.reanalyse,
             ),
           ),
+          style: _compactButtonStyle(),
           child: Text(
             copy.text(
               view.readOnly
@@ -535,7 +555,22 @@ class _PanelPageState extends State<PanelPage> {
     key: const Key('panel-recognise-once'),
     onPressed: () =>
         widget.onCommand(const PanelCommand(PanelCommandKind.recogniseOnce)),
+    style: _compactButtonStyle(),
     child: Text(copy.text(CopyKey.panelActionRecognise)),
+  );
+
+  /// The shared style for the panel's bottom-row buttons.
+  ///
+  /// The panel is a 300dp overlay, and its buttons are the one thing that can
+  /// quietly grow taller than the surface that holds them: Material's default
+  /// button is sized for a phone in hand, not a window the size of a note. A
+  /// compact density and the label's own size keep the row on one line.
+  ButtonStyle _compactButtonStyle() => OutlinedButton.styleFrom(
+    visualDensity: VisualDensity.compact,
+    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.m),
+    minimumSize: const Size(0, 36),
+    textStyle: Theme.of(context).textTheme.labelSmall,
   );
 
   /// A Wrap rather than a Row with a Spacer: three buttons in a 300dp panel do
@@ -548,162 +583,283 @@ class _PanelPageState extends State<PanelPage> {
     children: children,
   );
 
-  /// The batch, editable, in place of everything the panel would otherwise say.
+  /// The batch, editable as one block of text, in place of everything the panel
+  /// would otherwise say (ADR-0025).
   ///
-  /// Two rows per line rather than one, which is a trade the 300dp panel forces:
-  /// the text is what the user actually reads and corrects, so it gets the full
-  /// width, and the three-state speaker and the two line operations sit above
-  /// it. One row would have left a text field about a hundred points wide.
+  /// The speaker is a prefix on each line rather than a control beside it: one
+  /// block costs the panel a line a piece instead of two rows, and a missing
+  /// line is a carriage return rather than a button that never existed. The
+  /// shortcut row above the block does two jobs: the two speaker buttons rewrite
+  /// the prefix of the caret's line (or every line the selection touches), and
+  /// 删行 deletes the caret's whole physical line. They are disabled until the
+  /// block has been focused, because before that there is no line to act on and
+  /// guessing "the last one" would be an intention the user did not state.
   Widget _reviewForm(AppCopy copy, AppColors colors, ThemeData theme) => Padding(
-    padding: AppSpacing.card,
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        Text(
-          copy.text(CopyKey.panelReviewTitle),
-          style: theme.textTheme.labelSmall?.copyWith(color: colors.textMuted),
-        ),
-        AppSpacing.gapXs,
-        Text(
-          copy.text(CopyKey.panelReviewHint),
-          style: theme.textTheme.bodySmall?.copyWith(color: colors.textMuted),
-        ),
-        for (int index = 0; index < _review.length; index++)
-          _reviewRow(copy, index),
-      ],
-    ),
-  );
-
-  Widget _reviewRow(AppCopy copy, int index) {
-    final _ReviewRow row = _review[index];
-    return Padding(
-      padding: const EdgeInsets.only(top: AppSpacing.s),
+    padding: AppSpacing.panel,
+    // The whole form — title, shortcut buttons and the block — sits inside one
+    // `TextFieldTapRegion` so that tapping a shortcut is *not* a tap outside
+    // the field. The shortcut buttons act on the caret, and a tap that first
+    // dismissed the caret would leave them nothing to act on: the field's own
+    // `onTapOutside` unfocuses it, which flips `_reviewFocus.hasFocus` to false
+    // and the buttons disable themselves in the very frame the tap lands. One
+    // region keeps the buttons and the block in the same `EditableText` group,
+    // so the buttons read the caret instead of killing it.
+    child: TextFieldTapRegion(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
+          // The title and the shortcut buttons share one row, because the
+          // block is what the user reads and the header is what the 300dp panel
+          // can least afford to give two lines (ADR-0025 amendment: the hint and
+          // the fixed example line are gone — the block's own `我：`/`对方：`
+          // prefixes teach the rule by being in front of the user's eyes).
           Row(
             children: <Widget>[
               Expanded(
-                child: SegmentedButton<Speaker>(
-                  key: ValueKey<String>('panel-review-speaker-$index'),
-                  segments: <ButtonSegment<Speaker>>[
-                    ButtonSegment<Speaker>(
-                      value: Speaker.me,
-                      label: Text(copy.text(CopyKey.panelSpeakerMe)),
-                    ),
-                    ButtonSegment<Speaker>(
-                      value: Speaker.other,
-                      label: Text(copy.text(CopyKey.panelSpeakerOther)),
-                    ),
-                    // The third state is the whole reason this is not a toggle:
-                    // ADR-0015 makes admitting there is no author better than
-                    // inventing one, and the review is where the user gets to
-                    // say so.
-                    ButtonSegment<Speaker>(
-                      value: Speaker.unknown,
-                      label: Text(copy.text(CopyKey.panelSpeakerUnknown)),
-                    ),
-                  ],
-                  selected: <Speaker>{row.speaker},
-                  showSelectedIcon: false,
-                  onSelectionChanged: (Set<Speaker> value) =>
-                      setState(() => row.speaker = value.first),
-                  style: const ButtonStyle(
-                    visualDensity: VisualDensity.compact,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                child: Text(
+                  copy.text(CopyKey.panelReviewTitle),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colors.textMuted,
                   ),
                 ),
               ),
-              _lineAction(
-                key: ValueKey<String>('panel-review-merge-$index'),
-                tooltip: copy.text(CopyKey.panelActionMergeUp),
-                icon: Icons.vertical_align_top,
-                // Nothing above the first line to fold it into.
-                onPressed: index == 0 ? null : () => _mergeUp(index),
-              ),
-              _lineAction(
-                key: ValueKey<String>('panel-review-delete-$index'),
-                tooltip: copy.text(CopyKey.panelActionDeleteLine),
-                icon: Icons.close,
-                onPressed: () => _deleteLine(index),
-              ),
+              _reviewSpeakerButtons(copy, theme),
             ],
           ),
+          AppSpacing.gapXs,
+          // The block grows with its content and the panel body scrolls it; there
+          // is no `Expanded` here because the body already sits inside a
+          // `SingleChildScrollView` whose height is unbounded.
           Listener(
             onPointerDown: (_) async {
               await _takeInputFocus();
-              row.focus.requestFocus();
+              _reviewFocus.requestFocus();
             },
             child: TextField(
-              key: ValueKey<String>('panel-review-text-$index'),
-              controller: row.controller,
-              focusNode: row.focus,
-              minLines: 1,
-              maxLines: 3,
-              // The confirm button is disabled on a batch with nothing left in
+              key: const Key('panel-review-block'),
+              controller: _reviewController,
+              focusNode: _reviewFocus,
+              minLines: 6,
+              maxLines: null,
+              textAlignVertical: TextAlignVertical.top,
+              // The block is the densest surface on the panel, so it reads at a
+              // size below the body default: a ten-line capture in a 300dp window
+              // is what it has to fit, and every point the text gives up is a line
+              // the user does not scroll to find.
+              style: theme.textTheme.bodySmall,
+              // The confirm button is disabled on a block with nothing left in
               // it, so it has to know when the last text goes away.
               onChanged: (_) => setState(() {}),
               onTapOutside: (_) => _releaseInputFocus(),
-              decoration: const InputDecoration(isDense: true),
+              decoration: const InputDecoration(
+                isDense: true,
+                alignLabelWithHint: true,
+                border: OutlineInputBorder(),
+              ),
             ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _lineAction({
-    required Key key,
-    required String tooltip,
-    required IconData icon,
-    required VoidCallback? onPressed,
-  }) => IconButton(
-    key: key,
-    tooltip: tooltip,
-    iconSize: 18,
-    visualDensity: VisualDensity.compact,
-    padding: EdgeInsets.zero,
-    constraints: const BoxConstraints.tightFor(width: 32, height: 32),
-    onPressed: onPressed,
-    icon: Icon(icon),
+    ),
   );
 
-  /// Whether every line has been emptied out, which is the one thing the user
-  /// can do here that leaves nothing to analyse.
-  bool get _reviewIsEmpty =>
-      _review.every((_ReviewRow row) => row.controller.text.trim().isEmpty);
+  /// The shortcut row: the two speaker buttons and 删行.
+  ///
+  /// 未定 is not a button. ADR-0015 makes it a first-class speaker — a line
+  /// nobody has claimed is the honest answer — but the way to *produce* one is
+  /// to type the prefix or inherit it, not to tap a third button: a shortcut
+  /// whose whole job is "say there is no author" earns its place less than one
+  /// that deletes a line the recogniser read wrong. The prefix is still written
+  /// out by serialisation, so the state stays reachable without the button.
+  Widget _reviewSpeakerButtons(AppCopy copy, ThemeData theme) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: <Widget>[
+      for (final Speaker speaker in const <Speaker>[Speaker.me, Speaker.other])
+        Padding(
+          padding: const EdgeInsets.only(left: AppSpacing.xs),
+          child: _speakerButton(copy, speaker, theme),
+        ),
+      Padding(
+        padding: const EdgeInsets.only(left: AppSpacing.xs),
+        child: _deleteLineButton(copy, theme),
+      ),
+    ],
+  );
 
-  void _mergeUp(int index) {
-    if (index <= 0 || index >= _review.length) {
-      return;
+  Widget _speakerButton(AppCopy copy, Speaker speaker, ThemeData theme) =>
+      // A shortcut that takes focus would be a shortcut that disables itself:
+      // the buttons read `_reviewFocus.hasFocus`, and a focused button steals
+      // that focus from the block in the same gesture that taps it. `Focus` with
+      // `canRequestFocus: false` keeps the tap but refuses the focus, so the
+      // caret stays in the block and the button stays enabled.
+      Focus(
+        canRequestFocus: false,
+        child: OutlinedButton(
+          key: ValueKey<String>('panel-review-set-${speaker.name}'),
+          // No caret, no line to act on: the buttons stay disabled until the block
+          // has been focused once.
+          onPressed: _reviewFocus.hasFocus
+              ? () => _setSpeaker(speaker, copy)
+              : null,
+          style: OutlinedButton.styleFrom(
+            visualDensity: VisualDensity.compact,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            // Sharing the row with the title (ADR-0025 amendment) means the
+            // buttons are the smallest they can be and still read: no inner
+            // padding beyond the label, at the label's own size rather than the
+            // button default.
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s),
+            minimumSize: Size.zero,
+            textStyle: theme.textTheme.labelSmall,
+          ),
+          child: Text(_speakerLabel(copy, speaker)),
+        ),
+      );
+
+  /// 删行: deletes the caret's whole physical line, newline and all.
+  ///
+  /// It is a text edit, not a command to the engine — the block is the source
+  /// of truth while the review is up, and deleting a line is deleting text. It
+  /// is styled apart from the speaker buttons on purpose: it is the one
+  /// destructive action in the row, and red is how the panel says "this is not
+  /// reversible".
+  Widget _deleteLineButton(AppCopy copy, ThemeData theme) => Focus(
+    canRequestFocus: false,
+    child: OutlinedButton(
+      key: const Key('panel-review-delete-line'),
+      onPressed:
+          _reviewFocus.hasFocus && _reviewController.text.trim().isNotEmpty
+          ? () => _deleteLine()
+          : null,
+      style: OutlinedButton.styleFrom(
+        visualDensity: VisualDensity.compact,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s),
+        minimumSize: Size.zero,
+        textStyle: theme.textTheme.labelSmall,
+        foregroundColor: theme.colorScheme.error,
+      ),
+      child: Text(copy.text(CopyKey.panelActionDeleteLine)),
+    ),
+  );
+
+  /// Deletes the physical line the caret is on.
+  ///
+  /// "Physical" is deliberate: a chat message that wrapped is several physical
+  /// lines, and the user asked to delete the line they can see, not the message
+  /// the model will later read. A non-last line goes with its trailing newline,
+  /// a last line with its preceding newline, so the two neighbours meet rather
+  /// than leaving a blank line behind. The caret falls back to the start of the
+  /// deleted span, so tapping 删行 again removes the next line.
+  void _deleteLine() {
+    final TextEditingValue value = _reviewController.value;
+    final String text = value.text;
+    final TextSelection selection = value.selection;
+    final int caret = selection.start < 0 ? 0 : selection.start;
+    final int lineStart = text.lastIndexOf('\n', caret - 1) + 1;
+    final int lineEnd = text.indexOf('\n', caret); // -1 when the caret is on the last line
+
+    final int delStart;
+    final int delEnd;
+    if (lineEnd != -1) {
+      // Not the last line: the line plus its trailing newline.
+      delStart = lineStart;
+      delEnd = lineEnd + 1;
+    } else if (lineStart > 0) {
+      // The last line: its preceding newline plus the line.
+      delStart = lineStart - 1;
+      delEnd = text.length;
+    } else {
+      // The only line there is.
+      delStart = 0;
+      delEnd = text.length;
     }
+
     setState(() {
-      final _ReviewRow previous = _review[index - 1];
-      final _ReviewRow current = _review.removeAt(index);
-      // The rule `_Group.text` already uses for one wrapped bubble, and the
-      // upper line keeps the speaker: a split that was not a split is one
-      // message, and the user is folding the two halves of it back together.
-      previous.controller.text =
-          '${previous.controller.text.trim()} ${current.controller.text.trim()}'
-              .trim();
-      current.dispose();
+      _reviewController.value = TextEditingValue(
+        text: text.replaceRange(delStart, delEnd, ''),
+        selection: TextSelection.collapsed(offset: delStart),
+      );
     });
   }
 
-  void _deleteLine(int index) {
+  /// Rewrites the prefix of the caret's line — or of every line the selection
+  /// covers — to [speaker].
+  void _setSpeaker(Speaker speaker, AppCopy copy) {
+    final TextEditingValue value = _reviewController.value;
+    final String text = value.text;
+    final TextSelection selection = value.selection;
+    final int start = selection.start < 0 ? 0 : selection.start;
+    final int end = selection.end < 0 ? start : selection.end;
+    // The first line the selection touches, and the one after its end. A
+    // collapsed caret sets start == end and so a single line.
+    final int lineStart = text.lastIndexOf('\n', start - 1) + 1;
+    int lineEnd = text.indexOf('\n', end);
+    if (lineEnd == -1) {
+      lineEnd = text.length;
+    }
+
+    final String prefix = '${ReviewBlock.wordOf(speaker, copy)}：';
+    final String replacement = _rewriteSpan(
+      text,
+      lineStart,
+      lineEnd,
+      prefix,
+      copy,
+    );
+    final int caret = _caretAfter(
+      replacement,
+      lineStart,
+      prefix,
+      end,
+    );
     setState(() {
-      _review.removeAt(index).dispose();
+      _reviewController.value = TextEditingValue(
+        text: replacement,
+        selection: TextSelection.collapsed(offset: caret),
+      );
     });
   }
 
-  void _confirmReview() {
+  /// Replaces the speaker prefix of every line in `[lineStart, lineEnd)`.
+  String _rewriteSpan(
+    String text,
+    int lineStart,
+    int lineEnd,
+    String prefix,
+    AppCopy copy,
+  ) {
+    final String span = text.substring(lineStart, lineEnd);
+    final List<String> rewritten = <String>[];
+    for (final String raw in span.split('\n')) {
+      final String line = raw.trim();
+      final Speaker? matched = ReviewBlock.speakerOf(line, copy);
+      if (matched == null) {
+        rewritten.add('$prefix$line');
+      } else {
+        rewritten.add('$prefix${ReviewBlock.bodyOf(line, matched, copy)}');
+      }
+    }
+    return text.replaceRange(lineStart, lineEnd, rewritten.join('\n'));
+  }
+
+  /// Where the caret should land after a rewrite: at the end of the original
+  /// selection's extent, but never before the new prefix of that line.
+  int _caretAfter(String replacement, int lineStart, String prefix, int end) {
+    final int endLineStart = replacement.lastIndexOf('\n', end - 1) + 1;
+    final int prefixEnd = endLineStart + prefix.length;
+    return end < prefixEnd ? prefixEnd : end;
+  }
+
+  /// Whether the block has nothing left to analyse in it.
+  bool _reviewIsEmpty(AppCopy copy) =>
+      ReviewBlock.toLines(_reviewController.text, copy).isEmpty;
+
+  void _confirmReview(AppCopy copy) {
     widget.onCommand(
       PanelCommand(
         PanelCommandKind.confirmTranscript,
-        lines: <PanelLine>[
-          for (final _ReviewRow row in _review)
-            PanelLine(speaker: row.speaker, text: row.controller.text.trim()),
-        ],
+        lines: ReviewBlock.toLines(_reviewController.text, copy),
       ),
     );
   }
@@ -713,13 +869,6 @@ class _PanelPageState extends State<PanelPage> {
         widget.onInputFocusChanged;
     if (changeFocus != null) {
       await changeFocus(true);
-    }
-  }
-
-  void _requestReviewSize(bool reviewing) {
-    final Future<void> Function(bool reviewing)? change = widget.onReviewChanged;
-    if (change != null) {
-      unawaited(change(reviewing));
     }
   }
 
@@ -742,25 +891,23 @@ class _PanelPageState extends State<PanelPage> {
   /// until the user asks for an analysis, and a read that worked is the most
   /// interesting thing it knows.
   Widget _transcript(AppCopy copy, AppColors colors, ThemeData theme) => Padding(
-    padding: AppSpacing.card,
+    padding: AppSpacing.panel,
     child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         Text(
           copy.text(CopyKey.panelTranscriptLabel),
           style: theme.textTheme.labelSmall?.copyWith(color: colors.textMuted),
         ),
-        for (final PanelLine line in widget.frame.transcript)
-          Padding(
-            padding: const EdgeInsets.only(top: AppSpacing.xs),
-            child: Text(
-              copy
-                  .text(CopyKey.panelTranscriptLine)
-                  .replaceAll('{who}', _speakerLabel(copy, line.speaker))
-                  .replaceAll('{text}', line.text),
-              style: theme.textTheme.bodySmall,
-            ),
-          ),
+        AppSpacing.gapXs,
+        // The read-only reading is the same block the review edits (ADR-0025):
+        // tapping 「核对」 must not reformat the same words underneath the
+        // caret, and the two shapes of one batch must not disagree about what a
+        // batch looks like. It scrolls with the body, so no inner scroll.
+        Text(
+          ReviewBlock.fromLines(widget.frame.transcript, copy),
+          style: theme.textTheme.bodySmall,
+        ),
       ],
     ),
   );
@@ -775,8 +922,8 @@ class _PanelPageState extends State<PanelPage> {
   /// Why 「填入」 is gone, in so many words. ADR-0002 decision 3 asks for a
   /// banner rather than a silently missing button.
   Widget _banner(AppCopy copy, AppColors colors, ThemeData theme) => Container(
-    margin: AppSpacing.card,
-    padding: AppSpacing.card,
+    margin: AppSpacing.panel,
+    padding: AppSpacing.panel,
     decoration: BoxDecoration(
       color: colors.toneCautionBackground,
       borderRadius: AppRadius.card,
@@ -798,55 +945,18 @@ class _PanelPageState extends State<PanelPage> {
     widget.onExpandedChanged?.call(_expanded);
   }
 
-  bool _sameDrafts(Advice? before, Advice? after) {
-    final List<Candidate> oldCandidates =
-        before?.candidates ?? const <Candidate>[];
-    final List<Candidate> newCandidates =
-        after?.candidates ?? const <Candidate>[];
-    if (oldCandidates.length != newCandidates.length) {
-      return false;
-    }
-    for (int index = 0; index < oldCandidates.length; index++) {
-      if (oldCandidates[index].text != newCandidates[index].text) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  void _replaceDrafts() {
-    for (final TextEditingController controller in _drafts) {
-      controller.dispose();
-    }
-    for (final FocusNode node in _draftFocus) {
-      node.dispose();
-    }
-    _drafts = <TextEditingController>[
-      for (final Candidate candidate
-          in widget.frame.advice?.candidates ?? const <Candidate>[])
-        TextEditingController(text: candidate.text),
-    ];
-    _draftFocus = <FocusNode>[
-      for (int index = 0; index < _drafts.length; index++) FocusNode(),
-    ];
-  }
-
-  /// Builds the editable rows out of the batch the main engine sent down.
+  /// Loads the editable block out of the batch the main engine sent down.
   ///
-  /// Called without `setState` from [didUpdateWidget], where a rebuild is
-  /// already on its way — and from [initState], where there is nothing to
-  /// rebuild yet. Every call is a fresh copy of the batch, so any edit in
-  /// progress goes with the old one, which is the point: the rows are only ever
-  /// the batch that is actually on the panel.
+  /// Called from [didUpdateWidget], where a rebuild is already on its way, and
+  /// where the copy is readable. Every call is a fresh copy of the batch, so
+  /// any edit in progress goes with the old one, which is the point: the block
+  /// is only ever the batch that is actually on the panel.
   void _replaceReview() {
-    for (final _ReviewRow row in _review) {
-      row.dispose();
-    }
     _reviewSource = widget.frame.transcript;
-    _review = <_ReviewRow>[
-      for (final PanelLine line in _reviewSource)
-        _ReviewRow(speaker: line.speaker, text: line.text),
-    ];
+    _reviewController.text = ReviewBlock.fromLines(
+      _reviewSource,
+      CopyScope.of(context),
+    );
   }
 
   static bool _sameLines(List<PanelLine> before, List<PanelLine> after) {
@@ -860,24 +970,5 @@ class _PanelPageState extends State<PanelPage> {
       }
     }
     return true;
-  }
-}
-
-/// One line of the batch while it is being reviewed.
-///
-/// The speaker is the domain's own three-valued one, so the panel cannot invent
-/// a fourth; the text lives in a controller because that is what an editable
-/// field needs, and the pair is the whole of the state.
-final class _ReviewRow {
-  _ReviewRow({required this.speaker, required String text})
-    : controller = TextEditingController(text: text);
-
-  Speaker speaker;
-  final TextEditingController controller;
-  final FocusNode focus = FocusNode();
-
-  void dispose() {
-    controller.dispose();
-    focus.dispose();
   }
 }

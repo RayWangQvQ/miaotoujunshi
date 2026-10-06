@@ -26,6 +26,7 @@ class CandidateCard extends StatelessWidget {
     required this.rank,
     this.rankingStatus,
     this.onCopy,
+    this.dense = false,
   });
 
   final Candidate candidate;
@@ -40,6 +41,11 @@ class CandidateCard extends StatelessWidget {
   /// Copies the draft. Null means there is nowhere to copy it to yet.
   final VoidCallback? onCopy;
 
+  /// Whether the card sits on the 300dp overlay, where every point of padding is
+  /// a point of the batch it does not show. The panel sets this; the main-window
+  /// pages leave it false and keep the roomier inset.
+  final bool dense;
+
   @override
   Widget build(BuildContext context) {
     final AppCopy copy = CopyScope.of(context);
@@ -50,7 +56,7 @@ class CandidateCard extends StatelessWidget {
 
     return Card(
       child: Padding(
-        padding: AppSpacing.card,
+        padding: dense ? AppSpacing.panel : AppSpacing.card,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -87,11 +93,13 @@ class CandidateCard extends StatelessWidget {
             LabeledBlock(
               label: copy.text(CopyKey.candidateReason),
               value: candidate.reason,
+              dense: dense,
             ),
             AppSpacing.gapS,
             LabeledBlock(
               label: copy.text(CopyKey.candidateTradeoff),
               value: candidate.tradeoff,
+              dense: dense,
             ),
             Align(
               alignment: AlignmentDirectional.centerEnd,

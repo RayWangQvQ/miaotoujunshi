@@ -34,6 +34,14 @@ final class AppSpacing {
   static const EdgeInsets card = EdgeInsets.all(m);
   static const EdgeInsets page = EdgeInsets.all(l);
 
+  /// The padding of a card on the floating panel.
+  ///
+  /// The panel is a 300dp overlay, not a page: every point of padding it pays is
+  /// a point of the batch it does not show. A tighter card keeps the header,
+  /// the note and the review form from eating the window they share, while the
+  /// main window's pages keep [card]'s roomier reading.
+  static const EdgeInsets panel = EdgeInsets.all(s);
+
   /// A row of chips or badges.
   static const EdgeInsets row = EdgeInsets.symmetric(horizontal: s);
 

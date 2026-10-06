@@ -16,6 +16,7 @@ class LabeledBlock extends StatelessWidget {
     required this.label,
     required this.value,
     this.tone,
+    this.dense = false,
   });
 
   final String label;
@@ -24,6 +25,11 @@ class LabeledBlock extends StatelessWidget {
 
   /// Marks the value as something to read twice. Null keeps it ordinary.
   final StatusTone? tone;
+
+  /// Whether the block sits on the 300dp overlay, where the label reads at the
+  /// badge size and the value a step below the ordinary body. The panel's
+  /// candidate card sets this; the main-window pages leave it false.
+  final bool dense;
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +48,10 @@ class LabeledBlock extends StatelessWidget {
       children: <Widget>[
         Text(
           label,
-          style: theme.textTheme.labelMedium?.copyWith(color: colors.textMuted),
+          style: (dense
+                  ? theme.textTheme.labelSmall
+                  : theme.textTheme.labelMedium)
+              ?.copyWith(color: colors.textMuted),
         ),
         AppSpacing.gapXs,
         Text(

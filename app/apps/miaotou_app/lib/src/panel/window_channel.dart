@@ -186,19 +186,6 @@ final class AndroidPanelViewChannel implements PanelChannel {
     <String, Object?>{'value': expanded},
   );
 
-  /// Grows the panel window for the review state (ADR-0022 decision 15).
-  ///
-  /// **Android only, and deliberately not a member of [PanelChannel] or of the
-  /// capability contract.** The Android overlay is 300×380 dp and does not
-  /// resize for the input method, so the review — a form the user types into —
-  /// would be typed into through a keyboard that covers it. The two desktop
-  /// windows are 420×620 and already have the room, so there is nothing for them
-  /// to answer for and no third refusal to write.
-  Future<void> setReviewing(bool reviewing) => _channel.invokeMethod<void>(
-    'setReviewing',
-    <String, Object?>{'value': reviewing},
-  );
-
   Future<void> startDragging() => _channel.invokeMethod<void>('startDragging');
 
   Future<void> setFocusable(bool focusable) => _channel.invokeMethod<void>(

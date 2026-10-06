@@ -219,42 +219,6 @@ void main() {
     channel.dispose();
   });
 
-  testWidgets('the editable draft enables focus and crosses in a command', (
-    WidgetTester tester,
-  ) async {
-    final InMemoryPanelChannel channel = InMemoryPanelChannel();
-    final List<bool> focusChanges = <bool>[];
-    await tester.pumpWidget(
-      PanelApp(
-        channel: channel,
-        onInputFocusChanged: (bool focusable) async {
-          focusChanges.add(focusable);
-        },
-      ),
-    );
-    channel.push(
-      const PanelFrame(
-        analysed: conversation,
-        live: conversation,
-        advice: advice,
-      ),
-    );
-    await tester.pump();
-
-    await tester.tap(find.byKey(const ValueKey<String>('panel-draft-0')));
-    await tester.enterText(
-      find.byKey(const ValueKey<String>('panel-draft-0')),
-      '用系统输入法编辑',
-    );
-    await tester.tap(find.text('填入'));
-    await tester.pump();
-
-    expect(focusChanges, contains(true));
-    expect(channel.sent.single.kind, PanelCommandKind.fill);
-    expect(channel.sent.single.text, '用系统输入法编辑');
-    channel.dispose();
-  });
-
   test('the Windows runner registers plugins in the second engine', () {
     final String source = File('windows/runner/flutter_window.cpp')
         .readAsStringSync();

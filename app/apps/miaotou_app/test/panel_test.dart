@@ -328,7 +328,7 @@ void main() {
       );
 
       expect(tester.takeException(), isNull);
-      expect(find.text('第一条'), findsNWidgets(2));
+      expect(find.text('第一条'), findsOneWidget);
 
       await tester.drag(
         find.byKey(const Key('panel-scroll')),
@@ -336,8 +336,36 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('第四条').hitTestable(), findsOneWidget);
+      // The last candidate has scrolled into view. `hitTestable` rather than a
+      // bare `find.text`, because an off-screen candidate is still laid out; and
+      // `findsWidgets` rather than `findsOneWidget`, because how many of the
+      // card are on-screen at once depends on the type scale.
+      expect(find.text('第四条').hitTestable(), findsWidgets);
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('the candidate draft is clamped to a body line', (
+      WidgetTester tester,
+    ) async {
+      await pumpPanel(
+        tester,
+        frame(analysed: wechat, live: wechat, advice: adviceWith('好')),
+      );
+
+      // The panel clamps its type a step down (ADR-0025): `bodyLarge` — the
+      // candidate draft — reads at `bodyMedium`, so a 16px headline does not
+      // land on a 300dp overlay. The draft sits inside the card.
+      final Text draft = tester.widget<Text>(
+        find.descendant(
+          of: find.byType(CandidateCard),
+          matching: find.text('好'),
+        ),
+      );
+      expect(
+        draft.style?.fontSize,
+        14.0,
+        reason: 'no text on the panel may read larger than a body line',
+      );
     });
 
     testWidgets('the drag landing is the panel\'s own', (
@@ -424,7 +452,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         find.text('新的一句'),
-        findsNWidgets(2),
+        findsOneWidget,
         reason:
             'the panel renders the frame it was handed, not the one it '
             'was handed first',
@@ -493,8 +521,7 @@ void main() {
       );
 
       expect(find.text(AppCopy.zh.text(CopyKey.panelTranscriptLabel)), findsOneWidget);
-      expect(find.text('我：在吗'), findsOneWidget);
-      expect(find.text('对方：在的'), findsOneWidget);
+      expect(find.text('我：在吗\n对方：在的'), findsOneWidget);
       expect(
         find.text(AppCopy.zh.text(CopyKey.panelEmpty)),
         findsNothing,
@@ -562,8 +589,7 @@ void main() {
         find.text(AppCopy.zh.text(CopyKey.panelTranscriptLabel)),
         findsOneWidget,
       );
-      expect(find.text('我：在吗'), findsOneWidget);
-      expect(find.text('对方：在的'), findsOneWidget);
+      expect(find.text('我：在吗\n对方：在的'), findsOneWidget);
       expect(
         find.text(AppCopy.zh.text(CopyKey.panelEmpty)),
         findsNothing,
@@ -590,12 +616,13 @@ void main() {
       appNames: appNames,
     );
 
-    testWidgets('the form takes the body, with the batch in it', (
+    testWidgets('the form takes the body, with the batch as one block', (
       WidgetTester tester,
     ) async {
       // The report behind ADR-0022: a whole-frame capture landed on the panel as
       // read-only text under a note asking the user to check the sides, with no
-      // way to check them and no way past the gate.
+      // way to check them and no way past the gate. ADR-0025 made the edit one
+      // block of text rather than a row per line.
       //
       // Sized to the Android overlay on purpose — the form is the one thing the
       // panel has to fit that a Row of buttons did not, and an unbounded test
@@ -606,8 +633,14 @@ void main() {
         find.text(AppCopy.zh.text(CopyKey.panelReviewTitle)),
         findsOneWidget,
       );
-      expect(find.text('在吗'), findsOneWidget);
-      expect(find.text('在的'), findsOneWidget);
+      expect(
+        find.byKey(const Key('panel-review-block')),
+        findsOneWidget,
+      );
+      final TextField block = tester.widget<TextField>(
+        find.byKey(const Key('panel-review-block')),
+      );
+      expect(block.controller!.text, '我：在吗\n对方：在的');
       expect(
         find.text(AppCopy.zh.text(CopyKey.panelTranscriptLabel)),
         findsNothing,
@@ -624,54 +657,36 @@ void main() {
       );
     });
 
-    testWidgets('each row starts from the side the geometry guessed', (
+    testWidgets('the block starts from the side the geometry guessed', (
       WidgetTester tester,
     ) async {
       // ADR-0019's guess is a starting point, not a question the user starts
       // from scratch: most whole-frame reads are right about most lines.
       await pumpPanel(tester, reviewing());
 
-      expect(
-        tester
-            .widget<SegmentedButton<Speaker>>(
-              find.byKey(const ValueKey<String>('panel-review-speaker-0')),
-            )
-            .selected,
-        <Speaker>{Speaker.me},
+      final TextField block = tester.widget<TextField>(
+        find.byKey(const Key('panel-review-block')),
       );
-      expect(
-        tester
-            .widget<SegmentedButton<Speaker>>(
-              find.byKey(const ValueKey<String>('panel-review-speaker-1')),
-            )
-            .selected,
-        <Speaker>{Speaker.other},
-      );
+      expect(block.controller!.text, '我：在吗\n对方：在的');
     });
 
-    testWidgets('the side has a third answer, which is no answer', (
+    testWidgets('the side still has a third answer, which is no answer', (
       WidgetTester tester,
     ) async {
-      // A toggle would force a choice between two sides, and ADR-0015 makes
-      // admitting there is no author better than inventing one.
-      await pumpPanel(tester, reviewing());
-
-      final Finder third = find.descendant(
-        of: find.byKey(const ValueKey<String>('panel-review-speaker-0')),
-        matching: find.text(AppCopy.zh.text(CopyKey.panelSpeakerUnknown)),
+      // A two-way toggle would force a choice between two sides, and ADR-0015
+      // makes admitting there is no author better than inventing one. The block
+      // carries that third state as a prefix, and a button sets it.
+      await pumpPanel(
+        tester,
+        reviewing(lines: const <PanelLine>[
+          PanelLine(speaker: Speaker.unknown, text: '嗯'),
+        ]),
       );
-      expect(third, findsOneWidget);
 
-      await tester.tap(third);
-      await tester.pumpAndSettle();
-      expect(
-        tester
-            .widget<SegmentedButton<Speaker>>(
-              find.byKey(const ValueKey<String>('panel-review-speaker-0')),
-            )
-            .selected,
-        <Speaker>{Speaker.unknown},
+      final TextField block = tester.widget<TextField>(
+        find.byKey(const Key('panel-review-block')),
       );
+      expect(block.controller!.text, '未定：嗯');
     });
 
     testWidgets('the bottom row offers confirm and cancel, not a reanalyse', (
@@ -705,17 +720,10 @@ void main() {
       final InMemoryPanelChannel channel = await pumpPanel(tester, reviewing());
 
       // Both halves of what the form is for: the side was guessed wrong, and a
-      // character came back wrong.
-      await tester.tap(
-        find.descendant(
-          of: find.byKey(const ValueKey<String>('panel-review-speaker-1')),
-          matching: find.text(AppCopy.zh.text(CopyKey.panelSpeakerMe)),
-        ),
-      );
-      await tester.pumpAndSettle();
+      // character came back wrong — edited straight in the block.
       await tester.enterText(
-        find.byKey(const ValueKey<String>('panel-review-text-1')),
-        '在的，刚看到',
+        find.byKey(const Key('panel-review-block')),
+        '我：在吗\n我：在的，刚看到',
       );
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('panel-review-confirm')));
@@ -730,13 +738,17 @@ void main() {
       );
     });
 
-    testWidgets('a line that is not there can be deleted', (
+    testWidgets('a missing line is a carriage return, not a button', (
       WidgetTester tester,
     ) async {
+      // ADR-0022's row form had a delete and a merge but no insert; a line the
+      // recogniser dropped could only be recovered by re-photographing. In a
+      // block it is just another line typed.
       final InMemoryPanelChannel channel = await pumpPanel(tester, reviewing());
 
-      await tester.tap(
-        find.byKey(const ValueKey<String>('panel-review-delete-1')),
+      await tester.enterText(
+        find.byKey(const Key('panel-review-block')),
+        '我：在吗\n对方：在的\n对方：刚看到',
       );
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('panel-review-confirm')));
@@ -744,61 +756,227 @@ void main() {
 
       expect(
         channel.sent.last.lines?.map((PanelLine line) => line.text),
-        <String>['在吗'],
+        <String>['在吗', '在的', '刚看到'],
       );
     });
 
-    testWidgets('a bubble split in two can be folded back into one', (
+    testWidgets('the speaker buttons rewrite the caret\'s line', (
       WidgetTester tester,
     ) async {
       final InMemoryPanelChannel channel = await pumpPanel(tester, reviewing());
 
-      await tester.tap(
-        find.byKey(const ValueKey<String>('panel-review-merge-1')),
+      // Focus the block, then put the caret on the second line and flip it to
+      // 我. The caret is read straight off the controller, so the field does not
+      // need to rebuild for the button to act on it.
+      await tester.tap(find.byKey(const Key('panel-review-block')));
+      await tester.pumpAndSettle();
+      final TextField field = tester.widget<TextField>(
+        find.byKey(const Key('panel-review-block')),
+      );
+      field.controller!.selection = const TextSelection.collapsed(
+        offset: '我：在吗\n'.length + 1,
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('在吗 在的'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const ValueKey<String>('panel-review-set-me')),
+      );
+      await tester.pumpAndSettle();
+
+      final TextField rewritten = tester.widget<TextField>(
+        find.byKey(const Key('panel-review-block')),
+      );
+      expect(rewritten.controller!.text, '我：在吗\n我：在的');
+
       await tester.tap(find.byKey(const Key('panel-review-confirm')));
       await tester.pumpAndSettle();
       expect(
         channel.sent.last.lines?.map(
           (PanelLine line) => '${line.speaker.name}:${line.text}',
         ),
-        <String>['me:在吗 在的'],
-        reason:
-            'the upper line keeps the speaker: a split that was not a split is '
-            'one message, and the user is folding the two halves back together',
+        <String>['me:在吗', 'me:在的'],
       );
     });
 
-    testWidgets('the first line has nothing above it to fold into', (
+    testWidgets('the speaker buttons stay off until the block has focus', (
       WidgetTester tester,
     ) async {
       await pumpPanel(tester, reviewing());
 
       expect(
         tester
-            .widget<IconButton>(
-              find.byKey(const ValueKey<String>('panel-review-merge-0')),
+            .widget<OutlinedButton>(
+              find.byKey(const ValueKey<String>('panel-review-set-other')),
+            )
+            .onPressed,
+        isNull,
+        reason:
+            'with no caret there is no line to act on, and guessing "the last '
+            'one" would be an intention the user did not state',
+      );
+    });
+
+    testWidgets('tapping a shortcut keeps the caret, not kills it', (
+      WidgetTester tester,
+    ) async {
+      // The bug this pins: on a real device a tap on a shortcut button is a tap
+      // *outside* the field, which used to fire the field's `onTapOutside` and
+      // unfocus the block — flipping `hasFocus` to false and disabling the very
+      // button the finger was on, in the same frame. The whole form now shares
+      // one `TextFieldTapRegion`, so the button reads the caret instead of
+      // dismissing it.
+      final List<bool> focusChanges = <bool>[];
+      await pumpPanel(
+        tester,
+        reviewing(),
+        onInputFocusChanged: (bool focusable) async =>
+            focusChanges.add(focusable),
+      );
+
+      await tester.tap(find.byKey(const Key('panel-review-block')));
+      await tester.pumpAndSettle();
+      final TextField field = tester.widget<TextField>(
+        find.byKey(const Key('panel-review-block')),
+      );
+      field.controller!.selection = const TextSelection.collapsed(
+        offset: '我：在吗\n'.length + 1,
+      );
+      await tester.pumpAndSettle();
+      focusChanges.clear();
+
+      // The tap itself must not release the input focus, and must still act.
+      await tester.tap(
+        find.byKey(const ValueKey<String>('panel-review-set-me')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        focusChanges,
+        isNot(contains(false)),
+        reason: 'a shortcut tap must not dismiss the caret it acts on',
+      );
+      final TextField rewritten = tester.widget<TextField>(
+        find.byKey(const Key('panel-review-block')),
+      );
+      expect(rewritten.controller!.text, '我：在吗\n我：在的');
+    });
+
+    testWidgets('the speaker buttons stay off until the block has focus', (
+      WidgetTester tester,
+    ) async {
+      await pumpPanel(tester, reviewing());
+
+      expect(
+        tester
+            .widget<OutlinedButton>(
+              find.byKey(const ValueKey<String>('panel-review-set-other')),
+            )
+            .onPressed,
+        isNull,
+        reason:
+            'with no caret there is no line to act on, and guessing "the last '
+            'one" would be an intention the user did not state',
+      );
+    });
+
+    testWidgets('删行 deletes the caret\'s physical line and its newline', (
+      WidgetTester tester,
+    ) async {
+      await pumpPanel(tester, reviewing());
+
+      await tester.tap(find.byKey(const Key('panel-review-block')));
+      await tester.pumpAndSettle();
+      final TextField field = tester.widget<TextField>(
+        find.byKey(const Key('panel-review-block')),
+      );
+      // Caret on the second line.
+      field.controller!.selection = const TextSelection.collapsed(
+        offset: '我：在吗\n'.length + 1,
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('panel-review-delete-line')));
+      await tester.pumpAndSettle();
+
+      final TextField rewritten = tester.widget<TextField>(
+        find.byKey(const Key('panel-review-block')),
+      );
+      expect(rewritten.controller!.text, '我：在吗');
+      expect(
+        rewritten.controller!.selection,
+        const TextSelection.collapsed(offset: '我：在吗'.length),
+        reason:
+            'the last line goes with its preceding newline, so the caret '
+            'lands at the end of the surviving text',
+      );
+    });
+
+    testWidgets('删行 stays off until focused, and off again when empty', (
+      WidgetTester tester,
+    ) async {
+      await pumpPanel(tester, reviewing());
+
+      // Not focused: nothing to act on.
+      expect(
+        tester
+            .widget<OutlinedButton>(
+              find.byKey(const Key('panel-review-delete-line')),
             )
             .onPressed,
         isNull,
       );
+
+      // Focus, then empty the block: the button disables with it.
+      await tester.enterText(
+        find.byKey(const Key('panel-review-block')),
+        '   ',
+      );
+      await tester.tap(find.byKey(const Key('panel-review-block')));
+      await tester.pumpAndSettle();
+
+      expect(
+        tester
+            .widget<OutlinedButton>(
+              find.byKey(const Key('panel-review-delete-line')),
+            )
+            .onPressed,
+        isNull,
+        reason: 'there is no line left to delete',
+      );
     });
 
-    testWidgets('emptying every line says so and disables confirm', (
+    testWidgets('未定 is a prefix, not a button', (
+      WidgetTester tester,
+    ) async {
+      await pumpPanel(
+        tester,
+        reviewing(lines: const <PanelLine>[
+          PanelLine(speaker: Speaker.unknown, text: '嗯'),
+        ]),
+      );
+
+      expect(
+        find.byKey(const ValueKey<String>('panel-review-set-unknown')),
+        findsNothing,
+        reason:
+            'ADR-0015 keeps 未定 as a speaker, but the way to reach it is the '
+            'prefix or inheritance, not a third shortcut that only says "no '
+            'author"',
+      );
+      final TextField block = tester.widget<TextField>(
+        find.byKey(const Key('panel-review-block')),
+      );
+      expect(block.controller!.text, '未定：嗯');
+    });
+
+    testWidgets('emptying the block says so and disables confirm', (
       WidgetTester tester,
     ) async {
       await pumpPanel(tester, reviewing());
 
       await tester.enterText(
-        find.byKey(const ValueKey<String>('panel-review-text-0')),
-        '',
-      );
-      await tester.enterText(
-        find.byKey(const ValueKey<String>('panel-review-text-1')),
-        '   ',
+        find.byKey(const Key('panel-review-block')),
+        '   \n\n  ',
       );
       await tester.pumpAndSettle();
 
@@ -852,50 +1030,6 @@ void main() {
         find.text(AppCopy.zh.text(CopyKey.panelReviewTitle)),
         findsOneWidget,
       );
-    });
-
-    testWidgets('the host is asked for a taller window while the form is up', (
-      WidgetTester tester,
-    ) async {
-      // The panel cannot resize itself and does not try: the window is the
-      // host's, and on Android it is the host's own 380dp overlay with no
-      // `adjustResize`, which puts the keyboard over the form.
-      final List<bool> asked = <bool>[];
-      Future<void> record(bool reviewing) async => asked.add(reviewing);
-
-      await pumpPanel(
-        tester,
-        frame(analysed: wechat, live: wechat),
-        onReviewChanged: record,
-      );
-      expect(asked, isEmpty);
-
-      // A batch lands, and with it the review.
-      await pumpPanel(tester, reviewing(), onReviewChanged: record);
-      expect(asked, <bool>[true]);
-
-      // And the room is given back when the state ends.
-      await pumpPanel(
-        tester,
-        frame(analysed: wechat, live: wechat),
-        onReviewChanged: record,
-      );
-      expect(asked, <bool>[true, false]);
-    });
-
-    testWidgets('a panel that starts with the form up asks for the room too', (
-      WidgetTester tester,
-    ) async {
-      // The window was recreated while a review was outstanding. No frame change
-      // will come to say so, so the ask has to happen on the first build.
-      final List<bool> asked = <bool>[];
-      await pumpPanel(
-        tester,
-        reviewing(),
-        onReviewChanged: (bool reviewing) async => asked.add(reviewing),
-      );
-
-      expect(asked, <bool>[true]);
     });
 
     testWidgets('the standing 核对 is how the user gets back in', (
@@ -1000,7 +1134,7 @@ Widget panelIn(
   AppCopy copy = AppCopy.zh,
   bool initialExpanded = true,
   VoidCallback? onDragStart,
-  Future<void> Function(bool reviewing)? onReviewChanged,
+  Future<void> Function(bool focusable)? onInputFocusChanged,
   Size? panelSize,
 }) => CopyScope(
   copy: copy,
@@ -1016,7 +1150,7 @@ Widget panelIn(
             onCommand: channel.send,
             initialExpanded: initialExpanded,
             onDragStart: onDragStart,
-            onReviewChanged: onReviewChanged,
+            onInputFocusChanged: onInputFocusChanged,
           ),
         ),
       ),
@@ -1030,7 +1164,7 @@ Future<InMemoryPanelChannel> pumpPanel(
   AppCopy copy = AppCopy.zh,
   bool initialExpanded = true,
   VoidCallback? onDragStart,
-  Future<void> Function(bool reviewing)? onReviewChanged,
+  Future<void> Function(bool focusable)? onInputFocusChanged,
   Size? panelSize,
   InMemoryPanelChannel? channel,
 }) async {
@@ -1046,7 +1180,7 @@ Future<InMemoryPanelChannel> pumpPanel(
       copy: copy,
       initialExpanded: initialExpanded,
       onDragStart: onDragStart,
-      onReviewChanged: onReviewChanged,
+      onInputFocusChanged: onInputFocusChanged,
       panelSize: panelSize,
     ),
   );
