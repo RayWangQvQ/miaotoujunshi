@@ -160,6 +160,13 @@ of contract members that already exist.**
   (`OverlayController.kt:490`); the Flutter panel has no such surface, so a mis-guess can be
   read but not corrected. Tracked as its own item — it is the one piece without which
   ADR-0019's marking is a warning nobody can act on.
+
+  **Amended (2026-10-06, ADR-0022):** that item is closed. The surface is on the panel, and
+  the batch it lands is what the analysis is gated on — so the marking is now something the
+  user can both act on and resolve. Until it existed the whole-frame path was refused by the
+  domain every single time, because ADR-0019's marker landed on every line of a capture and
+  `allLinesUnconfirmed` then answered true by construction; the refusal asked the user to
+  confirm the speakers and the text and there was nowhere to do it.
 - **Device acceptance is required and cannot be replaced by the fixture.** The fixture pins
   the threshold arithmetic; whether a frame is obtainable at all on a given application
   (FLAG_SECURE, an unusual window type) is only observable on a device, per ADR-0014.

@@ -70,6 +70,14 @@ marked by making the line's provenance visible rather than by inventing a fourth
   `allLinesUnconfirmed`: a wholly OCR'd conversation would be refused analysis, and the panel
   has no line-by-line corrector to resolve it with. A path that produces nothing analysable
   is not more honest than a path that produces something analysable and labelled.
+
+  **Amended (2026-10-06, ADR-0022):** the corrector now exists, and this rejection no longer
+  holds on its stated ground — but the decision it defends does. The marker this ADR chose
+  lands on *every* line of a capture, so `allLinesUnconfirmed` refused the same conversation
+  the rejection predicted, by the other route (text doubt rather than attribution doubt), and
+  nothing on the panel could clear it. ADR-0022 keeps the geometry guess and gates the
+  analysis on a reviewed batch instead, which is this decision's shape with the missing half
+  supplied.
 - **Add a provenance field to `CapturedLine`.** Cleaner in principle — the model could be told
   "this side is a guess" separately from "this text is uncertain". Rejected for now: it
   reverses ADR-0015's boundary for a distinction the prompt line in `prompts.dart:64` already
@@ -102,3 +110,12 @@ marked by making the line's provenance visible rather than by inventing a fourth
 - **Superseded: the retired port's blanket attribution.** `ChatCaptureService.kt:476` filed
   every whole-frame line as the other party without attempting a split. That is now the
   fallback rather than the rule.
+
+  **Amended (2026-10-06, ADR-0022):** decision 3's marker reaches *every* line of a capture,
+  not the doubtful ones, because ML Kit reports no per-line score and the runtime must still
+  say the line came from pixels. That is how `allLinesUnconfirmed` came to answer true by
+  construction for the whole path. The marker is kept — it is a claim about the text, and it
+  is the one the model reads — and what changed is the gate: it now asks whether the batch
+  was reviewed, and stops asking once it was. The consequence above ("a wrong guess is now a
+  confident `我`") is unchanged in the transcript and now has the correction surface this
+  ADR's rejected alternative assumed did not exist.

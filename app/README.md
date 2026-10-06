@@ -169,6 +169,66 @@ Android's pages report nothing back. macOS and Windows refuse both members
 permanently through `UnsupportedError` and the section says so in one line instead
 of drawing two rows that will never change.
 
+### A refusal from the contract is about the port, not about the session
+
+`UiTreeReader` is the member Android answers and the two desktop ports refuse
+outright: they read pixels and recover the words through OCR, so there is no node
+tree to ask for and never will be. The refusal is an `UnsupportedError` raised by
+the implementation, which is exactly what ADR-0009 asks for — a member that
+cannot answer says so, rather than returning an empty list nobody can tell from a
+real one.
+
+The runtime is the other half and it was missing. `start()` subscribed to
+`snapshots` unconditionally, the getter throws synchronously on macOS, and the
+exception therefore left `main()` before `runApp` — the process came up owning no
+window, which the tool reports as a lost device rather than as a crash. `_readTree()`
+and `_subscribeToPushedReads()` are the two doors that close it: a typed refusal
+becomes "this port has no tree", while anything else still throws, because a
+defect has to stay as visible as a platform fact is quiet (ADR-0023).
+
+Two things follow. On these ports a capture is the way in rather than a fallback,
+and an analysis reads the batch the panel already holds instead of re-reading a
+tree that is not there — the rule ADR-0022 set for a reviewed batch, arrived at
+from the other end.
+
+### A capture is reviewed before it is analysed
+
+A whole-frame capture cannot say what the recogniser thought of its own work — ML
+Kit's Chinese recogniser reports no per-line score — so every line of a capture
+carries `[OCR待核对]`, and the domain refuses a batch whose every line is doubtful.
+That rule is right and it stays. What was missing was the other half: the panel
+showed those lines as read-only text under a note asking the user to check the
+sides, and there was nothing to check them with (ADR-0022).
+
+So a capture now lands in a review state, and so does any other batch the panel
+holds. Each line gets 我 / 对方 / 未定 and a text field, with 并到上一行 and 删除 for
+the two ways a whole-frame read gets the shape wrong; the side is pre-filled from
+ADR-0019's geometry guess, the note above it is the sentence that says what to
+check, and the bottom row becomes 取消 · 识别一次 · 确认. Confirming is what the
+gate was waiting for, and the analysis stays the next thing the user asks for. A
+standing 核对 button brings the form back once a batch has been confirmed, so a
+wrong character noticed afterwards does not cost a second photograph.
+
+Two consequences worth knowing. `PanelFrame.transcript` means "the lines behind the
+batch on the panel" rather than "what the last capture read", so a tree read is now
+visible before an analysis is asked for. And an analysis reads the batch the user
+confirmed rather than re-reading the tree, because re-reading would answer about an
+unreviewed copy of it and throw the confirmation away.
+
+A third, from ADR-0024: a confirmed batch is quoted to the model **without** the
+per-line `[OCR待核对]`. The source is still a screenshot and the recogniser's score
+still travels on the captured lines, but after a person has typed a line the engine
+is quoting that person — and leaving the doubt on told the model a batch the user
+had just vouched for was unvouched-for, which is answered with no drafts at all. A
+verdict with no drafts is a conclusion the domain reaches on purpose
+(`RankingStatus.notNeeded`), so the panel keeps the batch on screen when it happens
+and leaves the judgement one tap away in 详细分析.
+
+On Android the overlay grows for the review — a ratio of the screen, never shorter
+than the ordinary expanded height — because a 380dp window with no `adjustResize` is
+a form edited through a keyboard. The desktop windows are 420×620 and keep their
+size.
+
 ## The shared payload does not travel through Flutter assets
 
 `goutoujunshi/` and `miaotoujunshi/` are read from disk at runtime on all three
