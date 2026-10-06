@@ -179,6 +179,21 @@ enum CopyKey {
   // The label on the button a note carries when the note names a permission the
   // user can go and switch on (ADR-0021 decision 8).
   panelActionOpenSettings,
+  // The review state (ADR-0022). The panel is the only surface that can show
+  // what a batch read and let the user correct it, and what the analysis is
+  // gated on is the batch being confirmed rather than every line being right.
+  panelActionReview,
+  panelReviewTitle,
+  panelReviewHint,
+  panelActionConfirmReview,
+  panelActionCancelReview,
+  panelActionMergeUp,
+  panelActionDeleteLine,
+  panelReviewNothingLeft,
+  panelNoteReviewed,
+  // The label on the button a note carries when the refusal is the transcript
+  // being unconfirmed (ADR-0022 decision 13).
+  panelActionGoReview,
 
   runtimeAnalysing,
   runtimeConfigureModels,
@@ -392,6 +407,16 @@ final class AppCopy {
     CopyKey.panelActionDetails: '详情',
     CopyKey.panelActionRecognise: '识别一次',
     CopyKey.panelActionOpenSettings: '去开启',
+    CopyKey.panelActionReview: '核对',
+    CopyKey.panelReviewTitle: '核对本轮对话',
+    CopyKey.panelReviewHint: '识别结果可能有错。改好每行的「我／对方」和正文，再点确认。',
+    CopyKey.panelActionConfirmReview: '确认',
+    CopyKey.panelActionCancelReview: '取消',
+    CopyKey.panelActionMergeUp: '并到上一行',
+    CopyKey.panelActionDeleteLine: '删除',
+    CopyKey.panelReviewNothingLeft: '一行都不剩了，没法分析；先取消，或点「识别一次」重拍。',
+    CopyKey.panelNoteReviewed: '原文与说话人已人工核对。',
+    CopyKey.panelActionGoReview: '去核对',
     CopyKey.panelNoteSidesGuessed: '这一屏是截图识别的，左右按位置推定，可能有误；填入前请核对。',
     CopyKey.panelNoteSidesNotSplit: 'OCR 未分边，把全部消息当作对方所说',
     CopyKey.panelTranscriptLabel: '识别到的原文',

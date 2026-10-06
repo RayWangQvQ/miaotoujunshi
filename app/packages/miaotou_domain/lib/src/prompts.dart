@@ -361,8 +361,20 @@ void checkBackground(String background) {
 /// apart: if a caller validates with one rule and assembles with another, the
 /// validation stops being a guarantee, and the whole point is that an unusable
 /// input costs nothing.
+///
+/// Two questions live here and they are one line apart. The first is about the
+/// background, which is always the user's to fix. The second is about the
+/// transcript, and since ADR-0022 it has an answer: a batch a person has read
+/// and confirmed is analysable whatever the markers say, and a batch nobody has
+/// looked at is refused only when there is nothing in it worth analysing — see
+/// [allLinesUnconfirmed]. Without the review the rule was unsatisfiable for a
+/// whole-frame capture, because every line of one carries a marker and the
+/// confirmation it asked for had no surface.
 void checkAnalysable(Snapshot snapshot, String background) {
   checkBackground(background);
+  if (snapshot.reviewed) {
+    return;
+  }
   if (allLinesUnconfirmed(snapshot.transcript)) {
     throw const DomainException('当前对话全部待核对，请先确认说话人和原文，再生成回复');
   }

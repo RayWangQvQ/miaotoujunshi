@@ -19,6 +19,7 @@ Future<void> main() async {
         onExpandedChanged: panel.setExpanded,
         onDragStart: panel.startDragging,
         onInputFocusChanged: panel.setFocusable,
+        onReviewChanged: panel.setReviewing,
         initialExpanded: false,
       ),
     );

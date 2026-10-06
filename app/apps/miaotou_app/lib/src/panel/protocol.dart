@@ -38,6 +38,7 @@ final class PanelFrame {
     this.note,
     this.transcript = const <PanelLine>[],
     this.appNames = const <String, String>{},
+    this.reviewing = false,
   });
 
   /// Whose analysis is on the panel. [ConversationRef.none] before the first
@@ -53,12 +54,12 @@ final class PanelFrame {
   /// A caveat about how the analysed snapshot was produced, shown verbatim —
   /// an OCR capture cannot tell who said what, and that belongs on the panel.
   ///
-  /// It carries a possible remedy as well as words, because one of the notes the
-  /// panel shows is a refusal the user can act on (ADR-0021 decision 8).
+  /// It carries a possible way out as well as words, because some of the notes
+  /// the panel shows are refusals the user can act on (ADR-0021 decision 8,
+  /// ADR-0022 decision 13).
   final PanelNote? note;
 
-  /// What the last whole-frame capture read off the screen, in the order it
-  /// appeared, and empty for every other source.
+  /// The lines behind the batch on the panel, in the order they appeared.
   ///
   /// A capture is the one path where the panel is the only witness: the user
   /// pressed a button, the screen it photographed is still behind the panel, and
@@ -66,6 +67,12 @@ final class PanelFrame {
   /// to. Without this the panel can say that a capture happened and nothing at
   /// all about what it read — which is indistinguishable from a capture that
   /// read nothing, and was read that way (ADR-0018).
+  ///
+  /// Since ADR-0022 decision 17 the lines are published for **every** source
+  /// rather than only for a capture, because the review surface serves any batch
+  /// and the standing 「核对」 button has nothing to be about otherwise. What
+  /// the field means is therefore "the batch the panel is showing", not "the
+  /// last thing that was photographed".
   final List<PanelLine> transcript;
 
   /// Package name to display name, resolved by the side that owns the platform.
@@ -74,6 +81,16 @@ final class PanelFrame {
   /// and drives the 「未识别会话」 fallbacks. It is never a reason to print the
   /// package.
   final Map<String, String> appNames;
+
+  /// True while the panel is asking the user to read the batch and confirm it
+  /// (ADR-0022).
+  ///
+  /// The main engine owns this rather than the panel deriving it, for the same
+  /// reason it owns [note]: that side holds the gate, and it is the side that
+  /// knows whether a confirmation is still outstanding. It is on the frame
+  /// rather than left to the panel because "there is a transcript" is not the
+  /// same question — a confirmed batch is still shown.
+  final bool reviewing;
 
   /// The resolver [derivePanel] wants, over this frame's map.
   String? appNameFor(ConversationRef reference) =>
@@ -96,30 +113,70 @@ final class PanelLine {
   String toString() => 'PanelLine(${speaker.name}, $text)';
 }
 
+/// Something the user can do about a note.
+///
+/// A note is nearly always only words. Some are not: the platform refusing
+/// because a system permission is off names a cause the user still has to act
+/// on, and a sentence that says "go and switch it on" without being able to take
+/// them there is what cost ADR-0018's first device run a code-reading session. So
+/// did the refusal that asked the user to confirm the speakers and the text of a
+/// batch whose only surface was read-only text (ADR-0022).
+///
+/// The way out travels as a value rather than as a flag, so the panel neither
+/// knows nor names the thing it is asking for — it reports what the note needs
+/// and the main engine, which owns the capabilities and the gate, decides what
+/// that means on this port.
+sealed class PanelRemedy {
+  const PanelRemedy();
+}
+
+/// The system page for one permission is the way out.
+final class OpenPermissionPage extends PanelRemedy {
+  const OpenPermissionPage(this.kind);
+
+  final PermissionKind kind;
+
+  @override
+  bool operator ==(Object other) =>
+      other is OpenPermissionPage && other.kind == kind;
+
+  @override
+  int get hashCode => Object.hash(OpenPermissionPage, kind);
+
+  @override
+  String toString() => 'OpenPermissionPage(${kind.name})';
+}
+
+/// Reviewing the batch is the way out.
+///
+/// The refusal this answers is 「all of this is unconfirmed, confirm it first」,
+/// and the batch it is about is the one the panel is showing (ADR-0022).
+final class EnterReview extends PanelRemedy {
+  const EnterReview();
+
+  @override
+  bool operator ==(Object other) => other is EnterReview;
+
+  @override
+  int get hashCode => Object.hash(EnterReview, 0);
+
+  @override
+  String toString() => 'EnterReview()';
+}
+
 /// Something the panel has to say, and what the user can do about it.
-///
-/// A note is nearly always only words. One is not: when the platform refuses
-/// because a system permission is off, the sentence names the cause and the user
-/// still has to go and switch it on, and a sentence that says "去系统设置里打开"
-/// without being able to take them there is what cost ADR-0018's first device run
-/// a code-reading session.
-///
-/// The remedy is a [PermissionKind] rather than a flag or a boolean, so the panel
-/// neither knows nor names the system page it is asking for — it reports which
-/// permission the user needs and the main engine, which owns the capabilities,
-/// decides what that means on this port.
 final class PanelNote {
   const PanelNote(this.text, {this.remedy});
 
   final String text;
 
-  /// The permission whose system page fixes this, or null when the note is only
-  /// something to read.
-  final PermissionKind? remedy;
+  /// What the user can do about this, or null when the note is only something to
+  /// read.
+  final PanelRemedy? remedy;
 
   @override
   String toString() =>
-      'PanelNote($text${remedy == null ? '' : ', remedy: ${remedy!.name}'})';
+      'PanelNote($text${remedy == null ? '' : ', remedy: $remedy'})';
 }
 
 /// How the panel paints its own fill.
@@ -202,6 +259,28 @@ enum PanelCommandKind {
   /// carries a [PermissionKind] and the main engine holds the capability. That
   /// is the same split every other command here follows.
   openPermissionSettings,
+
+  /// Shows the batch on the panel as something the user can edit and confirm
+  /// (ADR-0022).
+  ///
+  /// One command for both doors into the review state — the standing 「核对」
+  /// button and the landing point of a refusal whose remedy is [EnterReview] —
+  /// because they ask for the same thing and the engine already knows which
+  /// batch is on the panel.
+  openReview,
+
+  /// The user confirmed the batch, and [PanelCommand.lines] is how they left it.
+  ///
+  /// This is the only command that changes the transcript rather than reporting
+  /// something about it: what comes back is the user's reading of the screen,
+  /// and the next analysis is gated on it.
+  confirmTranscript,
+
+  /// The user dropped the batch instead of confirming it (ADR-0022).
+  ///
+  /// The batch is thrown away rather than kept for later, because a panel that
+  /// shows words it refuses to use is worse than an empty one.
+  cancelReview,
 }
 
 /// A command going up.
@@ -211,6 +290,7 @@ final class PanelCommand {
     this.candidateIndex,
     this.text,
     this.permission,
+    this.lines,
   });
 
   final PanelCommandKind kind;
@@ -224,11 +304,25 @@ final class PanelCommand {
   /// Which system page, for [PanelCommandKind.openPermissionSettings].
   final PermissionKind? permission;
 
+  /// The batch as the user left it, for [PanelCommandKind.confirmTranscript].
+  ///
+  /// A list of lines rather than one string, because the review edits the
+  /// speaker of a line as well as its words, and the unit the user works in is
+  /// the batch: they delete a line, fold one into the one above it, and confirm
+  /// the rest. A single string could carry the text and nothing about who said
+  /// it.
+  ///
+  /// Null for every other command, which is what keeps "no lines" distinct from
+  /// "an empty batch" — the latter is refused by the panel, which disables the
+  /// button rather than sending it.
+  final List<PanelLine>? lines;
+
   @override
   String toString() =>
       'PanelCommand(${kind.name}${candidateIndex == null ? '' : ', $candidateIndex'}'
       '${text == null ? '' : ', edited'}'
-      '${permission == null ? '' : ', ${permission!.name}'})';
+      '${permission == null ? '' : ', ${permission!.name}'}'
+      '${lines == null ? '' : ', ${lines!.length} lines'})';
 }
 
 /// The one seam between the two windows.

@@ -62,6 +62,7 @@ final class Snapshot {
     this.windowId = 0,
     this.source = 'manual',
     this.capturedLines = const <CapturedLine>[],
+    this.reviewed = false,
   }) {
     if (transcript.trim().isEmpty) {
       throw const DomainException('请先读取或粘贴对话');
@@ -83,18 +84,35 @@ final class Snapshot {
   /// anti-injection filter can see which lines came from the other party without
   /// re-parsing the rendered form. They are empty for a pasted transcript, and
   /// an empty list is the filter's no-op signal (#10, AC1).
+  /// **A reviewed batch is quoted without the per-line doubt.**
+  ///
+  /// [reviewed] drops `[OCR待核对]` from the rendered transcript and from
+  /// nothing else: [capturedLines] keeps the confidence the recogniser gave, and
+  /// [source] still says `ocr`, so the model is still told where the words came
+  /// from. What it is no longer told is to doubt every one of them — a person
+  /// has just read the batch line by line and corrected it, and the engine is
+  /// quoting that person, not the recogniser. A `说话人待确认` line keeps its
+  /// label: the user chose *not to* attribute it, which is a different fact
+  /// (ADR-0015) and one a review does not erase.
+  ///
+  /// It was the other way round until ADR-0024. Left as it was, the marker told
+  /// the model that every line of a confirmed batch was unvouched-for, and a
+  /// model that believes it has nothing trustworthy to answer from answers with
+  /// no candidates at all — which the panel then had no way to show.
   factory Snapshot.fromCaptured({
     required String? title,
     required List<CapturedLine> lines,
     int windowId = 0,
     String source = 'ocr',
+    bool reviewed = false,
   }) =>
       Snapshot(
         title: (title ?? '').trim(),
-        transcript: renderTranscript(lines),
+        transcript: renderTranscript(reviewed ? _withoutOcrDoubt(lines) : lines),
         windowId: windowId,
         source: source,
         capturedLines: lines,
+        reviewed: reviewed,
       );
 
   final String title;
@@ -117,6 +135,19 @@ final class Snapshot {
   /// would couple the filter to the renderer's exact format.
   final List<CapturedLine> capturedLines;
 
+  /// Whether a person read this batch and confirmed it (ADR-0022).
+  ///
+  /// It is what [checkAnalysable] reads instead of the per-line markers once it
+  /// is set, and it is **not** a claim about the recogniser: [source] still
+  /// says `ocr`, because confirming says "this is what the screen said", not
+  /// "the recogniser was right".
+  ///
+  /// It does end the per-line doubt. A confirmed line no longer carries
+  /// `[OCR待核对]` into the transcript, because after a review the engine is
+  /// quoting the person who read the screen rather than the pixels it read
+  /// (ADR-0024).
+  final bool reviewed;
+
   /// A stable signature of the last few lines — this conversation's identity.
   ///
   /// Empty for a pasted transcript, which has no captured lines and therefore no
@@ -124,6 +155,17 @@ final class Snapshot {
   /// invented from pasted text would compare equal to nothing.
   String get signature => conversationSignature(capturedLines);
 }
+
+/// The same lines with the recogniser's confidence taken off them.
+///
+/// Only the confidence goes, because that is the one field whose rendering is a
+/// claim about whether the engine vouches for the text. The speaker stays,
+/// including [Speaker.unknown]: a line the user declined to attribute is
+/// answered by `说话人待确认`, which a review confirms rather than resolves.
+List<CapturedLine> _withoutOcrDoubt(List<CapturedLine> lines) => <CapturedLine>[
+  for (final CapturedLine line in lines)
+    CapturedLine(speaker: line.speaker, text: line.text, sender: line.sender),
+];
 
 /// The label a speaker is written as in a transcript.
 ///

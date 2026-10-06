@@ -47,12 +47,22 @@ final class PanelWindowRuntime {
     required this.setExpanded,
     required this.startDragging,
     required this.setFocusable,
+    this.setReviewing,
   });
 
   final PanelChannel channel;
   final Future<void> Function(bool expanded) setExpanded;
   final Future<void> Function() startDragging;
   final Future<void> Function(bool focusable) setFocusable;
+
+  /// Grows the panel window while the user is reviewing a batch (ADR-0022).
+  ///
+  /// **Null where the port has nothing to do**, which is the honest answer
+  /// rather than a no-op: the desktop windows are 420×620 and the review already
+  /// fits, so only Android — 300×380, and no `adjustResize` for an overlay —
+  /// has a size to change. A null therefore means "this port's panel is already
+  /// the size it should be", not "this port forgot".
+  final Future<void> Function(bool reviewing)? setReviewing;
 }
 
 /// Which side of the panel this process is, or null when it is the main window.
@@ -79,6 +89,8 @@ Future<PanelWindowRuntime?> attachPanelWindowForCurrentPlatform() async {
       setExpanded: channel.setExpanded,
       startDragging: channel.startDragging,
       setFocusable: channel.setFocusable,
+      // The only port whose panel is too short to review in (ADR-0022).
+      setReviewing: channel.setReviewing,
     );
   }
   if (Platform.isMacOS) {
@@ -248,6 +260,7 @@ Future<void> _showPanel({
         note: panelShowFailureNote(failure, copy),
         transcript: current.transcript,
         appNames: current.appNames,
+        reviewing: current.reviewing,
       ),
     );
     return;
@@ -276,7 +289,7 @@ PanelNote panelShowFailureNote(PlatformException failure, AppCopy copy) =>
     switch (failure.code) {
       'overlay_permission_denied' => PanelNote(
         copy.text(CopyKey.runtimePanelPermissionDenied),
-        remedy: PermissionKind.overlay,
+        remedy: const OpenPermissionPage(PermissionKind.overlay),
       ),
       'overlay_permission_pending' => PanelNote(
         copy.text(CopyKey.runtimePanelPermissionPending),

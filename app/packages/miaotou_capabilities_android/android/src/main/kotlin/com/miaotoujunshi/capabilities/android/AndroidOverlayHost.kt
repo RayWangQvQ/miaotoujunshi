@@ -29,6 +29,18 @@ internal class AndroidOverlayHost(
         private const val EXPANDED_HEIGHT_DP = 380
         private const val DEFAULT_TOP_DP = 56
         private const val SAFE_EXPANDED_TOP_DP = 48
+
+        /**
+         * How much of the screen the review state is allowed to take (ADR-0022).
+         *
+         * A ratio rather than a constant, because what is being made room for is
+         * a keyboard and the keyboard's share of a screen is roughly the same on
+         * every phone while a fixed height is not. It is a mitigation and not a
+         * guarantee: an overlay window is not an Activity, so `adjustResize`
+         * does not reach it and this class cannot shrink the panel as the input
+         * method rises. The user still scrolls.
+         */
+        private const val REVIEW_HEIGHT_RATIO = 0.65
     }
 
     var activity: Activity? = null
@@ -48,6 +60,9 @@ internal class AndroidOverlayHost(
     private var visible = false
     private var expanded = false
     private var focusable = false
+
+    /** Whether the panel is asking for the taller review window (ADR-0022). */
+    private var reviewing = false
     private var edge = "left"
     private var collapsedY = 0
 
@@ -141,6 +156,32 @@ internal class AndroidOverlayHost(
         }
     }
 
+    /**
+     * Grows the panel for the review state, and shrinks it back (ADR-0022).
+     *
+     * The panel engine asks for this when the batch on it becomes editable: a
+     * 380 dp window is a few lines of text and the review is a form, so the
+     * space has to come from somewhere. The collapsed ball is unaffected — a
+     * review the user has folded away is still folded away — and the expanded
+     * height is derived rather than stored, so collapsing and expanding again
+     * lands back on the review size instead of the ordinary one.
+     */
+    fun setReviewing(value: Boolean) {
+        if (reviewing == value) {
+            return
+        }
+        reviewing = value
+        val window = params ?: return
+        if (!expanded) {
+            return
+        }
+        window.height = expandedHeightPx()
+        clamp(window)
+        if (visible) {
+            windowManager.updateViewLayout(container, window)
+        }
+    }
+
     fun publishFrame(frame: Any?) {
         latestFrame = frame
         if (panelReady) {
@@ -229,6 +270,10 @@ internal class AndroidOverlayHost(
                         }
                         "setFocusable" -> {
                             setFocusable(call.arguments.argumentBoolean("value"))
+                            result.success(null)
+                        }
+                        "setReviewing" -> {
+                            setReviewing(call.arguments.argumentBoolean("value"))
                             result.success(null)
                         }
                         else -> result.notImplemented()
@@ -334,7 +379,7 @@ internal class AndroidOverlayHost(
         }
         expanded = value
         window.width = dp(if (value) EXPANDED_WIDTH_DP else COLLAPSED_SIZE_DP)
-        window.height = dp(if (value) EXPANDED_HEIGHT_DP else COLLAPSED_SIZE_DP)
+        window.height = if (value) expandedHeightPx() else dp(COLLAPSED_SIZE_DP)
         window.y = if (value) {
             window.y.coerceAtMost(dp(SAFE_EXPANDED_TOP_DP))
         } else {
@@ -346,6 +391,25 @@ internal class AndroidOverlayHost(
         if (visible) {
             windowManager.updateViewLayout(container, window)
         }
+    }
+
+    /**
+     * The height the expanded panel is drawn at right now.
+     *
+     * Derived from [reviewing] rather than stored, so that the two ways to
+     * change it — the collapse toggle and the review state — cannot disagree.
+     * Never shorter than the ordinary expanded height: a "taller" state that is
+     * shorter on a small screen would be a bug whose cause the user cannot see.
+     */
+    private fun expandedHeightPx(): Int {
+        if (!reviewing) {
+            return dp(EXPANDED_HEIGHT_DP)
+        }
+        val screenHeight = context.resources.displayMetrics.heightPixels
+        val wanted = (screenHeight * REVIEW_HEIGHT_RATIO).roundToInt()
+        return wanted
+            .coerceAtLeast(dp(EXPANDED_HEIGHT_DP))
+            .coerceAtMost(screenHeight - dp(SAFE_EXPANDED_TOP_DP))
     }
 
     private fun moveBy(dx: Float, dy: Float) {

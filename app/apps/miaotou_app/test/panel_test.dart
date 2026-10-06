@@ -536,6 +536,432 @@ void main() {
     });
   });
 
+  group('a verdict with no drafts', () {
+    testWidgets('the batch stays on the panel', (WidgetTester tester) async {
+      // ADR-0024. `RankingStatus.notNeeded` is the domain saying 「本轮建议不
+      // 回复」 on purpose, and the panel used to answer it with a blank body: an
+      // advice is not null, so the transcript's branch was skipped, and there
+      // were no drafts to draw either — leaving the note and nothing else,
+      // which is what made 「重新分析」 look like it had done nothing at all.
+      await pumpPanel(
+        tester,
+        PanelFrame(
+          analysed: wechat,
+          live: wechat,
+          advice: adviceWithCandidates(const <String>[]),
+          note: PanelNote(AppCopy.zh.text(CopyKey.panelNoteReviewed)),
+          transcript: const <PanelLine>[
+            PanelLine(speaker: Speaker.me, text: '在吗'),
+            PanelLine(speaker: Speaker.other, text: '在的'),
+          ],
+          appNames: appNames,
+        ),
+      );
+
+      expect(
+        find.text(AppCopy.zh.text(CopyKey.panelTranscriptLabel)),
+        findsOneWidget,
+      );
+      expect(find.text('我：在吗'), findsOneWidget);
+      expect(find.text('对方：在的'), findsOneWidget);
+      expect(
+        find.text(AppCopy.zh.text(CopyKey.panelEmpty)),
+        findsNothing,
+        reason:
+            'a batch the user just confirmed is the one thing on the panel that '
+            'is theirs; an analysis that produced no drafts is not a reason to '
+            'take it away',
+      );
+    });
+  });
+
+  group('a batch is reviewed before it is analysed', () {
+    const List<PanelLine> batch = <PanelLine>[
+      PanelLine(speaker: Speaker.me, text: '在吗'),
+      PanelLine(speaker: Speaker.other, text: '在的'),
+    ];
+
+    PanelFrame reviewing({List<PanelLine> lines = batch}) => PanelFrame(
+      analysed: wechat,
+      live: wechat,
+      note: PanelNote(AppCopy.zh.text(CopyKey.panelNoteSidesGuessed)),
+      transcript: lines,
+      reviewing: true,
+      appNames: appNames,
+    );
+
+    testWidgets('the form takes the body, with the batch in it', (
+      WidgetTester tester,
+    ) async {
+      // The report behind ADR-0022: a whole-frame capture landed on the panel as
+      // read-only text under a note asking the user to check the sides, with no
+      // way to check them and no way past the gate.
+      //
+      // Sized to the Android overlay on purpose — the form is the one thing the
+      // panel has to fit that a Row of buttons did not, and an unbounded test
+      // surface would hide an overflow that ships.
+      await pumpPanel(tester, reviewing(), panelSize: const Size(300, 380));
+
+      expect(
+        find.text(AppCopy.zh.text(CopyKey.panelReviewTitle)),
+        findsOneWidget,
+      );
+      expect(find.text('在吗'), findsOneWidget);
+      expect(find.text('在的'), findsOneWidget);
+      expect(
+        find.text(AppCopy.zh.text(CopyKey.panelTranscriptLabel)),
+        findsNothing,
+        reason:
+            'the read-only reading of the same batch, behind an editable one, '
+            'is the panel talking over itself',
+      );
+      expect(
+        find.text(AppCopy.zh.text(CopyKey.panelNoteSidesGuessed)),
+        findsOneWidget,
+        reason:
+            'the caveat stays: it is the sentence that says what the user is '
+            'being asked to check',
+      );
+    });
+
+    testWidgets('each row starts from the side the geometry guessed', (
+      WidgetTester tester,
+    ) async {
+      // ADR-0019's guess is a starting point, not a question the user starts
+      // from scratch: most whole-frame reads are right about most lines.
+      await pumpPanel(tester, reviewing());
+
+      expect(
+        tester
+            .widget<SegmentedButton<Speaker>>(
+              find.byKey(const ValueKey<String>('panel-review-speaker-0')),
+            )
+            .selected,
+        <Speaker>{Speaker.me},
+      );
+      expect(
+        tester
+            .widget<SegmentedButton<Speaker>>(
+              find.byKey(const ValueKey<String>('panel-review-speaker-1')),
+            )
+            .selected,
+        <Speaker>{Speaker.other},
+      );
+    });
+
+    testWidgets('the side has a third answer, which is no answer', (
+      WidgetTester tester,
+    ) async {
+      // A toggle would force a choice between two sides, and ADR-0015 makes
+      // admitting there is no author better than inventing one.
+      await pumpPanel(tester, reviewing());
+
+      final Finder third = find.descendant(
+        of: find.byKey(const ValueKey<String>('panel-review-speaker-0')),
+        matching: find.text(AppCopy.zh.text(CopyKey.panelSpeakerUnknown)),
+      );
+      expect(third, findsOneWidget);
+
+      await tester.tap(third);
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<SegmentedButton<Speaker>>(
+              find.byKey(const ValueKey<String>('panel-review-speaker-0')),
+            )
+            .selected,
+        <Speaker>{Speaker.unknown},
+      );
+    });
+
+    testWidgets('the bottom row offers confirm and cancel, not a reanalyse', (
+      WidgetTester tester,
+    ) async {
+      final InMemoryPanelChannel channel = await pumpPanel(tester, reviewing());
+
+      expect(find.byKey(const Key('panel-review-confirm')), findsOneWidget);
+      expect(find.byKey(const Key('panel-review-cancel')), findsOneWidget);
+      expect(
+        find.byKey(const Key('panel-recognise-once')),
+        findsOneWidget,
+        reason:
+            're-photographing is the answer to a capture that read badly, and '
+            'it is the same button rather than a second one beside it',
+      );
+      expect(
+        find.text(AppCopy.zh.text(CopyKey.panelActionReanalyse)),
+        findsNothing,
+        reason:
+            'ADR-0022 decision 10: the gate refuses an unconfirmed batch every '
+            'time, and a button that cannot succeed is a button the user will '
+            'press',
+      );
+      expect(channel.sent, isEmpty);
+    });
+
+    testWidgets('confirm sends the batch as the user left it', (
+      WidgetTester tester,
+    ) async {
+      final InMemoryPanelChannel channel = await pumpPanel(tester, reviewing());
+
+      // Both halves of what the form is for: the side was guessed wrong, and a
+      // character came back wrong.
+      await tester.tap(
+        find.descendant(
+          of: find.byKey(const ValueKey<String>('panel-review-speaker-1')),
+          matching: find.text(AppCopy.zh.text(CopyKey.panelSpeakerMe)),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey<String>('panel-review-text-1')),
+        '在的，刚看到',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('panel-review-confirm')));
+      await tester.pumpAndSettle();
+
+      expect(channel.sent.last.kind, PanelCommandKind.confirmTranscript);
+      expect(
+        channel.sent.last.lines?.map(
+          (PanelLine line) => '${line.speaker.name}:${line.text}',
+        ),
+        <String>['me:在吗', 'me:在的，刚看到'],
+      );
+    });
+
+    testWidgets('a line that is not there can be deleted', (
+      WidgetTester tester,
+    ) async {
+      final InMemoryPanelChannel channel = await pumpPanel(tester, reviewing());
+
+      await tester.tap(
+        find.byKey(const ValueKey<String>('panel-review-delete-1')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('panel-review-confirm')));
+      await tester.pumpAndSettle();
+
+      expect(
+        channel.sent.last.lines?.map((PanelLine line) => line.text),
+        <String>['在吗'],
+      );
+    });
+
+    testWidgets('a bubble split in two can be folded back into one', (
+      WidgetTester tester,
+    ) async {
+      final InMemoryPanelChannel channel = await pumpPanel(tester, reviewing());
+
+      await tester.tap(
+        find.byKey(const ValueKey<String>('panel-review-merge-1')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('在吗 在的'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('panel-review-confirm')));
+      await tester.pumpAndSettle();
+      expect(
+        channel.sent.last.lines?.map(
+          (PanelLine line) => '${line.speaker.name}:${line.text}',
+        ),
+        <String>['me:在吗 在的'],
+        reason:
+            'the upper line keeps the speaker: a split that was not a split is '
+            'one message, and the user is folding the two halves back together',
+      );
+    });
+
+    testWidgets('the first line has nothing above it to fold into', (
+      WidgetTester tester,
+    ) async {
+      await pumpPanel(tester, reviewing());
+
+      expect(
+        tester
+            .widget<IconButton>(
+              find.byKey(const ValueKey<String>('panel-review-merge-0')),
+            )
+            .onPressed,
+        isNull,
+      );
+    });
+
+    testWidgets('emptying every line says so and disables confirm', (
+      WidgetTester tester,
+    ) async {
+      await pumpPanel(tester, reviewing());
+
+      await tester.enterText(
+        find.byKey(const ValueKey<String>('panel-review-text-0')),
+        '',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey<String>('panel-review-text-1')),
+        '   ',
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(AppCopy.zh.text(CopyKey.panelReviewNothingLeft)),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<FilledButton>(find.byKey(const Key('panel-review-confirm')))
+            .onPressed,
+        isNull,
+        reason:
+            'the command would be an empty batch, which the runtime refuses '
+            'anyway — disabling it here is the first reading of the same rule',
+      );
+    });
+
+    testWidgets('cancel asks to drop the batch rather than confirm it', (
+      WidgetTester tester,
+    ) async {
+      final InMemoryPanelChannel channel = await pumpPanel(tester, reviewing());
+
+      await tester.tap(find.byKey(const Key('panel-review-cancel')));
+      await tester.pumpAndSettle();
+
+      expect(channel.sent.last.kind, PanelCommandKind.cancelReview);
+      expect(channel.sent.last.lines, isNull);
+    });
+
+    testWidgets('the form wins over a draft already on screen', (
+      WidgetTester tester,
+    ) async {
+      // The review is a state rather than a section: the user is being asked a
+      // question, and a candidate card behind it is the panel talking over
+      // itself.
+      await pumpPanel(
+        tester,
+        PanelFrame(
+          analysed: wechat,
+          live: wechat,
+          advice: adviceWith('好呀'),
+          transcript: batch,
+          reviewing: true,
+          appNames: appNames,
+        ),
+      );
+
+      expect(find.byType(CandidateCard), findsNothing);
+      expect(
+        find.text(AppCopy.zh.text(CopyKey.panelReviewTitle)),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('the host is asked for a taller window while the form is up', (
+      WidgetTester tester,
+    ) async {
+      // The panel cannot resize itself and does not try: the window is the
+      // host's, and on Android it is the host's own 380dp overlay with no
+      // `adjustResize`, which puts the keyboard over the form.
+      final List<bool> asked = <bool>[];
+      Future<void> record(bool reviewing) async => asked.add(reviewing);
+
+      await pumpPanel(
+        tester,
+        frame(analysed: wechat, live: wechat),
+        onReviewChanged: record,
+      );
+      expect(asked, isEmpty);
+
+      // A batch lands, and with it the review.
+      await pumpPanel(tester, reviewing(), onReviewChanged: record);
+      expect(asked, <bool>[true]);
+
+      // And the room is given back when the state ends.
+      await pumpPanel(
+        tester,
+        frame(analysed: wechat, live: wechat),
+        onReviewChanged: record,
+      );
+      expect(asked, <bool>[true, false]);
+    });
+
+    testWidgets('a panel that starts with the form up asks for the room too', (
+      WidgetTester tester,
+    ) async {
+      // The window was recreated while a review was outstanding. No frame change
+      // will come to say so, so the ask has to happen on the first build.
+      final List<bool> asked = <bool>[];
+      await pumpPanel(
+        tester,
+        reviewing(),
+        onReviewChanged: (bool reviewing) async => asked.add(reviewing),
+      );
+
+      expect(asked, <bool>[true]);
+    });
+
+    testWidgets('the standing 核对 is how the user gets back in', (
+      WidgetTester tester,
+    ) async {
+      // ADR-0022 decision 12: a wrong character noticed after the fact should
+      // not cost a second photograph of the screen.
+      final InMemoryPanelChannel channel = await pumpPanel(
+        tester,
+        PanelFrame(
+          analysed: wechat,
+          live: wechat,
+          transcript: batch,
+          appNames: appNames,
+        ),
+      );
+
+      final Finder open = find.byKey(const Key('panel-review-open'));
+      expect(open, findsOneWidget);
+      await tester.tap(open);
+      await tester.pumpAndSettle();
+
+      expect(channel.sent.last.kind, PanelCommandKind.openReview);
+    });
+
+    testWidgets('a refusal carries the way into the form', (
+      WidgetTester tester,
+    ) async {
+      // ADR-0022 decision 13. 「当前对话全部待核对」 with nothing to act on is the
+      // sentence the report was stuck on; the sentence alone tells the user what
+      // is wrong and leaves them to find the surface that fixes it.
+      final InMemoryPanelChannel channel = await pumpPanel(
+        tester,
+        PanelFrame(
+          analysed: wechat,
+          live: wechat,
+          note: const PanelNote(
+            '当前对话全部待核对，请先确认说话人和原文，再生成回复',
+            remedy: EnterReview(),
+          ),
+          transcript: batch,
+          appNames: appNames,
+        ),
+      );
+
+      final Finder remedy = find.byKey(const Key('panel-note-remedy'));
+      expect(remedy, findsOneWidget);
+      expect(
+        find.text(AppCopy.zh.text(CopyKey.panelActionGoReview)),
+        findsOneWidget,
+      );
+      await tester.tap(remedy);
+      await tester.pumpAndSettle();
+
+      expect(channel.sent.last.kind, PanelCommandKind.openReview);
+    });
+
+    testWidgets('nothing read yet keeps the standing button away', (
+      WidgetTester tester,
+    ) async {
+      await pumpPanel(tester, frame(analysed: wechat, live: wechat));
+
+      expect(find.byKey(const Key('panel-review-open')), findsNothing);
+    });
+  });
+
   testWidgets('the gallery hosts it, so it is not dead code', (
     WidgetTester tester,
   ) async {
@@ -563,41 +989,69 @@ void main() {
 Matrix4 _landing(WidgetTester tester) =>
     tester.widget<Transform>(find.byKey(const Key('panel-landing'))).transform;
 
+/// The panel in the shell a test drives it from.
+///
+/// Split out from [pumpPanel] so a test can pump the *same* position twice and
+/// let `didUpdateWidget` run, which is the path a real republish takes — the
+/// review is entered by a frame change, not by the panel deciding anything.
+Widget panelIn(
+  PanelFrame frame,
+  InMemoryPanelChannel channel, {
+  AppCopy copy = AppCopy.zh,
+  bool initialExpanded = true,
+  VoidCallback? onDragStart,
+  Future<void> Function(bool reviewing)? onReviewChanged,
+  Size? panelSize,
+}) => CopyScope(
+  copy: copy,
+  child: MaterialApp(
+    theme: buildTheme(),
+    home: Scaffold(
+      body: SingleChildScrollView(
+        child: SizedBox(
+          width: panelSize?.width,
+          height: panelSize?.height,
+          child: PanelPage(
+            frame: frame,
+            onCommand: channel.send,
+            initialExpanded: initialExpanded,
+            onDragStart: onDragStart,
+            onReviewChanged: onReviewChanged,
+          ),
+        ),
+      ),
+    ),
+  ),
+);
+
 Future<InMemoryPanelChannel> pumpPanel(
   WidgetTester tester,
   PanelFrame frame, {
   AppCopy copy = AppCopy.zh,
   bool initialExpanded = true,
   VoidCallback? onDragStart,
+  Future<void> Function(bool reviewing)? onReviewChanged,
   Size? panelSize,
+  InMemoryPanelChannel? channel,
 }) async {
-  final InMemoryPanelChannel channel = InMemoryPanelChannel();
-  addTearDown(channel.dispose);
+  final InMemoryPanelChannel target = channel ?? InMemoryPanelChannel();
+  if (channel == null) {
+    addTearDown(target.dispose);
+  }
 
   await tester.pumpWidget(
-    CopyScope(
+    panelIn(
+      frame,
+      target,
       copy: copy,
-      child: MaterialApp(
-        theme: buildTheme(),
-        home: Scaffold(
-          body: SingleChildScrollView(
-            child: SizedBox(
-              width: panelSize?.width,
-              height: panelSize?.height,
-              child: PanelPage(
-                frame: frame,
-                onCommand: channel.send,
-                initialExpanded: initialExpanded,
-                onDragStart: onDragStart,
-              ),
-            ),
-          ),
-        ),
-      ),
+      initialExpanded: initialExpanded,
+      onDragStart: onDragStart,
+      onReviewChanged: onReviewChanged,
+      panelSize: panelSize,
     ),
   );
   await tester.pumpAndSettle();
-  return channel;
+  return target;
 }
 
 String _sourceOf(String relative) {

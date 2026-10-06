@@ -28,7 +28,7 @@ void main() {
       expect(note.text, copy.text(CopyKey.runtimePanelPermissionDenied));
       expect(
         note.remedy,
-        PermissionKind.overlay,
+        const OpenPermissionPage(PermissionKind.overlay),
         reason: 'the user was taken to the page and declined; the same page is '
             'still the only thing that fixes it',
       );

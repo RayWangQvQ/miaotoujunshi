@@ -38,7 +38,10 @@ void main() {
       analysed: conversation,
       live: conversation,
       advice: advice,
-      note: PanelNote('OCR 待核对', remedy: PermissionKind.accessibility),
+      note: PanelNote(
+        'OCR 待核对',
+        remedy: OpenPermissionPage(PermissionKind.accessibility),
+      ),
       transcript: <PanelLine>[
         PanelLine(speaker: Speaker.me, text: '在吗'),
         PanelLine(speaker: Speaker.other, text: '在的'),
@@ -58,7 +61,7 @@ void main() {
     expect(after.note?.text, 'OCR 待核对');
     expect(
       after.note?.remedy,
-      PermissionKind.accessibility,
+      const OpenPermissionPage(PermissionKind.accessibility),
       reason: 'the remedy is the whole reason a note is a PanelNote rather than a '
           'string; losing it on the wire leaves the panel with a sentence and no '
           'button (ADR-0021 decision 8)',
@@ -98,11 +101,18 @@ void main() {
   test('every shared command survives the window wire codec', () {
     for (final PanelCommandKind kind in PanelCommandKind.values) {
       final bool opensAPage = kind == PanelCommandKind.openPermissionSettings;
+      final bool carriesBatch = kind == PanelCommandKind.confirmTranscript;
       final PanelCommand before = PanelCommand(
         kind,
         candidateIndex: kind == PanelCommandKind.fill ? 2 : null,
         text: kind == PanelCommandKind.fill ? '改过的回复' : null,
         permission: opensAPage ? PermissionKind.overlay : null,
+        lines: carriesBatch
+            ? const <PanelLine>[
+                PanelLine(speaker: Speaker.me, text: '在吗'),
+                PanelLine(speaker: Speaker.unknown, text: '？'),
+              ]
+            : null,
       );
       final PanelCommand after = PanelWireCodec.decodeCommand(
         PanelWireCodec.encodeCommand(before),
@@ -115,7 +125,48 @@ void main() {
         before.permission,
         reason: 'a command to open a page that arrives without one opens nothing',
       );
+      expect(
+        after.lines?.map((PanelLine line) => line.speaker).toList(),
+        before.lines?.map((PanelLine line) => line.speaker).toList(),
+        reason: 'ADR-0022: the confirmation carries what the user said, and a '
+            'side that does not survive the wire comes back as the wrong one',
+      );
+      expect(
+        after.lines?.map((PanelLine line) => line.text).toList(),
+        before.lines?.map((PanelLine line) => line.text).toList(),
+      );
     }
+  });
+
+  test('the review state and its way out survive the codec', () {
+    // ADR-0022 decision 13: the refusal that asks for a confirmation carries
+    // the way to give one, and both halves of that have to cross the window.
+    const PanelFrame before = PanelFrame(
+      analysed: conversation,
+      transcript: <PanelLine>[PanelLine(speaker: Speaker.other, text: '在吗')],
+      note: PanelNote('当前对话全部待核对', remedy: EnterReview()),
+      reviewing: true,
+    );
+
+    final PanelFrame after = PanelWireCodec.decodeFrame(
+      PanelWireCodec.encodeFrame(before),
+    );
+
+    expect(after.reviewing, isTrue);
+    expect(after.note?.remedy, const EnterReview());
+    expect(after.transcript.single.text, '在吗');
+  });
+
+  test('an unreviewed frame crosses without the flag', () {
+    final PanelFrame after = PanelWireCodec.decodeFrame(
+      PanelWireCodec.encodeFrame(const PanelFrame(analysed: conversation)),
+    );
+    expect(
+      after.reviewing,
+      isFalse,
+      reason: 'the flag is absent when it is false, so an older neighbour still '
+          'decodes — and absence has to mean false rather than an error',
+    );
   });
 
   test('the main-engine panel session owns live frames and commands', () async {

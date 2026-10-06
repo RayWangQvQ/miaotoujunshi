@@ -45,6 +45,7 @@ final class ChatUiSnapshot {
     required this.capturedAt,
     this.unreadBubbles = const <UnreadBubble>[],
     this.note,
+    this.reviewed = false,
   });
 
   final ConversationRef conversation;
@@ -57,6 +58,21 @@ final class ChatUiSnapshot {
   /// A caveat about how this snapshot was produced, shown verbatim in the
   /// panel. Null when there is nothing to warn about.
   final String? note;
+
+  /// Whether the user has read this batch and confirmed it.
+  ///
+  /// **A fact about the batch, not about a line.** A manual whole-frame capture
+  /// cannot be scored per line, so every line of one carries `[OCR待核对]`, and
+  /// the domain refuses a batch whose every line is doubtful. The way out is a
+  /// person saying "that is the conversation", which is answered for the batch
+  /// as a whole — a user who changed nothing has still answered it. It is
+  /// deliberately not a field on [ChatLine]: a line's speaker and text are what
+  /// the perception layer produced, and what the user did with them afterwards
+  /// is a different claim (ADR-0022).
+  ///
+  /// Defaults to false because the ordinary snapshot is one nobody has looked
+  /// at yet.
+  final bool reviewed;
 
   /// A stable signature of the last few lines, so a caller can tell a real
   /// change from a re-read of the same screen. Six is the count the Android
@@ -73,5 +89,5 @@ final class ChatUiSnapshot {
   @override
   String toString() =>
       'ChatUiSnapshot($conversation, ${lines.length} lines, '
-      '${unreadBubbles.length} unread)';
+      '${unreadBubbles.length} unread${reviewed ? ', reviewed' : ''})';
 }

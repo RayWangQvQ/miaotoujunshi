@@ -37,6 +37,7 @@ class PanelApp extends StatefulWidget {
     this.onExpandedChanged,
     this.onDragStart,
     this.onInputFocusChanged,
+    this.onReviewChanged,
     this.initialExpanded = true,
     this.initialAppearance = const PanelAppearance(),
   });
@@ -47,6 +48,14 @@ class PanelApp extends StatefulWidget {
   final ValueChanged<bool>? onExpandedChanged;
   final VoidCallback? onDragStart;
   final Future<void> Function(bool focusable)? onInputFocusChanged;
+
+  /// Asks the host to grow the window while the batch is being reviewed
+  /// (ADR-0022 decision 15).
+  ///
+  /// Null on the ports whose panel is already tall enough, which is why it is
+  /// optional rather than required: a port with nothing to do says so by not
+  /// answering, and the review still works.
+  final Future<void> Function(bool reviewing)? onReviewChanged;
   final bool initialExpanded;
 
   /// What the panel paints itself with until the main window's first push
@@ -124,6 +133,7 @@ class _PanelAppState extends State<PanelApp> {
                             onExpandedChanged: widget.onExpandedChanged,
                             onDragStart: widget.onDragStart,
                             onInputFocusChanged: widget.onInputFocusChanged,
+                            onReviewChanged: widget.onReviewChanged,
                             initialExpanded: widget.initialExpanded,
                           ),
                     ),

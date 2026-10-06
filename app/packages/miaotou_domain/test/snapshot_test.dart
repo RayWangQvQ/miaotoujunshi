@@ -96,4 +96,67 @@ void main() {
     expect(snapshot.source, 'ocr');
     expect(snapshot.transcript, '对方：在吗');
   });
+
+  test('a reviewed batch is quoted without the per-line doubt', () {
+    // ADR-0024. The confidence is still the recogniser's and still travels on
+    // `capturedLines`, and the source is still `ocr` — what the review ends is
+    // the claim that the engine cannot vouch for the words, because after a
+    // person has typed them the engine is quoting that person.
+    //
+    // Left in, the marker told the model that every line of a batch the user
+    // had just confirmed was unvouched-for, and a model with nothing it is
+    // allowed to trust answers with no candidates at all.
+    const List<CapturedLine> lines = <CapturedLine>[
+      CapturedLine(speaker: Speaker.other, text: '在吗', confidence: double.nan),
+      CapturedLine(speaker: Speaker.me, text: '在的', confidence: double.nan),
+    ];
+    final Snapshot reviewed = Snapshot.fromCaptured(
+      title: 'A',
+      lines: lines,
+      reviewed: true,
+    );
+    expect(reviewed.transcript, '对方：在吗\n我：在的');
+    expect(reviewed.source, 'ocr');
+    expect(
+      reviewed.capturedLines.singleWhere(
+        (CapturedLine line) => line.text == '在吗',
+      ).confidence,
+      isNaN,
+      reason: 'the recogniser\'s own score is a fact the filter may still read',
+    );
+
+    // Unreviewed, the same lines keep the marker — that is the whole reason the
+    // gate refuses them.
+    expect(
+      Snapshot.fromCaptured(title: 'A', lines: lines).transcript,
+      '对方：在吗 [OCR待核对]\n我：在的 [OCR待核对]',
+    );
+  });
+
+  test('a review confirms an unattributed line rather than resolving it', () {
+    // The speaker label is a different fact from the recogniser's doubt:
+    // ADR-0015 makes admitting there is no author better than inventing one,
+    // and the user choosing `unknown` in the review is them saying so.
+    final Snapshot reviewed = Snapshot.fromCaptured(
+      title: 'A',
+      lines: const <CapturedLine>[
+        CapturedLine(speaker: Speaker.unknown, text: '嗯', confidence: double.nan),
+      ],
+      reviewed: true,
+    );
+    expect(reviewed.transcript, '说话人待确认：嗯');
+  });
+
+  test('a captured batch is unreviewed unless the caller says otherwise', () {
+    // ADR-0022: nobody has looked at a batch that just came off the screen, and
+    // a pasted transcript has no batch to review at all.
+    const List<CapturedLine> lines = <CapturedLine>[
+      CapturedLine(speaker: Speaker.other, text: '在吗'),
+    ];
+    expect(Snapshot.fromCaptured(title: 'A', lines: lines).reviewed, isFalse);
+    expect(
+      Snapshot.fromCaptured(title: 'A', lines: lines, reviewed: true).reviewed,
+      isTrue,
+    );
+  });
 }

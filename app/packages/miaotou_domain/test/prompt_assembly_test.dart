@@ -194,6 +194,37 @@ void main() {
       );
     });
 
+    test('a reviewed batch is analysable whatever its markers say', () {
+      // ADR-0022. Every line of a whole-frame capture carries the marker, so
+      // the refusal above was unsatisfiable on that path: it asked the user to
+      // confirm the speakers and the text, and there was nowhere to do it.
+      expect(
+        () => build(
+          snapshot: Snapshot(
+            title: 'A',
+            transcript: '对方：这周忙 [OCR待核对]',
+            reviewed: true,
+          ),
+        ),
+        returnsNormally,
+      );
+    });
+
+    test('an unreviewed batch with one clean line is still analysable', () {
+      // The gate reads the batch, not the markers, and it only fires when there
+      // is nothing in the transcript worth analysing — one clean line is
+      // evidence, and the model is asked to work within that.
+      expect(
+        () => build(
+          snapshot: Snapshot(
+            title: 'A',
+            transcript: '对方：这周忙 [OCR待核对]\n我：那下周再说',
+          ),
+        ),
+        returnsNormally,
+      );
+    });
+
     test('refuses a background past the ceiling', () {
       expect(
         () => build(background: '字' * (maxBackground + 1)),

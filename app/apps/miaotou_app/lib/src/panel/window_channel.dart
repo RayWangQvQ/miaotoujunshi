@@ -186,6 +186,19 @@ final class AndroidPanelViewChannel implements PanelChannel {
     <String, Object?>{'value': expanded},
   );
 
+  /// Grows the panel window for the review state (ADR-0022 decision 15).
+  ///
+  /// **Android only, and deliberately not a member of [PanelChannel] or of the
+  /// capability contract.** The Android overlay is 300×380 dp and does not
+  /// resize for the input method, so the review — a form the user types into —
+  /// would be typed into through a keyboard that covers it. The two desktop
+  /// windows are 420×620 and already have the room, so there is nothing for them
+  /// to answer for and no third refusal to write.
+  Future<void> setReviewing(bool reviewing) => _channel.invokeMethod<void>(
+    'setReviewing',
+    <String, Object?>{'value': reviewing},
+  );
+
   Future<void> startDragging() => _channel.invokeMethod<void>('startDragging');
 
   Future<void> setFocusable(bool focusable) => _channel.invokeMethod<void>(
@@ -393,12 +406,9 @@ final class PanelWireCodec {
         if (frame.note != null) 'note': _encodeNote(frame.note!),
         if (frame.transcript.isNotEmpty)
           'transcript': <Map<String, Object?>>[
-            for (final PanelLine line in frame.transcript)
-              <String, Object?>{
-                'speaker': line.speaker.name,
-                'text': line.text,
-              },
+            for (final PanelLine line in frame.transcript) _encodeLine(line),
           ],
+        if (frame.reviewing) 'reviewing': true,
         'appNames': frame.appNames,
       };
 
@@ -411,17 +421,18 @@ final class PanelWireCodec {
       note: map['note'] == null ? null : _decodeNote(map['note']),
       transcript: _decodeTranscript(map['transcript']),
       appNames: _stringMap(map['appNames'], 'appNames'),
+      reviewing: _flag(map['reviewing'], 'reviewing'),
     );
   }
 
-  /// The note and its optional remedy, as one value.
+  /// The note and its optional way out, as one value.
   ///
   /// A map rather than two keys, so a note without a remedy crosses as a note
   /// rather than as a note plus an absent field the far side has to remember to
   /// read.
   static Map<String, Object?> _encodeNote(PanelNote note) => <String, Object?>{
     'text': note.text,
-    if (note.remedy != null) 'remedy': note.remedy!.name,
+    if (note.remedy != null) 'remedy': _encodeRemedy(note.remedy!),
   };
 
   static PanelNote _decodeNote(Object? value) {
@@ -429,8 +440,33 @@ final class PanelWireCodec {
     final Object? remedy = map['remedy'];
     return PanelNote(
       _string(map, 'text'),
-      remedy: remedy == null ? null : _decodeKind(remedy),
+      remedy: remedy == null ? null : _decodeRemedy(remedy),
     );
+  }
+
+  /// A way out of a note, as one map.
+  ///
+  /// A named shape per variant rather than a bare string, because
+  /// [OpenPermissionPage] carries a value of its own and a decoder that read
+  /// only the name would have to guess the rest. An unknown name is an error
+  /// rather than a null, so a build that has drifted from its neighbour says so
+  /// instead of drawing no button.
+  static Map<String, Object?> _encodeRemedy(PanelRemedy remedy) =>
+      switch (remedy) {
+        OpenPermissionPage(:final PermissionKind kind) => <String, Object?>{
+          'kind': 'permission',
+          'permission': kind.name,
+        },
+        EnterReview() => const <String, Object?>{'kind': 'review'},
+      };
+
+  static PanelRemedy _decodeRemedy(Object? value) {
+    final Map<Object?, Object?> map = _map(value, 'panel remedy');
+    return switch (_string(map, 'kind')) {
+      'permission' => OpenPermissionPage(_decodeKind(map['permission'])),
+      'review' => const EnterReview(),
+      final String other => throw FormatException('unknown remedy $other'),
+    };
   }
 
   /// How the panel paints itself, as one whole percentage.
@@ -472,6 +508,12 @@ final class PanelWireCodec {
     );
   }
 
+  /// One line going down, and one line coming back up in a confirmed batch.
+  static Map<String, Object?> _encodeLine(PanelLine line) => <String, Object?>{
+    'speaker': line.speaker.name,
+    'text': line.text,
+  };
+
   static Map<String, Object?> encodeCommand(PanelCommand command) =>
       <String, Object?>{
         'kind': command.kind.name,
@@ -479,6 +521,10 @@ final class PanelWireCodec {
           'candidateIndex': command.candidateIndex,
         if (command.text != null) 'text': command.text,
         if (command.permission != null) 'permission': command.permission!.name,
+        if (command.lines != null)
+          'lines': <Map<String, Object?>>[
+            for (final PanelLine line in command.lines!) _encodeLine(line),
+          ],
       };
 
   static PanelCommand decodeCommand(Object? value) {
@@ -497,11 +543,22 @@ final class PanelWireCodec {
       throw const FormatException('text must be a string');
     }
     final Object? rawPermission = map['permission'];
+    final Object? rawLines = map['lines'];
+    List<PanelLine>? lines;
+    if (rawLines != null) {
+      if (rawLines is! List<Object?>) {
+        throw const FormatException('lines must be a list');
+      }
+      lines = <PanelLine>[
+        for (final Object? raw in rawLines) _decodeLine(raw),
+      ];
+    }
     return PanelCommand(
       commandKind,
       candidateIndex: rawIndex as int?,
       text: rawText as String?,
       permission: rawPermission == null ? null : _decodeKind(rawPermission),
+      lines: lines,
     );
   }
 
@@ -601,6 +658,22 @@ final class PanelWireCodec {
   static Map<Object?, Object?> _map(Object? value, String name) {
     if (value is! Map<Object?, Object?>) {
       throw FormatException('$name must be a map');
+    }
+    return value;
+  }
+
+  /// A flag that is absent when it is false.
+  ///
+  /// Absent is false rather than an error, which is what lets an older frame
+  /// from a neighbour that has not been rebuilt yet still decode. A value that
+  /// is present and is not a bool is an error, because that is drift rather
+  /// than a default.
+  static bool _flag(Object? value, String name) {
+    if (value == null) {
+      return false;
+    }
+    if (value is! bool) {
+      throw FormatException('$name must be a bool');
     }
     return value;
   }
