@@ -76,6 +76,11 @@ review is a surface on the panel.**
    the reply. See also decision 16, amended the same way.
 5. **The review is per line: a three-state speaker and the text.** Each line gets 我 /
    对方 / 不确定 and an editable body, because the domain already carries three speakers
+
+   **Superseded by** [ADR-0025](0025-review-a-batch-as-one-editable-block.md) as to
+   *the form*: the review is now one editable block, and the three states live in a
+   line prefix rather than in a per-line control. What survives is the substance —
+   three states, never a two-way toggle — and ADR-0015's reason for them.
    (`speakerLabel` renders the third as 「说话人待确认」) and ADR-0015's point is that
    inventing an author is worse than admitting there is none. A two-state toggle would force
    an attribution on a line the user cannot attribute.
@@ -85,6 +90,11 @@ review is a surface on the panel.**
    text to the one above with a single space — the rule `_Group.text` already uses — and
    keeps the upper line's speaker. Confirming a batch with no non-blank line left is
    refused by disabling the button rather than by an error.
+
+   **Superseded by** [ADR-0025](0025-review-a-batch-as-one-editable-block.md): both
+   operations are now done by typing — deleting a line is deleting its text, folding
+   it up is deleting the newline between the two — and the two buttons are gone.
+   Disabling the confirm button on a batch with nothing left is unchanged.
 7. **A capture enters the review state immediately.** The gate would refuse the first
    analysis of an unreviewed batch every time, so offering that analysis first would be a
    round trip that is known to fail.
@@ -119,6 +129,11 @@ review is a surface on the panel.**
 15. **The panel grows for the review state, by screen ratio, on Android only.** The Android
     overlay is 300×380 dp and does not resize for the input method, so editing in it would
     be editing through a keyboard. The desktop windows are 420×620 and already have the room.
+
+    **Superseded by** [ADR-0025](0025-review-a-batch-as-one-editable-block.md): the growing
+    window was the thing the user fought — an overlay the input method covers no matter how
+    tall it is made — so the review no longer grows the panel at all. The expanded panel is
+    one fixed height (320 dp) in every state.
 16. **The model's vocabulary is untouched.** `Snapshot.source` stays `ocr` and no new field
     reaches the prompt: `prompts.dart:64` already tells the model that
     「说话人可能经过人工核对」, which is as much as the pipeline can honestly say.
@@ -159,6 +174,12 @@ review is a surface on the panel.**
   a device and the least code. Rejected because the prefix protocol is invisible — the old
   port had to teach it with a toast — and a pasted multi-line message silently becomes
   several messages.
+
+  **Superseded by** [ADR-0025](0025-review-a-batch-as-one-editable-block.md), which adopts
+  the box and answers both objections: the rule is made visible by a hint plus a fixed
+  example line instead of a toast, and a prefix-less line inherits the speaker above it
+  instead of being filed as unknown, which is what made a paste fan out. The objection
+  stands as a warning about *how* the box is introduced, not about the box.
 - **Confirm-and-analyse in one tap.** Rejected only because it spends a model call the
   user did not ask for, and because it makes the two actions impossible to tell apart when
   the analysis fails.
