@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -7,17 +6,20 @@ import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 import 'package:miaotou_capabilities_macos/miaotou_capabilities_macos.dart';
 import 'package:miaotou_capabilities_macos/testing.dart';
 
-/// The shared payload on macOS, and the packaging invariant around it.
+/// What macOS still owns of the shared payload: the resource root, and the build
+/// phase that puts the payload in the bundle.
+///
+/// The reader itself moved to `miaotou_capabilities_shared` — what a key is, and
+/// what a missing one means, is asserted once, there, for all three ports. What is
+/// left here is the half that is genuinely macOS's: the one string a bundled app
+/// cannot know about itself, the refusal to join onto an empty one, and the build
+/// phase that makes AC4 and AC5 true.
 ///
 /// AC3 says the packaged application reads the payload **as real files, with no
-/// copy inlined into the port**. That is two claims and this file holds both: the
-/// first two tests read bytes out of a directory the test chose, and the guards at
-/// the bottom read the port's own source to confirm nothing was pasted into it.
-///
-/// AC4 and AC5 are about the build, and the script that implements them is
-/// `apps/miaotou_app/macos/Runner/sync_shared_payload.sh`, wired into an Xcode
-/// build phase. The tests in the last group **run that script** through the same
-/// environment Xcode gives it — same `SRCROOT`, same working directory, same
+/// copy inlined into the port**. The last group here is about that: the script
+/// that implements it is `apps/miaotou_app/macos/Runner/sync_shared_payload.sh`,
+/// wired into an Xcode build phase, and these tests **run that script** through the
+/// same environment Xcode gives it — same `SRCROOT`, same working directory, same
 /// bundle path — so AC4 is checked by the test suite and not only by a build.
 ///
 /// The reason for running it rather than reading it is this file's own history.
@@ -30,12 +32,10 @@ import 'package:miaotou_capabilities_macos/testing.dart';
 void main() {
   late Directory payload;
   late FakeMacosNative native;
-  late MacosSharedPayload shared;
 
   setUp(() {
     native = FakeMacosNative();
     payload = Directory.systemTemp.createTempSync('miaotou-payload');
-    shared = MacosSharedPayload(native);
 
     // A miniature of the real tree: two levels deep, so a key that walks out of
     // the root has somewhere to walk to.
@@ -45,10 +45,6 @@ void main() {
         .writeAsStringSync('{"strategy_guide": "g.md"}');
     File('${payload.path}/miaotoujunshi/references/data/strategy-criteria.json')
         .writeAsStringSync('{"strategies": ["A"]}');
-    Directory('${payload.path}/miaotoujunshi/references/data/nested')
-        .createSync();
-    File('${payload.path}/miaotoujunshi/references/data/nested/deep.json')
-        .writeAsStringSync('{"deep": true}');
     native.payloadRoot = payload.path;
   });
 
@@ -57,128 +53,9 @@ void main() {
     payload.deleteSync(recursive: true);
   });
 
-  test('a key is read as the bytes of the file at that path', () async {
-    final Uint8List bytes = await shared.read(
-      'miaotoujunshi/references/data/payload-map.json',
-    );
-
-    expect(
-      utf8.decode(bytes),
-      '{"strategy_guide": "g.md"}',
-      reason: 'the key is repository-root-relative and resolves against the '
-          'bundle, which is what keeps the built artifact mirroring the '
-          'repository (ADR-0008 decision 3)',
-    );
-  });
-
-  test('a key with Chinese characters in it resolves, because the payload has them',
-      () async {
-    final File tone =
-        File('${payload.path}/miaotoujunshi/references/knowledge/口吻与取舍.md')
-          ..parent.createSync(recursive: true);
-    tone.writeAsStringSync('口吻规则');
-
-    expect(
-      utf8.decode(await shared.read(
-        'miaotoujunshi/references/knowledge/口吻与取舍.md',
-      )),
-      '口吻规则',
-    );
-  });
-
-  test('a missing key is a hard error, not an empty buffer', () async {
-    await expectLater(
-      shared.read('miaotoujunshi/references/data/does-not-exist.json'),
-      throwsA(
-        isA<FileSystemException>().having(
-          (FileSystemException e) => e.message,
-          'message',
-          contains('packaging fault'),
-        ),
-      ),
-      reason: 'a caller that gets bytes back must be able to trust they came '
-          'from the payload; an empty buffer is indistinguishable from an empty '
-          'document, and the caller is a prompt. The message is asserted as well '
-          'as the type because `dart:io` raises the same type on its own — what '
-          'the explicit check adds is the diagnosis, and a guard on the type '
-          'alone would not notice losing it',
-    );
-  });
-
-  test('a missing directory is a hard error, not an empty list', () async {
-    await expectLater(
-      shared.list('miaotoujunshi/references/data/does-not-exist'),
-      throwsA(
-        isA<FileSystemException>().having(
-          (FileSystemException e) => e.message,
-          'message',
-          contains('packaging fault'),
-        ),
-      ),
-    );
-  });
-
-  test('listing a directory needs no member list', () async {
-    expect(
-      await shared.list('miaotoujunshi/references/data'),
-      <String>['payload-map.json', 'strategy-criteria.json'],
-      reason: 'this is the property that makes a zero-change addition '
-          'observable at runtime rather than only in a build log '
-          '(ADR-0008 decision 5)',
-    );
-  });
-
-  test('listing is not recursive, because the contract asks about one directory',
-      () async {
-    expect(
-      await shared.list('miaotoujunshi/references/data'),
-      isNot(contains('deep.json')),
-      reason: '`nested/` is a directory, and a recursive walk would answer a '
-          'different question than the one asked',
-    );
-  });
-
-  test('a file added to the payload is visible with no code change', () async {
-    // AC5. The property the whole arrangement exists for, and it is two
-    // properties together: the tree is copied whole, and the key set is derived
-    // rather than transcribed. Either alone would break it.
-    final List<String> before =
-        await shared.list('miaotoujunshi/references/data');
-
-    File('${payload.path}/miaotoujunshi/references/data/added-later.json')
-        .writeAsStringSync('{"added": true}');
-
-    final List<String> after =
-        await shared.list('miaotoujunshi/references/data');
-    expect(after, hasLength(before.length + 1));
-    expect(after, contains('added-later.json'));
-    expect(
-      utf8.decode(
-        await shared.read('miaotoujunshi/references/data/added-later.json'),
-      ),
-      '{"added": true}',
-    );
-  });
-
-  test('a key that leaves the payload tree is refused', () async {
-    // The bundle is the whole world: a key that walked out of the resource root
-    // would read a file the app does not ship, which is the one thing resolving
-    // keys against the bundle is for.
-    await expectLater(
-      shared.read('../secrets.txt'),
-      throwsArgumentError,
-    );
-    await expectLater(
-      shared.read('/etc/passwd'),
-      throwsArgumentError,
-    );
-    await expectLater(
-      shared.read(''),
-      throwsArgumentError,
-    );
-  });
-
   test('the resource root is asked once, however many files are read', () async {
+    final PayloadReader shared = PayloadReader(MacosPayloadTree(native));
+
     await shared.read('miaotoujunshi/references/data/payload-map.json');
     await shared.read('miaotoujunshi/references/data/strategy-criteria.json');
     await shared.list('miaotoujunshi/references/data');
@@ -186,9 +63,9 @@ void main() {
     expect(
       native.log.where((String call) => call == 'resourceRoot').length,
       1,
-      reason: 'a scene load reads a dozen files; asking the channel each time '
-          'puts a platform round trip in the middle of every document read for a '
-          'value that cannot change within a process',
+      reason: 'a scene load reads a dozen files; asking the channel each time puts '
+          'a platform round trip in the middle of every document read for a value '
+          'that cannot change within a process',
     );
   });
 
@@ -201,18 +78,13 @@ void main() {
     addTearDown(bare.close);
 
     await expectLater(
-      MacosSharedPayload(bare).read('miaotoujunshi/references/data/x.json'),
+      PayloadReader(MacosPayloadTree(bare))
+          .read('miaotoujunshi/references/data/x.json'),
       throwsStateError,
     );
   });
 
   group('the channel answering nil', () {
-    // `StoragePaths.resourceRoot()` returns nil rather than `''` when the bundle
-    // reports no resource path, so the Dart side has to decide what a nil is. The
-    // decision it used to make was `?? ''`, which is the worst of both: the empty
-    // string joins into `/miaotoujunshi/…`, an absolute path out of the filesystem
-    // root, and the failure that eventually surfaces names a file the application
-    // never meant to read instead of the bundle that is missing its payload.
     // `StoragePaths.resourceRoot()` returns nil rather than `''` when the bundle
     // reports no resource path, so the Dart side has to decide what a nil is. The
     // decision it used to make was `?? ''`, which is the worst of both: the empty
@@ -249,11 +121,12 @@ void main() {
     test('and a read over it fails rather than reaching the filesystem root',
         () async {
       // The end-to-end shape of the same fault. Without the refusal this throws
-      // too, but as a `FileSystemException` naming `/miaotoujunshi/…`, which
-      // points at the filesystem root instead of at the missing build step.
+      // too, but naming `/miaotoujunshi/…`, which points at the filesystem root
+      // instead of at the missing build step.
       answerRootAsNull();
-      final MacosSharedPayload payload =
-          MacosSharedPayload(MethodChannelMacosNative());
+      final PayloadReader payload = PayloadReader(
+        MacosPayloadTree(MethodChannelMacosNative()),
+      );
 
       await expectLater(
         payload.read('miaotoujunshi/references/data/x.json'),
@@ -289,13 +162,13 @@ void main() {
     test('an empty root from any implementation is refused where it is used',
         () async {
       // Deliberately not through the channel. `MacosNative` is an interface, so
-      // `MacosSharedPayload` cannot assume the only implementation of it is the
-      // one that throws — a fake, a future port, or a test double all reach this
+      // `MacosPayloadTree` cannot assume the only implementation of it is the one
+      // that throws — a fake, a future port, or a test double all reach this
       // class. The guard therefore has to hold here as well, and this is the only
       // assertion that reaches it: with the channel refusing first, nothing else
       // ever gets an empty root as far as the join.
       await expectLater(
-        MacosSharedPayload(_EmptyRoot()).read('miaotoujunshi/x.json'),
+        MacosPayloadTree(_EmptyRoot()).resourceRoot(),
         throwsA(
           isA<StateError>().having(
             (StateError e) => e.message,

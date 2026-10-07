@@ -1,13 +1,12 @@
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
+import 'package:miaotou_capabilities_shared/miaotou_capabilities_shared.dart';
 
 import 'capabilities.dart';
+import 'documents.dart';
 import 'ingest_native.dart';
-import 'knowledge.dart';
-import 'memory.dart';
 import 'panel_native.dart';
 import 'payload.dart';
 import 'permission_native.dart';
-import 'preferences.dart';
 import 'secrets.dart';
 import 'storage_native.dart';
 
@@ -26,6 +25,7 @@ CapabilitySet androidCapabilities({
       ingestNative ?? MethodChannelAndroidIngestNative();
   final AndroidStorageNative storage =
       storageNative ?? MethodChannelAndroidStorageNative();
+  final AndroidDocuments documents = AndroidDocuments(storage);
   return CapabilitySet(
     screenCapture: AndroidScreenCapture(ingest),
     uiTreeReader: AndroidUiTreeReader(ingest),
@@ -35,10 +35,10 @@ CapabilitySet androidCapabilities({
     permissions: AndroidPermissions(
       permissionNative ?? MethodChannelAndroidPermissionNative(),
     ),
-    sharedPayload: AndroidSharedPayload(storage),
-    preferences: AndroidPreferences(storage),
+    sharedPayload: PayloadReader(AndroidPayloadTree(storage)),
+    preferences: PreferenceLedger(documents),
     secretStore: AndroidSecretStore(storage),
-    knowledgeStore: AndroidKnowledgeStore(storage),
-    memoryStore: AndroidMemoryStore(storage),
+    knowledgeStore: KnowledgeLedger(documents),
+    memoryStore: MemoryLedger(documents),
   );
 }

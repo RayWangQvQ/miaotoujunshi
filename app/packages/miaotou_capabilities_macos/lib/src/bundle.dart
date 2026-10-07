@@ -1,12 +1,10 @@
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
+import 'package:miaotou_capabilities_shared/miaotou_capabilities_shared.dart';
 
 import 'capabilities.dart';
-import 'knowledge.dart';
-import 'memory.dart';
+import 'container_documents.dart';
 import 'native.dart';
-import 'pacing.dart';
 import 'payload.dart';
-import 'preferences.dart';
 import 'secrets.dart';
 
 /// Every capability this port answers for, together.
@@ -25,18 +23,22 @@ import 'secrets.dart';
 /// and a bundle that let a caller pass one of each would be a way to wire a
 /// capture that photographs the panel.
 ///
-/// The five storage members are all built over the one seam and share nothing but
-/// its container directory. Each owns its own file in it — `preferences.json`,
-/// `knowledge.json`, `memory.json` — and the Keychain, which owns nothing on disk
-/// at all. They are separate objects rather than one "storage" object because the
-/// contract has five capabilities and a bundle that merged them would be a place
-/// where answering for one means being asked about all five.
+/// The storage members are all built over the one seam and share nothing but its
+/// container directory. Each store owns its own document in it —
+/// `preferences.json`, `knowledge.json`, `memory.json` — and the Keychain owns
+/// nothing on disk at all. They are separate objects rather than one "storage"
+/// object because the contract has five capabilities and a bundle that merged them
+/// would be a place where answering for one means being asked about all five.
+///
+/// One [ContainerDocuments] serves all of them, so the container directory is
+/// asked for once per bundle rather than once per store.
 CapabilitySet macosCapabilities({
   MacosNative? native,
   CapturePacing? pacing,
 }) {
   final MacosNative seam = native ?? MethodChannelMacosNative();
   final MacosFloatingPanel panel = MacosFloatingPanel(seam);
+  final ContainerDocuments documents = ContainerDocuments(seam);
   return CapabilitySet(
     screenCapture: MacosScreenCapture(seam, panel, pacing: pacing),
     uiTreeReader: const MacosUiTreeReader(),
@@ -44,10 +46,10 @@ CapabilitySet macosCapabilities({
     textInject: MacosTextInject(seam),
     floatingPanel: panel,
     permissions: const MacosPermissions(),
-    sharedPayload: MacosSharedPayload(seam),
-    preferences: MacosPreferences.inContainer(seam),
+    sharedPayload: PayloadReader(MacosPayloadTree(seam)),
+    preferences: PreferenceLedger(documents),
     secretStore: MacosSecretStore(seam),
-    knowledgeStore: MacosKnowledgeStore.inContainer(seam),
-    memoryStore: MacosMemoryStore.inContainer(seam),
+    knowledgeStore: KnowledgeLedger(documents),
+    memoryStore: MemoryLedger(documents),
   );
 }

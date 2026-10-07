@@ -17,11 +17,23 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
+/**
+ * The device half of the storage seam: assets, the Android Keystore and
+ * app-private files, none of which has a Dart API.
+ *
+ * The four `preferences.*` members used to be here, forwarding this app's settings
+ * to `SharedPreferences`, which meant the record shape of the settings document was
+ * decided twice — once in Kotlin here and once in the two desktop ports — and had
+ * drifted. That document belongs to the shared Dart module now and travels over
+ * `document.read` / `document.write` like the knowledge base and the memory store.
+ *
+ * The `SharedPreferences` left in this file belongs to [KeystoreSecretStore], where
+ * a store keyed by name is exactly the right primitive and the values are opaque
+ * encrypted envelopes rather than a record format.
+ */
 internal class AndroidStorageHost(
     private val context: Context,
 ) : MethodChannel.MethodCallHandler {
-    private val preferences: SharedPreferences =
-        context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
     private val secrets = KeystoreSecretStore(context)
     private val documents = File(context.filesDir, DOCUMENT_DIRECTORY)
 
@@ -31,22 +43,6 @@ internal class AndroidStorageHost(
             when (call.method) {
                 "payload.read" -> result.success(readPayload(arguments.string("path")))
                 "payload.list" -> result.success(listPayload(arguments.string("path")))
-                "preferences.read" -> result.success(
-                    readPreference(arguments.string("key"), arguments.string("type")),
-                )
-                "preferences.write" -> {
-                    writePreference(
-                        arguments.string("key"),
-                        arguments.string("type"),
-                        arguments["value"],
-                    )
-                    result.success(null)
-                }
-                "preferences.remove" -> {
-                    preferences.edit().remove(arguments.string("key")).commitOrThrow()
-                    result.success(null)
-                }
-                "preferences.keys" -> result.success(preferences.all.keys.sorted())
                 "secret.read" -> result.success(secrets.read(arguments.string("key")))
                 "secret.write" -> {
                     secrets.write(
@@ -79,12 +75,24 @@ internal class AndroidStorageHost(
         }
     }
 
-    private fun readPayload(path: String): ByteArray {
+    /**
+     * The bytes at a packaged payload path, or null when there is no file there.
+     *
+     * Null rather than a refusal because on this port the payload is inside the APK:
+     * an absent key *is* an incomplete package, and the Dart above this seam is the
+     * one that says so, in the words all three ports share.
+     */
+    private fun readPayload(path: String): ByteArray? {
         validatePayloadPath(path)
-        return context.assets.open(path).use { it.readBytes() }
+        return try {
+            context.assets.open(path).use { it.readBytes() }
+        } catch (_: FileNotFoundException) {
+            null
+        }
     }
 
-    private fun listPayload(path: String): List<String> {
+    /** The names directly inside a packaged payload directory, or null if there is none. */
+    private fun listPayload(path: String): List<String>? {
         validatePayloadPath(path)
         val children = context.assets.list(path).orEmpty()
         val files = children.filter { child ->
@@ -95,39 +103,7 @@ internal class AndroidStorageHost(
                 false
             }
         }.sorted()
-        if (files.isEmpty()) {
-            throw FileNotFoundException(
-                "the shared payload has no directory at $path; the package is incomplete",
-            )
-        }
-        return files
-    }
-
-    private fun readPreference(key: String, type: String): Any? {
-        val value = preferences.all[key] ?: return null
-        return when (type) {
-            "string" -> value as? String
-            "bool" -> value as? Boolean
-            "int" -> value as? Int
-            "stringList" -> (value as? Set<*>)?.filterIsInstance<String>()?.sorted()
-            else -> throw IllegalArgumentException("unknown preference type: $type")
-        }
-    }
-
-    private fun writePreference(key: String, type: String, value: Any?) {
-        val editor = preferences.edit()
-        when (type) {
-            "string" -> editor.putString(key, value as? String ?: wrongType(type))
-            "bool" -> editor.putBoolean(key, value as? Boolean ?: wrongType(type))
-            "int" -> editor.putInt(key, value as? Int ?: wrongType(type))
-            "stringList" -> {
-                val values = (value as? List<*>)?.filterIsInstance<String>()
-                    ?: wrongType(type)
-                editor.putStringSet(key, values.toSet())
-            }
-            else -> throw IllegalArgumentException("unknown preference type: $type")
-        }
-        editor.commitOrThrow()
+        return files.ifEmpty { null }
     }
 
     private fun readDocument(name: String): String? {
@@ -169,13 +145,6 @@ internal class AndroidStorageHost(
         }
     }
 
-    private fun wrongType(type: String): Nothing =
-        throw IllegalArgumentException("preference value is not a $type")
-
-    private fun SharedPreferences.Editor.commitOrThrow() {
-        check(commit()) { "could not persist app-private preferences" }
-    }
-
     private fun Any?.asArguments(): Map<*, *> =
         this as? Map<*, *> ?: emptyMap<Any, Any>()
 
@@ -183,7 +152,6 @@ internal class AndroidStorageHost(
         this[key] as? String ?: throw IllegalArgumentException("$key must be a string")
 
     private companion object {
-        const val PREFERENCES_NAME = "miaotou_preferences"
         const val DOCUMENT_DIRECTORY = "storage"
         val DOCUMENT_NAME = Regex("[A-Za-z0-9_.-]+")
     }

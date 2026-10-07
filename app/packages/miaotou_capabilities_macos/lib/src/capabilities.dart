@@ -1,9 +1,9 @@
 import 'dart:async';
 
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
+import 'package:miaotou_capabilities_shared/miaotou_capabilities_shared.dart';
 
 import 'native.dart';
-import 'pacing.dart';
 
 /// macOS's answer for screen capture.
 ///

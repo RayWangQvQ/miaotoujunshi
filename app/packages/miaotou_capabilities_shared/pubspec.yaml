@@ -1,0 +1,21 @@
+name: miaotou_capabilities_shared
+description: >-
+  The platform-free bodies of the capability implementations: the capture pacing
+  schedule, the stores that sit over a flat JSON document, and the payload
+  reader. Sits behind the three platform packages, never above them.
+publish_to: "none"
+
+environment:
+  sdk: ^3.13.0
+
+resolution: workspace
+
+dependencies:
+  miaotou_capabilities:
+    path: ../miaotou_capabilities
+
+dev_dependencies:
+  test: ^1.25.0
+  # Used by the dependency-direction test to read the neighbouring pubspec files
+  # rather than to grep them: a text scan would pass on a commented-out edge.
+  yaml: ^3.1.2

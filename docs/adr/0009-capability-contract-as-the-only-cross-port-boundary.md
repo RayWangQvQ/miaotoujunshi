@@ -43,6 +43,27 @@ implementation packages are the only code that differs per platform.**
    platform group, Android implements it, and both desktop ports refuse it — which
    is this decision's rule about declaring support, applied to a capability only
    one port has.
+   **Amended (2026-10-07):** the three implementation packages are no longer the
+   only implementation code. `miaotou_capabilities_shared` holds the modules all
+   three ports use, and every port package depends on it:
+   `miaotou_capabilities_<platform> → miaotou_capabilities_shared →
+   miaotou_capabilities`. It sits *behind* the ports rather than beside them, so
+   this is not a fourth port and no new cross-port seam appears — the domain still
+   sees the contract and nothing else, and the interface package is still the only
+   boundary above the ports. What it replaces is the platform-free **body** of four
+   of the eleven interfaces — `Preferences`, `KnowledgeStore`, `MemoryStore` and
+   `SharedPayload`, which had been written three times each and had drifted apart in
+   record shape, validation and refusal wording — plus the capture schedule the two
+   desktop ports had duplicated as two classes under two names. It reaches the
+   platform through two small interfaces the port still implements: `TextDocuments`
+   (one named document's bytes) and `PayloadTree` (the packaged payload). Where the
+   bytes live, how a key joins a path, and how a write is made atomic stay on the
+   port, because those are the parts that genuinely differ. The membership test is
+   **"do all three ports use this?"**, not "is this platform-free?" — a package
+   defined by "platform-free" would have to explain why `miaotou_domain` is not in
+   it, and it would wrongly admit `perception.dart` (macOS's own calibration,
+   ADR-0011 decision 6) and `EdgeSnap` / `PanelPositionMemory` (the contract's own
+   value types).
 2. **Support is declared, never implied.** A port that cannot implement a member
    throws. No implementation returns an empty buffer, an empty list, an
    `UnsupportedError`-swallowing null, or an inlined fallback. `UiTreeReader` on
@@ -139,3 +160,25 @@ implementation packages are the only code that differs per platform.**
   injection and awaits none of them, so a decision cannot quietly turn into a timing
   decision. It is also what makes every transition reachable from `dart test` with
   nothing attached.
+- **The shared module is `dart:io`-free, and that is enforced rather than
+  intended.** Nothing under `packages/miaotou_capabilities_shared/lib` imports
+  `dart:io`, `dart:ffi` or Flutter —
+  `test/dependency_direction_test.dart` fails if anything does — so every module in
+  it reaches the platform through `TextDocuments` or `PayloadTree` and the whole
+  behaviour suite runs under `dart test` on any machine, with no device, no channel
+  and no temporary directory. A module that needs a path is a module that does not
+  belong there, and one that needs pixels or a node tree is one the port keeps.
+- **Android's preferences left `SharedPreferences`.** The three documents
+  (preferences, knowledge, memory) now cross one app-private document layer with the
+  same atomic write on all three ports, the channel's four `preferences.*` members
+  and the plugin's `SharedPreferences` instance are gone, and credentials stay in
+  Kotlin where the Keystore is. The device answers only the two questions it is the
+  only one that can: where a document name resolves to, and how bytes reach it
+  atomically.
+- **`undo` no longer crosses a restart on macOS and Windows.** The last-write stack
+  was a document key on those two ports and a field on Android; the contract's own
+  wording ("rolls back every write made **since this store was opened**") is the
+  in-memory reading, so all three keep it in memory now. No user-facing behaviour is
+  lost — the only caller in `lib/` is the support probe table — and a document
+  written by an older build keeps its `undo` key as dead data that nothing reads and
+  nothing refreshes.

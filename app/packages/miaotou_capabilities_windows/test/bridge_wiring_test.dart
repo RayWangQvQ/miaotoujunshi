@@ -17,7 +17,7 @@ void main() {
     () async {
       final WindowsScreenCapture capture = WindowsScreenCapture(
         native,
-        pacing: WindowsCapturePacing(
+        pacing: CapturePacing(
           clock: _SteppingClock().call,
           minInterval: Duration.zero,
         ),
@@ -41,7 +41,7 @@ void main() {
       native.captureError = const WindowsBridgeUnavailable('worker exited');
       final WindowsScreenCapture capture = WindowsScreenCapture(
         native,
-        pacing: WindowsCapturePacing(minInterval: Duration.zero),
+        pacing: CapturePacing(minInterval: Duration.zero),
       );
 
       final CaptureOutcome outcome = await capture.capture(

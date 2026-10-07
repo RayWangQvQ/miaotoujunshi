@@ -22,12 +22,14 @@ library;
 
 export 'src/bundle.dart';
 export 'src/capabilities.dart';
-export 'src/container_file.dart';
-export 'src/knowledge.dart';
-export 'src/memory.dart';
+export 'src/container_documents.dart';
 export 'src/native.dart';
-export 'src/pacing.dart';
 export 'src/payload.dart';
 export 'src/perception.dart';
-export 'src/preferences.dart';
 export 'src/secrets.dart';
+
+// What the three ports share is re-exported rather than hidden: `CapturePacing`
+// is part of this package's own signatures (`MacosScreenCapture` takes one,
+// `macosCapabilities` passes one through), and a type that appears in the public
+// API has to be reachable from the same import that names it.
+export 'package:miaotou_capabilities_shared/miaotou_capabilities_shared.dart';

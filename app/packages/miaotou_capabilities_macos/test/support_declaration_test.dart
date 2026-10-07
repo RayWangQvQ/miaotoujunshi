@@ -4,8 +4,6 @@ import 'package:miaotou_capabilities/testing.dart';
 import 'package:miaotou_capabilities_macos/miaotou_capabilities_macos.dart';
 import 'package:miaotou_capabilities_macos/testing.dart';
 
-
-
 /// What the macOS implementation package promises.
 ///
 /// ADR-0009 decision 2 requires every port to answer for every member of the
@@ -40,8 +38,9 @@ void main() {
   //
   // The cast is the honest shape of the thing: `MemoryStore` has no member for
   // "the user agreed", so the switch is only reachable on the concrete type. That
-  // gap is noted in `memory.dart` and belongs to a ticket above this one.
-  final MacosMemoryStore memory = capabilities.memoryStore as MacosMemoryStore;
+  // gap is noted in the shared package's `memory.dart` and belongs to a ticket
+  // above this one.
+  final MemoryLedger memory = capabilities.memoryStore as MemoryLedger;
 
   setUpAll(() async {
     await memory.grantConsent(confirmed: true);
@@ -56,8 +55,16 @@ void main() {
     // Asserted here rather than left implicit, because the gate is the one member
     // of the contract whose correct answer *is* a refusal, and a reader of this
     // file should not have to know that to understand why the cast above exists.
-    final MacosMemoryStore virgin =
-        MacosMemoryStore.inContainer(fakeMacosWithTemporaryStorage());
+    //
+    // A store of its own, over a container of its own: the one the bundle built
+    // has already been consented to below, and the gate is only observable on a
+    // store nobody has answered.
+    final FakeMacosNative untouched = fakeMacosWithTemporaryStorage();
+    addTearDown(() async {
+      await untouched.close();
+      deleteTemporaryStorage(untouched);
+    });
+    final MemoryLedger virgin = MemoryLedger(ContainerDocuments(untouched));
 
     expect((await virgin.status()).acceptsWrites, isFalse);
     await expectLater(
@@ -150,11 +157,25 @@ void main() {
   test('the bundle is wired to this package and covers all eleven', () {
     final Map<String, String> report = capabilities.describe();
     expect(report, hasLength(11));
+
+    // The three storage members are `miaotou_capabilities_shared`'s, so they carry
+    // the same class names here as on the other two ports — that is the point of
+    // the module. Everything else has to be this port's: a bundle that silently
+    // wired another platform would still compile, and this is the only place that
+    // is observable.
     expect(
-      report.values,
-      everyElement(startsWith('Macos')),
-      reason: 'an implementation package that silently wires another platform '
-          'would still compile',
+      report.values.where((String type) => !type.startsWith('Macos')).toSet(),
+      <String>{
+        'PreferenceLedger',
+        'KnowledgeLedger',
+        'MemoryLedger',
+        'PayloadReader',
+      },
+      reason: 'exactly the settings, knowledge and memory documents and the '
+          'payload reader come from the shared module. A fifth non-Macos name '
+          'would be a shared implementation this port did not have before, and a '
+          'member missing from this set would be one that had stopped being '
+          'Macos\'s',
     );
   });
 }

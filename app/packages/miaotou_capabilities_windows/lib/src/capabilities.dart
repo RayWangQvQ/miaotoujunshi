@@ -1,7 +1,7 @@
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
+import 'package:miaotou_capabilities_shared/miaotou_capabilities_shared.dart';
 
 import 'native.dart';
-import 'pacing.dart';
 
 /// Windows's answer for screen capture.
 ///
@@ -9,11 +9,11 @@ import 'pacing.dart';
 /// Windows Graphics Capture (ADR-0013). It is the largest hand-written surface
 /// in the migration and the port most likely to overrun.
 final class WindowsScreenCapture implements ScreenCapture {
-  WindowsScreenCapture(this._native, {WindowsCapturePacing? pacing})
-    : pacing = pacing ?? WindowsCapturePacing();
+  WindowsScreenCapture(this._native, {CapturePacing? pacing})
+    : pacing = pacing ?? CapturePacing();
 
   final WindowsNative _native;
-  final WindowsCapturePacing pacing;
+  final CapturePacing pacing;
 
   static const int bridgeUnavailableCode = -3;
 

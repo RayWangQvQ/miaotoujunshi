@@ -24,5 +24,6 @@ workspace:
   - packages/miaotou_capabilities
   - packages/miaotou_capabilities_android
   - packages/miaotou_capabilities_macos
+  - packages/miaotou_capabilities_shared
   - packages/miaotou_capabilities_windows
   - packages/miaotou_domain

@@ -1,11 +1,9 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:flutter_test/flutter_test.dart';
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
-import 'package:miaotou_capabilities_macos/miaotou_capabilities_macos.dart';
-
-
+import 'package:miaotou_capabilities_shared/miaotou_capabilities_shared.dart';
+import 'package:test/test.dart';
 
 /// The rate limit, the backoff and the watchdog.
 ///
@@ -13,6 +11,12 @@ import 'package:miaotou_capabilities_macos/miaotou_capabilities_macos.dart';
 /// merely *present* proves nothing: a throttle that never throttles, a backoff
 /// that never grows and a watchdog that never fires all pass a test that only
 /// checks the happy path returned a frame.
+///
+/// This is the one suite for the schedule. The two desktop ports carried a copy
+/// each — `miaotou_capabilities_macos/test/pacing_test.dart` and
+/// `miaotou_capabilities_windows/test/pacing_test.dart`, the second of which was
+/// the first rewritten with a different class name — and the measured numbers are
+/// the same numbers on every port because the schedule is the same decision.
 void main() {
   /// A clock the test moves by hand, so a one-second floor costs no wall time.
   DateTime now = DateTime(2026, 10, 4, 12);
@@ -20,25 +24,24 @@ void main() {
     Duration minInterval = const Duration(seconds: 1),
     Duration maxBackoff = const Duration(seconds: 30),
     Duration watchdog = const Duration(seconds: 3),
-  }) =>
-      CapturePacing(
-        clock: () => now,
-        minInterval: minInterval,
-        maxBackoff: maxBackoff,
-        watchdog: watchdog,
-      );
+  }) => CapturePacing(
+    clock: () => now,
+    minInterval: minInterval,
+    maxBackoff: maxBackoff,
+    watchdog: watchdog,
+  );
 
   CaptureOutcome aFrame() => CaptureOk(
-        CaptureFrame(
-          pixels: Uint8List.fromList(<int>[1, 2, 3, 4]),
-          width: 1,
-          height: 1,
-          scaleX: 1,
-          scaleY: 1,
-          originX: 0,
-          originY: 0,
-        ),
-      );
+    CaptureFrame(
+      pixels: Uint8List.fromList(<int>[1, 2, 3, 4]),
+      width: 1,
+      height: 1,
+      scaleX: 1,
+      scaleY: 1,
+      originX: 0,
+      originY: 0,
+    ),
+  );
 
   CaptureOutcome refused() => const CaptureFailed(code: 9, message: 'no frame');
 
@@ -55,7 +58,11 @@ void main() {
     final CaptureOutcome second = await pacing.run(body);
 
     expect(first, isA<CaptureOk>());
-    expect(attempts, 1, reason: 'the second capture must not reach the system at all');
+    expect(
+      attempts,
+      1,
+      reason: 'the second capture must not reach the system at all',
+    );
     expect(second, isA<CaptureFailed>());
     expect((second as CaptureFailed).code, CapturePacing.throttledCode);
   });
@@ -96,7 +103,9 @@ void main() {
   });
 
   test('a capture that never answers trips the watchdog rather than hanging', () async {
-    final CapturePacing pacing = pacingWith(watchdog: const Duration(milliseconds: 20));
+    final CapturePacing pacing = pacingWith(
+      watchdog: const Duration(milliseconds: 20),
+    );
     final CaptureOutcome outcome = await pacing.run(
       () => Completer<CaptureOutcome>().future,
     );

@@ -12,10 +12,11 @@ implementation and was deleted in the same change that tagged it — macOS
 (`#16`), Windows, Android (`#24`) — under
 `archive/jev-<port>-<language>-final`. The shared workspace and the capability
 contract are live: macOS, Windows and Android each carry their own capability
-package, Windows has its process-isolated capture/OCR/input bridge plus a
+package over one shared module of the code they all use (ADR-0009's 2026-10-07
+amendment), Windows has its process-isolated capture/OCR/input bridge plus a
 second-engine frameless floating panel, and Android pushes accessibility
-snapshots through its retained Kotlin service and persists its four stores
-through app-private Android storage. Two items remain tracked separately: verified
+snapshots through its retained Kotlin service and keeps its documents in
+app-private Android storage. Two items remain tracked separately: verified
 Android one-tap fill (#29) and packaging the Windows bridge and its models with
 the artifact (#19).
 
@@ -33,13 +34,18 @@ app/
   packages/
     miaotou_capabilities/       the eleven interfaces. Pure Dart, no platform
     miaotou_capabilities_<platform>/   one per build target; every member answered for
+    miaotou_capabilities_shared/   the modules all three ports use. Pure Dart, no dart:io
     miaotou_domain/            pure Dart; platform-free business logic (#7–#10)
 ```
 
 Dependency direction is `apps/miaotou_app → miaotou_capabilities_<platform> →
-miaotou_capabilities`, and `miaotou_domain` depends on the contract and on no
-platform package at all. `packages/miaotou_domain/test/dependency_direction_test.dart`
-is what keeps the second half of that true.
+miaotou_capabilities_shared → miaotou_capabilities`, and `miaotou_domain` depends
+on the contract and on no platform package at all.
+`packages/miaotou_domain/test/dependency_direction_test.dart` is what keeps the
+second half of that true, and
+`packages/miaotou_capabilities_shared/test/dependency_direction_test.dart` keeps
+the shared module platform-free — it is what lets that package's whole suite run
+under `dart test` on any machine.
 
 ## Building and testing
 
@@ -54,10 +60,11 @@ flutter pub get
 # **Which tool runs a package is read from its pubspec, not from this list.** A
 # package that depends on the Flutter SDK is a Flutter package: `dart test` runs
 # on a VM with no `dart:ui`, so a widget test cannot even be loaded there. That is
-# exactly how `flutter.yml` decides, and running all six with `dart test` fails
+# exactly how `flutter.yml` decides, and running all seven with `dart test` fails
 # the three platform packages with `switch` exhaustiveness errors inside the
 # framework, which looks like a code fault and is not one.
 (cd packages/miaotou_capabilities        && dart test)
+(cd packages/miaotou_capabilities_shared && dart test)
 (cd packages/miaotou_domain              && dart test)
 (cd packages/miaotou_capabilities_android && flutter test)
 (cd packages/miaotou_capabilities_macos   && flutter test)
@@ -140,10 +147,12 @@ Conversation read-only state is computed by the service and sent as presentation
 state. Either identity half may be absent, and Kotlin supplies the display label
 so the panel never falls back to rendering a raw package name.
 
-The same plugin exposes one storage channel. Preferences use private
-`SharedPreferences`; credentials are AES-GCM encrypted with an Android Keystore
-key; knowledge and memory documents use atomic app-private file writes. The
-payload is read through `AssetManager`.
+The same plugin exposes one storage channel. Documents — preferences, knowledge
+and memory — cross the shared module's `TextDocuments` seam, so their bytes are
+written atomically into app-private files by the same code on all three ports;
+credentials are AES-GCM encrypted with an Android Keystore key, which stays in
+Kotlin because the Keystore is the device's. The payload is read through
+`AssetManager`.
 
 ### The two Android permissions are stated, and their pages are one tap away
 
@@ -256,8 +265,8 @@ gone: the domain (judging, prompts, scoring, trend data), the knowledge base and
 memory store, the anti-injection filter, scenario selection, the update check,
 the design system, the main-window routing shell and the panel content all live
 under `packages/` and `apps/miaotou_app/` today, and each build target carries its
-own capability package. Two items are still open and are tracked in GitHub Issues
-rather than here:
+own capability package over the shared module. Two items are still open and are
+tracked in GitHub Issues rather than here:
 
 | Open | Ticket |
 | --- | --- |

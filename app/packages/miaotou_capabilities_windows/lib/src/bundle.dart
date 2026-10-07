@@ -1,16 +1,14 @@
 import 'dart:io';
 
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
+import 'package:miaotou_capabilities_shared/miaotou_capabilities_shared.dart';
 
 import 'capabilities.dart';
-import 'json_file.dart';
+import 'documents.dart';
 import 'native.dart';
-import 'knowledge.dart';
-import 'memory.dart';
 import 'panel.dart';
 import 'panel_native.dart';
 import 'payload.dart';
-import 'preferences.dart';
 import 'secrets.dart';
 
 /// Every capability this port answers for, together.
@@ -29,6 +27,11 @@ CapabilitySet windowsCapabilities({
   final WindowsFloatingPanel panel = WindowsFloatingPanel(
     panelNative ?? DesktopMultiWindowPanelNative(),
   );
+  // One seam object for all three stores, so the directory is resolved once and
+  // the environment is read at most once per bundle.
+  final WindowsDocuments documents = applicationDataDirectory == null
+      ? WindowsDocuments.inApplicationData()
+      : WindowsDocuments(applicationDataDirectory);
   return CapabilitySet(
     screenCapture: WindowsScreenCapture(platform),
     uiTreeReader: const WindowsUiTreeReader(),
@@ -36,22 +39,10 @@ CapabilitySet windowsCapabilities({
     textInject: WindowsTextInject(platform),
     floatingPanel: panel,
     permissions: const WindowsPermissions(),
-    sharedPayload: WindowsSharedPayload(executableDirectory),
-    preferences: applicationDataDirectory == null
-        ? WindowsPreferences.inApplicationData()
-        : WindowsPreferences(
-            WindowsJsonFile(applicationDataDirectory, 'preferences.json'),
-          ),
+    sharedPayload: PayloadReader(WindowsPayloadTree(executableDirectory)),
+    preferences: PreferenceLedger(documents),
     secretStore: WindowsSecretStore(credentialBackend),
-    knowledgeStore: applicationDataDirectory == null
-        ? WindowsKnowledgeStore.inApplicationData()
-        : WindowsKnowledgeStore(
-            WindowsJsonFile(applicationDataDirectory, 'knowledge.json'),
-          ),
-    memoryStore: applicationDataDirectory == null
-        ? WindowsMemoryStore.inApplicationData()
-        : WindowsMemoryStore(
-            WindowsJsonFile(applicationDataDirectory, 'memory.json'),
-          ),
+    knowledgeStore: KnowledgeLedger(documents),
+    memoryStore: MemoryLedger(documents),
   );
 }

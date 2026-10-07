@@ -13,6 +13,8 @@ dependencies:
     sdk: flutter
   miaotou_capabilities:
     path: ../miaotou_capabilities
+  miaotou_capabilities_shared:
+    path: ../miaotou_capabilities_shared
 
 dev_dependencies:
   flutter_test:

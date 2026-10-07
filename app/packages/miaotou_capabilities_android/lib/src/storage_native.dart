@@ -2,21 +2,31 @@ import 'package:flutter/services.dart';
 
 /// Device-only storage operations behind one Android method channel.
 ///
-/// AssetManager, SharedPreferences, Android Keystore and app-private files have
-/// no Dart API. Everything else -- path validation, JSON formats and memory
+/// AssetManager, the Android Keystore and app-private files have no Dart API.
+/// Everything else -- path validation, JSON formats, the record shapes and memory
 /// policy -- stays above this seam where a unit test can exercise it.
+///
+/// **Preferences used to be here and are not any more.** Four members
+/// (`preferences.read` / `write` / `remove` / `keys`) forwarded this app's
+/// settings to `SharedPreferences` in Kotlin, which is to say the *record shape*
+/// of a settings document was decided on the far side of a language boundary and
+/// twice: once here and once in the two desktop ports. The stores are one shared
+/// module now, so the same capability is answered over [readDocument] and
+/// [writeDocument] like the knowledge base and the memory store, and the four
+/// Kotlin members are gone with them. ADR-0009's Consequences record the move.
 abstract interface class AndroidStorageNative {
-  Future<Uint8List> readPayload(String repoRelativePath);
+  /// The bytes at a packaged payload path, or null when the package has no file
+  /// there.
+  ///
+  /// Null rather than a refusal because on this port the payload is inside the APK:
+  /// an absent key *is* an incomplete package, and the caller above this seam is
+  /// the one that gets to say so. See `PayloadTree` in
+  /// `miaotou_capabilities_shared`.
+  Future<Uint8List?> readPayload(String repoRelativePath);
 
-  Future<List<String>> listPayload(String repoRelativeDir);
-
-  Future<Object?> readPreference(String key, String type);
-
-  Future<void> writePreference(String key, String type, Object value);
-
-  Future<void> removePreference(String key);
-
-  Future<Set<String>> preferenceKeys();
+  /// The file names directly inside a packaged payload directory, or null when
+  /// there is none.
+  Future<List<String>?> listPayload(String repoRelativeDir);
 
   Future<String?> readSecret(String key);
 
@@ -40,61 +50,18 @@ final class MethodChannelAndroidStorageNative implements AndroidStorageNative {
   final MethodChannel _channel;
 
   @override
-  Future<Uint8List> readPayload(String repoRelativePath) async {
-    final Uint8List? bytes = await _channel.invokeMethod<Uint8List>(
-      'payload.read',
-      <String, Object?>{'path': repoRelativePath},
-    );
-    if (bytes == null) {
-      throw StateError(
-        'Android returned no bytes for $repoRelativePath; the packaged payload '
-        'is incomplete',
+  Future<Uint8List?> readPayload(String repoRelativePath) =>
+      _channel.invokeMethod<Uint8List>(
+        'payload.read',
+        <String, Object?>{'path': repoRelativePath},
       );
-    }
-    return bytes;
-  }
 
   @override
-  Future<List<String>> listPayload(String repoRelativeDir) async {
-    final List<String>? names = await _channel.invokeListMethod<String>(
-      'payload.list',
-      <String, Object?>{'path': repoRelativeDir},
-    );
-    if (names == null) {
-      throw StateError(
-        'Android returned no listing for $repoRelativeDir; the packaged payload '
-        'is incomplete',
+  Future<List<String>?> listPayload(String repoRelativeDir) =>
+      _channel.invokeListMethod<String>(
+        'payload.list',
+        <String, Object?>{'path': repoRelativeDir},
       );
-    }
-    return names;
-  }
-
-  @override
-  Future<Object?> readPreference(String key, String type) =>
-      _channel.invokeMethod<Object?>('preferences.read', <String, Object?>{
-        'key': key,
-        'type': type,
-      });
-
-  @override
-  Future<void> writePreference(String key, String type, Object value) =>
-      _channel.invokeMethod<void>('preferences.write', <String, Object?>{
-        'key': key,
-        'type': type,
-        'value': value,
-      });
-
-  @override
-  Future<void> removePreference(String key) => _channel.invokeMethod<void>(
-    'preferences.remove',
-    <String, Object?>{'key': key},
-  );
-
-  @override
-  Future<Set<String>> preferenceKeys() async => Set<String>.from(
-    await _channel.invokeListMethod<String>('preferences.keys') ??
-        const <String>[],
-  );
 
   @override
   Future<String?> readSecret(String key) => _channel.invokeMethod<String>(

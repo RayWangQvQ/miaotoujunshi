@@ -16,9 +16,9 @@ abstract interface class Preferences {
 
   Future<int?> getInt(String key);
 
-  /// Stored as a set, so the order is not part of the value. Android's
-  /// `SharedPreferences` has no ordered collection and neither do the two
-  /// desktop stores the ports already use.
+  /// Stored as a set, so the order is not part of the value: a caller that wrote
+  /// `['a', 'b']` and one that wrote `['b', 'a']` have stored the same thing and
+  /// read back the same thing.
   Future<List<String>?> getStringList(String key);
 
   Future<void> setString(String key, String value);

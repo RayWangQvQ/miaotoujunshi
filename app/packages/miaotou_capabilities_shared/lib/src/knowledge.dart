@@ -1,12 +1,11 @@
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 
-import 'container_file.dart';
-import 'native.dart';
+import 'document.dart';
 
-/// macOS's answer for the knowledge base.
+/// The knowledge base, in the one form all three ports use.
 ///
-/// Owned by #15. The union baseline (ADR-0007 decision 4) means this port keeps a
-/// capability it never had: the knowledge base used to be Android's alone.
+/// The union baseline (ADR-0007 decision 4) means every port keeps a capability
+/// only Android had: the knowledge base, the contacts and the chat history.
 ///
 /// ## The matching rule, and why it is the whole point
 ///
@@ -26,18 +25,41 @@ import 'native.dart';
 /// user typed by hand will not match the title byte for byte. It is *not* fuzzy:
 /// a partial match would merge two different people, and a wrong merge in a store
 /// that holds someone's relationship stage is worse than a missed one.
-final class MacosKnowledgeStore implements KnowledgeStore {
-  MacosKnowledgeStore(ContainerFile file) : _file = file;
+///
+/// ## The document's shape
+///
+/// Three keys: `notes` and `contacts` are lists of id-keyed rows, and `logs` is a
+/// map from contact id to that contact's lines. Nothing else is read or written,
+/// and an unknown key in the file rides along untouched — a forward-compatibility
+/// courtesy the three ports shared before this module did.
+///
+/// ## What a damaged row does, and where the line is
+///
+/// **A row's identity must be sound.** A `notes` or `contacts` entry with no
+/// `id` string refuses the document. macOS used to drop such a row and said so —
+/// "a damaged file loses the damaged rows rather than inventing an identity for
+/// them" — but dropping is not what happened: `saveNote` rebuilds the section from
+/// the rows it decoded, so the dropped row disappeared from the file on the next
+/// save, without a word. The same argument that makes a document which is not an
+/// object a refusal ([JsonDocument]) makes a row that cannot be identified one.
+///
+/// **An optional field still reads back as empty.** Every text field of a note or
+/// a contact is optional in the contract, and `''` is the contract's own spelling
+/// of "not set", so a missing or mistyped `title` is `''` rather than a refusal.
+/// The difference is not arbitrary: `id` has no default the store could invent,
+/// and the other fields have exactly one.
+final class KnowledgeLedger implements KnowledgeStore {
+  KnowledgeLedger(TextDocuments documents)
+    : _file = JsonDocument(documents, fileName);
 
-  /// Over this port's own knowledge file in the application container.
-  factory MacosKnowledgeStore.inContainer(MacosNative native) =>
-      MacosKnowledgeStore(ContainerFile(native, 'knowledge.json'));
-
-  final ContainerFile _file;
+  /// The document this store owns, inside whatever directory the platform uses.
+  static const String fileName = 'knowledge.json';
 
   static const String _notesKey = 'notes';
   static const String _contactsKey = 'contacts';
   static const String _logsKey = 'logs';
+
+  final JsonDocument _file;
 
   @override
   Future<List<KnowledgeNote>> notes() async =>
@@ -46,7 +68,7 @@ final class MacosKnowledgeStore implements KnowledgeStore {
   @override
   Future<void> saveNote(KnowledgeNote note) async {
     final Map<String, Object?> contents = await _file.read();
-    final List<Map<String, Object?>> all = _rows(contents[_notesKey]);
+    final List<Map<String, Object?>> all = _rows(contents[_notesKey], _notesKey);
     all.removeWhere((Map<String, Object?> row) => row['id'] == note.id);
     all.add(_encodeNote(note));
     await _file.write(<String, Object?>{...contents, _notesKey: all});
@@ -55,7 +77,7 @@ final class MacosKnowledgeStore implements KnowledgeStore {
   @override
   Future<void> deleteNote(String id) async {
     final Map<String, Object?> contents = await _file.read();
-    final List<Map<String, Object?>> all = _rows(contents[_notesKey]);
+    final List<Map<String, Object?>> all = _rows(contents[_notesKey], _notesKey);
     if (!_removeById(all, id)) {
       return;
     }
@@ -112,16 +134,23 @@ final class MacosKnowledgeStore implements KnowledgeStore {
   @override
   Future<void> saveContact(KnowledgeContact contact) async {
     final Map<String, Object?> contents = await _file.read();
-    final List<Map<String, Object?>> all = _rows(contents[_contactsKey]);
+    final List<Map<String, Object?>> all = _rows(contents[_contactsKey], _contactsKey);
     all.removeWhere((Map<String, Object?> row) => row['id'] == contact.id);
     all.add(_encodeContact(contact));
     await _file.write(<String, Object?>{...contents, _contactsKey: all});
   }
 
+  /// Deletes the contact and its history, and writes nothing if there was neither.
+  ///
+  /// The early return is not an optimisation. `deleteNote` — and through it this
+  /// shape of delete — is reachable from a swipe gesture, and a rewrite on every
+  /// empty swipe would make the document's timestamp mean nothing. The `logs` key
+  /// is written only when there was history to remove, so a delete that took no
+  /// history does not materialise an empty object into a file that never had one.
   @override
   Future<void> deleteContact(String id) async {
     final Map<String, Object?> contents = await _file.read();
-    final List<Map<String, Object?>> all = _rows(contents[_contactsKey]);
+    final List<Map<String, Object?>> all = _rows(contents[_contactsKey], _contactsKey);
     if (!_removeById(all, id)) {
       return;
     }
@@ -144,9 +173,9 @@ final class MacosKnowledgeStore implements KnowledgeStore {
     List<KnowledgeLogEntry> entries,
   ) async {
     if (entries.isEmpty) {
-      // Appending nothing must not rewrite the file: `appendLog` is called after
-      // every capture, and a no-op that touched the document would make its
-      // timestamp mean nothing.
+      // Appending nothing must not rewrite the document: `appendLog` is called
+      // after every capture, and a no-op that touched it would make its timestamp
+      // mean nothing.
       return;
     }
     final Map<String, Object?> contents = await _file.read();
@@ -174,8 +203,9 @@ final class MacosKnowledgeStore implements KnowledgeStore {
       // none, and handing back everything would make a limit a suggestion.
       return const <KnowledgeLogEntry>[];
     }
-    final List<Map<String, Object?>> all =
-        _anyRows(_map((await _file.read())[_logsKey])[contactId]);
+    final List<Map<String, Object?>> all = _anyRows(
+      _map((await _file.read())[_logsKey])[contactId],
+    );
     final int from = all.length > limit ? all.length - limit : 0;
     // The most recent `limit`, still oldest first: the contract asks for the
     // lines in the order they were said, and a reversed window would render a
@@ -192,11 +222,9 @@ final class MacosKnowledgeStore implements KnowledgeStore {
 
   /// Removes every row with this id, reporting whether there was one.
   ///
-  /// Both halves matter: the callers use the answer to avoid rewriting the file
-  /// for a delete of something that was never there, which matters because
-  /// `deleteNote` is reachable from a swipe gesture and a rewrite on every empty
-  /// swipe would make the file's timestamp meaningless. It is written by hand
-  /// rather than with `removeWhere` because that returns `void`.
+  /// The callers use the answer to avoid a write for a delete of something that
+  /// was never there. It is written by hand rather than with `removeWhere` because
+  /// that returns `void`.
   static bool _removeById(List<Map<String, Object?>> rows, String id) {
     final int before = rows.length;
     rows.removeWhere((Map<String, Object?> row) => row['id'] == id);
@@ -244,14 +272,14 @@ final class MacosKnowledgeStore implements KnowledgeStore {
   // -- decoding ------------------------------------------------------------
 
   static KnowledgeNote _decodeNote(Map<String, Object?> row) => KnowledgeNote(
-        id: _text(row['id']),
-        title: _text(row['title']),
-        content: _text(row['content']),
-        updatedAt: _time(row['updatedAt']),
-        tags: _texts(row['tags']),
-        alwaysOn: row['alwaysOn'] == true,
-        enabled: row['enabled'] != false,
-      );
+    id: _text(row['id']),
+    title: _text(row['title']),
+    content: _text(row['content']),
+    updatedAt: _time(row['updatedAt']),
+    tags: _texts(row['tags']),
+    alwaysOn: row['alwaysOn'] == true,
+    enabled: row['enabled'] != false,
+  );
 
   static KnowledgeContact _decodeContact(Map<String, Object?> row) =>
       KnowledgeContact(
@@ -276,58 +304,81 @@ final class MacosKnowledgeStore implements KnowledgeStore {
       );
 
   static List<KnowledgeNote> _notesFrom(Object? raw) => <KnowledgeNote>[
-        for (final Map<String, Object?> row in _rows(raw)) _decodeNote(row),
-      ];
+    for (final Map<String, Object?> row in _rows(raw, _notesKey)) _decodeNote(row),
+  ];
 
   static List<KnowledgeContact> _contactsFrom(Object? raw) =>
       <KnowledgeContact>[
-        for (final Map<String, Object?> row in _rows(raw)) _decodeContact(row),
+        for (final Map<String, Object?> row in _rows(raw, _contactsKey))
+          _decodeContact(row),
       ];
 
   /// Absent and empty are the same thing in this file.
   ///
-  /// Every text field of a contact is optional in the contract, and writing `''`
-  /// for the unset ones keeps the file small and the decoder free of null checks
-  /// that could not fail.
+  /// Every text field of a note and a contact is optional in the contract, and
+  /// writing `''` for the unset ones keeps the file small and the decoder free of
+  /// null checks that could not fail. See the class comment for why an optional
+  /// field is coerced while an `id` is not.
   static String _text(Object? raw) => raw is String ? raw : '';
 
   /// The rows of a keyed section — notes and contacts.
   ///
-  /// A row with no `id` is **dropped**, not defaulted. An id is the only field
-  /// that is not optional on either value type, and a row missing it is a file
-  /// this store did not write. Giving it `''` would merge it with every other
-  /// idless row into one record that the next save would then overwrite, so a
-  /// damaged file loses the damaged rows rather than inventing an identity for
-  /// them.
-  static List<Map<String, Object?>> _rows(Object? raw) => <Map<String, Object?>>[
-        for (final Object? row in _list(raw))
-          if (row is Map && row['id'] is String)
-            row.cast<String, Object?>(),
-      ];
+  /// A row without an `id` string refuses the document rather than being dropped;
+  /// the class comment has that argument.
+  static List<Map<String, Object?>> _rows(Object? raw, String key) {
+    final List<Map<String, Object?>> rows = _shape(raw, key);
+    for (final Map<String, Object?> row in rows) {
+      if (row['id'] is! String) {
+        throw StateError(
+          'every $key entry needs an id; refusing to read the knowledge base '
+          'rather than dropping the row',
+        );
+      }
+    }
+    return rows;
+  }
 
   /// The rows of an unkeyed section — the chat log.
   ///
   /// A separate reader from [_rows] because a log entry has **no id**: it is
-  /// identified by its position and its timestamp, and `KnowledgeLogEntry` in the
+  /// identified by its position and its timestamp, and [KnowledgeLogEntry] in the
   /// contract has no identifier field at all. Running the keyed filter over the
   /// log would drop every line, which is the bug this split exists to prevent —
   /// and which the mutation list records as caught.
-  static List<Map<String, Object?>> _anyRows(Object? raw) => <Map<String, Object?>>[
-        for (final Object? row in _list(raw))
-          if (row is Map) row.cast<String, Object?>(),
-      ];
+  static List<Map<String, Object?>> _anyRows(Object? raw) => _shape(raw, _logsKey);
 
-  static Map<String, Object?> _map(Object? raw) => raw is Map
-      ? raw.cast<String, Object?>()
-      : <String, Object?>{};
+  /// Every entry of a section, as maps, or a refusal naming what is wrong.
+  static List<Map<String, Object?>> _shape(Object? raw, String key) {
+    if (raw == null) {
+      return <Map<String, Object?>>[];
+    }
+    if (raw is! List) {
+      throw StateError(
+        '$key must be a list, and knowledge.json holds a ${raw.runtimeType}',
+      );
+    }
+    final List<Map<String, Object?>> rows = <Map<String, Object?>>[];
+    for (final Object? row in raw) {
+      if (row is! Map) {
+        throw StateError(
+          'every $key entry must be an object, and one is a ${row.runtimeType}',
+        );
+      }
+      rows.add(row.cast<String, Object?>());
+    }
+    return rows;
+  }
+
+  static Map<String, Object?> _map(Object? raw) =>
+      raw is Map ? raw.cast<String, Object?>() : <String, Object?>{};
 
   static List<Object?> _list(Object? raw) =>
       raw is List ? raw.cast<Object?>() : const <Object?>[];
 
   static List<String> _texts(Object? raw) => <String>[
-        for (final Object? item in _list(raw))
-          if (item is String) item,
-      ];
+    for (final Object? item in _list(raw))
+      if (item is String) item,
+  ];
 
   static DateTime _time(Object? raw) => raw is String
       ? DateTime.parse(raw).toLocal()
@@ -339,7 +390,7 @@ final class MacosKnowledgeStore implements KnowledgeStore {
   /// older build unreadable as a whole conversation. The other side is lost: the
   /// line is a chat line, and the two ends are the only two there are.
   static Speaker _speaker(Object? raw) => Speaker.values.firstWhere(
-        (Speaker candidate) => candidate.name == raw,
-        orElse: () => Speaker.other,
-      );
+    (Speaker candidate) => candidate.name == raw,
+    orElse: () => Speaker.other,
+  );
 }

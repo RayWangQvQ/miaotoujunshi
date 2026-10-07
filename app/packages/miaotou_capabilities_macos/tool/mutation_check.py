@@ -1,19 +1,37 @@
 #!/usr/bin/env python3
-"""Mutation harness for #15's guards.
+"""Mutation harness for #15's macOS-only guards.
 
 The repository's rule is that a guard nobody has broken is not known to work, so
 each mutation below breaks one implementation on purpose, runs the suite, and
 records **which** test went red. A mutation that leaves everything green means
 the guard it was aimed at does not exist.
 
+**This file used to carry every mutation for #15.** The storage modules it mutated
+— preferences, the knowledge base, the memory store, the JSON document and the
+payload reader — are `miaotou_capabilities_shared`'s now, so those mutations moved
+with them into that package's own harness. What is left here is what this package
+still owns: its Keychain, its container directory, its payload root, and its build.
+A mutation for a shared module would have to reach across into another package's
+`lib/`, and it would be caught by a suite that lives there — a harness pointing at
+the wrong tree.
+
 Run from the macOS package directory:
 
     python3 tool/mutation_check.py            # all of them
     python3 tool/mutation_check.py 3 7        # just these (1-based)
+
+**This one is a POSIX tool.** Several of the guards below run the Xcode build phase
+through `/bin/sh`, so the baseline is not green on Windows and the harness stops
+there with `baseline is not green` — which is the correct answer, not a bug to work
+around. The shared package's harness (`dart test`, no shell anywhere) runs on every
+platform this repository is developed on, which is why the storage guards live
+there now.
 """
 
 from __future__ import annotations
 
+import os
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -25,15 +43,35 @@ PACKAGE = Path(__file__).resolve().parents[1]
 # `flutter test` needs to reach its own tester process over a loopback socket, and
 # this environment sets HTTP_PROXY for everything, which the tester honours and
 # then fails on. Cleared per run rather than inherited.
+#
+# `PUB_HOSTED_URL` is pinned for the sibling harness's reason: a Windows User-scope
+# value points at an unreachable corporate host here, and `flutter test` resolves
+# before it runs anything, so the baseline would report a package-mirror socket
+# error instead of the POSIX guards that actually make it red on Windows.
 ENV = {
-    **dict(__import__("os").environ),
+    **dict(os.environ),
     "NO_PROXY": "localhost,127.0.0.1",
     "no_proxy": "localhost,127.0.0.1",
+    "PUB_HOSTED_URL": "https://pub.dev",
 }
 for _name in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
     ENV.pop(_name, None)
 
-FLUTTER = str(Path.home() / "dev/flutter-3.47.6/bin/flutter")
+
+def _flutter() -> str:
+    """The Flutter launcher, from `PATH` when it is there.
+
+    It used to be pinned to `~/dev/flutter-3.47.6/bin/flutter`, which was the
+    migration's toolchain and is not every machine's. The version this workspace
+    targets is declared in `.github/workflows/flutter.yml`; this only has to find
+    *a* launcher, and the suite is what says whether it is the right one.
+    """
+    return shutil.which("flutter") or str(
+        Path.home() / "dev/flutter-3.47.6/bin/flutter"
+    )
+
+
+FLUTTER = _flutter()
 
 
 @dataclass(frozen=True)
@@ -51,11 +89,11 @@ class Mutation:
         The original is **snapshotted**, not reconstructed by substituting the
         mutation back out. Reverse substitution is only correct when the mutated
         text is unique in the file, and several of these mutations replace a
-        fragment that occurs twice (`return undo.length;` is the return of both
-        `undo`'s empty branch and its real one). Getting that wrong silently
-        leaves a mutated file behind, which is how a mutation run corrupts a
-        working tree — so the snapshot is the only mechanism used, and a
-        post-condition check below refuses to report a result otherwise.
+        fragment that occurs twice (`if (root.isEmpty) {` is the guard in both the
+        container and the payload tree). Getting that wrong silently leaves a
+        mutated file behind, which is how a mutation run corrupts a working tree —
+        so the snapshot is the only mechanism used, and a post-condition check
+        below refuses to report a result otherwise.
         """
         target = PACKAGE / self.path
         text = target.read_text(encoding="utf-8")
@@ -80,24 +118,9 @@ class Mutation:
 
 
 MUTATIONS = (
+    # -- what this package's Dart still answers for --------------------------
     Mutation(
         1,
-        "preferences: a wrong-typed read coerces instead of returning null",
-        "lib/src/preferences.dart",
-        "return typed['type'] == type ? typed : null;",
-        "return typed;",
-        "reading a key as the wrong type gives null",
-    ),
-    Mutation(
-        2,
-        "preferences: a string list keeps the order it was given",
-        "lib/src/preferences.dart",
-        "_put(key, _stringList, value.toSet().toList()..sort())",
-        "_put(key, _stringList, value)",
-        "a string list is stored as a set",
-    ),
-    Mutation(
-        3,
         "the keychain: keys() answers a value as well as a name",
         "lib/src/secrets.dart",
         "Future<Set<String>> keys() async => (await _native.keychainKeys()).toSet();",
@@ -105,181 +128,9 @@ MUTATIONS = (
         "keys() names the configured routes",
     ),
     Mutation(
-        4,
-        "the payload: a missing key reads as an empty buffer",
-        "lib/src/payload.dart",
-        """        'the shared payload has no file at this key; this is a packaging fault, '
-        'not a missing document',""",
-        """        'no file at this key',""",
-        "a missing key is a hard error, not an empty buffer",
-    ),
-    Mutation(
-        5,
-        "the payload: listing walks into subdirectories",
-        "lib/src/payload.dart",
-        "directory.listSync(followLinks: false)",
-        "directory.listSync(recursive: true, followLinks: false)",
-        "listing is not recursive",
-    ),
-    Mutation(
-        6,
-        "the payload: a key may leave the resource root",
-        "lib/src/payload.dart",
-        "repoRelativeKey.split('/').contains('..')",
-        "false",
-        "a key that leaves the payload tree is refused",
-    ),
-    Mutation(
-        7,
-        "the payload: the resource root is asked on every read",
-        "lib/src/payload.dart",
-        # The memoisation moved into `resourceRoot`'s body when F1 gave it an
-        # empty-root guard, so it is now an `await` on a local rather than the
-        # whole body of an arrow function. The mutation follows the behaviour it
-        # protects — which is the caching, not where the caching is written.
-        "final String root = await (_root ??= _native.resourceRoot());",
-        "final String root = await _native.resourceRoot();",
-        "the resource root is asked once",
-    ),
-    Mutation(
-        8,
-        "the knowledge base: a title alone matches, without the package",
-        "lib/src/knowledge.dart",
-        # Also moved by the package-matching fix: the empty-package case became
-        # an early return, so what is left in the loop is the bare package test.
-        # Dropping it is still exactly "a title alone matches".
-        """      if (!contact.packageNames.map(_normalise).contains(wantedPackage)) {
-        continue;
-      }""",
-        "",
-        "the right title in the wrong package is not a match",
-    ),
-    Mutation(
-        9,
-        "the knowledge base: an empty title matches the first contact",
-        "lib/src/knowledge.dart",
-        """    if (wanted.isEmpty) {""",
-        """    if (false) {""",
-        "an empty title matches nothing",
-    ),
-    Mutation(
-        10,
-        "the knowledge base: the log window is reversed",
-        "lib/src/knowledge.dart",
-        "for (final Map<String, Object?> row in all.sublist(from)) _decodeEntry(row),",
-        "for (final Map<String, Object?> row in all.sublist(from).reversed)\n        _decodeEntry(row),",
-        "history is appended oldest first",
-    ),
-    Mutation(
-        11,
-        "the knowledge base: a limit of zero returns the whole log",
-        "lib/src/knowledge.dart",
-        "if (limit <= 0) {",
-        "if (false) {",
-        "a limit of zero or less returns nothing",
-    ),
-    Mutation(
-        12,
-        "the knowledge base: deleting a contact keeps its history",
-        "lib/src/knowledge.dart",
-        "final bool hadLog = logs.remove(id) != null;",
-        "final bool hadLog = false;",
-        "deleting a contact takes its history with it",
-    ),
-    Mutation(
-        13,
-        "the memory store: apply writes without consent",
-        "lib/src/memory.dart",
-        """    if (!consent) {
-      throw StateError('长期记忆尚未获得用户同意');
-    }""",
-        "",
-        "a store nobody has consented to writes nothing",
-    ),
-    Mutation(
-        14,
-        "the memory store: the value cap is not enforced",
-        "lib/src/memory.dart",
-        "if (trimmed.length > maxValueChars) {",
-        "if (false) {",
-        "the value cap is upstream MAX_VALUE_CHARS",
-    ),
-    Mutation(
-        15,
-        "the memory store: the capacity bound is not enforced",
-        "lib/src/memory.dart",
-        "if (existing < 0 && records.length >= maxRows) {",
-        "if (false) {",
-        "the capacity bound is upstream MAX_ROWS",
-    ),
-    Mutation(
-        16,
-        "the memory store: undo reports zero and keeps the stack",
-        "lib/src/memory.dart",
-        """      _undo: const <Object?>[],
-    });
-    return undo.length;""",
-        """      _undo: const <Object?>[],
-    });
-    return 0;""",
-        "undo rolls back exactly this run and reports how many",
-    ),
-    Mutation(
-        17,
-        "the memory store: undo does not restore a previous value",
-        "lib/src/memory.dart",
-        """      if (before == null) {
-        records.removeAt(at);
-      } else {""",
-        """      if (before == null) {
-        records.removeAt(at);
-      } else if (false) {""",
-        "undo restores a value that predates the stack",
-    ),
-    Mutation(
-        18,
-        "the memory store: a paused store still writes",
-        "lib/src/memory.dart",
-        """    if (paused) {
-      throw StateError('长期记忆当前已暂停');
-    }""",
-        "",
-        "a paused store refuses writes but still reads",
-    ),
-    Mutation(
-        19,
-        "the memory store: consent needs no confirmation",
-        "lib/src/memory.dart",
-        "if (!confirmed) {",
-        "if (false) {",
-        "consent is required to be confirmed",
-    ),
-    Mutation(
-        20,
-        "the memory store: an empty value is stored",
-        "lib/src/memory.dart",
-        "if (trimmed.isEmpty) {",
-        "if (false) {",
-        "an empty value is refused",
-    ),
-    Mutation(
-        21,
-        "the container: a corrupt file is read as an empty store",
-        "lib/src/container_file.dart",
-        """    if (decoded is! Map) {
-      throw FormatException(
-        '$fileName does not hold a JSON object; refusing to treat it as an '
-        'empty store, because that would hide the loss',
-        source.path,
-      );
-    }""",
-        "    if (decoded is! Map) return <String, Object?>{};",
-        "a corrupt settings file is refused rather than read as empty",
-    ),
-    Mutation(
-        22,
+        2,
         "the container: a store with no directory writes to the working directory",
-        "lib/src/container_file.dart",
+        "lib/src/container_documents.dart",
         """    if (root.isEmpty) {
       throw StateError(""",
         """    if (false) {
@@ -287,7 +138,30 @@ MUTATIONS = (
         "an answer with no path in it is refused",
     ),
     Mutation(
-        23,
+        3,
+        "the payload: the resource root is asked on every read",
+        "lib/src/payload.dart",
+        # The mutation follows the behaviour it protects — the caching — rather
+        # than where the caching used to be written. It moved into `resourceRoot`'s
+        # body when that gained its empty-root guard, so it is an `await` on a
+        # local instead of the whole body of an arrow function.
+        "final String root = await (_root ??= _native.resourceRoot());",
+        "final String root = await _native.resourceRoot();",
+        "the resource root is asked once",
+    ),
+    Mutation(
+        4,
+        "the payload: an empty root is joined onto instead of refused",
+        "lib/src/payload.dart",
+        """    if (root.isEmpty) {
+      throw StateError(""",
+        """    if (false) {
+      throw StateError(""",
+        "an empty root from any implementation is refused where it is used",
+    ),
+    # -- the build and the two native halves ---------------------------------
+    Mutation(
+        5,
         "the Keychain: the listing query asks for data",
         "macos/miaotou_capabilities_macos/Sources/miaotou_capabilities_macos/"
         "KeychainStore.swift",
@@ -296,7 +170,7 @@ MUTATIONS = (
         "the listing query asks for attributes and not for data",
     ),
     Mutation(
-        24,
+        6,
         "the Keychain: a query drops the data protection attribute",
         "macos/miaotou_capabilities_macos/Sources/miaotou_capabilities_macos/"
         "KeychainStore.swift",
@@ -308,7 +182,7 @@ MUTATIONS = (
         "every query asks for the data protection keychain",
     ),
     Mutation(
-        25,
+        7,
         "the sync: rsync becomes a copy, leaving deleted files behind",
         "../../apps/miaotou_app/macos/Runner/sync_shared_payload.sh",
         'rsync -a --delete "$REPO_ROOT/$tree/" "$RESOURCES/$tree/"',
@@ -316,7 +190,7 @@ MUTATIONS = (
         "the sync is an rsync mirror",
     ),
     Mutation(
-        26,
+        8,
         "the sync: the assertion is looked for beside SRCROOT instead of in tool/",
         "../../apps/miaotou_app/macos/Runner/sync_shared_payload.sh",
         # Realigned from "the phase no longer calls the assertion" when F1 fixed
@@ -334,7 +208,7 @@ MUTATIONS = (
         "the build phase runs, and it passes",
     ),
     Mutation(
-        27,
+        9,
         "the payload map: a scene document is dropped from the key set",
         "../../apps/miaotou_app/tool/validate_payload_keys.dart",
         "_mapMapKeys = <String>['scene_knowledge'];",
@@ -387,9 +261,16 @@ def preflight(selected: list[Mutation]) -> list[str]:
 
 
 def run_suite() -> tuple[int, str]:
-    """The macOS package's whole suite. Returns (exit code, output)."""
+    """The macOS package's whole suite. Returns (exit code, output).
+
+    `--no-pub` because the workspace is already resolved by the time this runs
+    (the README's own recipe is `flutter pub get` once, then test), and an
+    implicit re-resolve turns a package-mirror outage into "baseline is not
+    green" — a red baseline for a reason that has nothing to do with the guards
+    this harness is here to break.
+    """
     result = subprocess.run(
-        [FLUTTER, "test", "--reporter", "compact"],
+        [FLUTTER, "test", "--no-pub", "--reporter", "compact"],
         cwd=PACKAGE,
         env=ENV,
         capture_output=True,
@@ -420,7 +301,7 @@ def main(argv: list[str]) -> int:
 
     # Every target text is checked before the baseline runs, not lazily inside
     # the loop. A drifted mutation is a hard error — never a skip — because the
-    # alternative is a harness that reports "all 27 caught" while one of them
+    # alternative is a harness that reports "all caught" while one of them
     # quietly stopped breaking anything.
     problems = preflight(selected)
     if problems:
@@ -445,7 +326,7 @@ def main(argv: list[str]) -> int:
         print("baseline is not green; fix that before mutating", file=sys.stderr)
         print(output[-4000:], file=sys.stderr)
         return 2
-    print(f"baseline green\n")
+    print("baseline green\n")
 
     survivors: list[tuple[Mutation, set[str]]] = []
     for mutation in selected:
@@ -474,12 +355,16 @@ def main(argv: list[str]) -> int:
             hit = sorted(n for n in failed if mutation.expect_red in n)
             print(f"    caught by: {hit[0]}")
         elif code != 0:
-            print(f"    red, but not by the expected test. Other failures: "
-                  f"{sorted(failed)[:3]}")
+            print(
+                f"    red, but not by the expected test. Other failures: "
+                f"{sorted(failed)[:3]}"
+            )
             survivors.append((mutation, failed))
         else:
-            print(f"    NOT CAUGHT — expected a test named like "
-                  f"{mutation.expect_red!r}")
+            print(
+                f"    NOT CAUGHT — expected a test named like "
+                f"{mutation.expect_red!r}"
+            )
             survivors.append((mutation, failed))
 
     print()

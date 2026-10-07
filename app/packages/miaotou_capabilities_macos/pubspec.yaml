@@ -12,13 +12,17 @@ dependencies:
   # The seam is a method channel, so this package is a Flutter package now rather
   # than a pure Dart one. What that costs is the cheapest test story in the tree
   # (`dart test` with no Flutter binding), and what it buys is a real macOS
-  # implementation at all. The pure-Dart work — the pacing schedule, the edge
+  # implementation at all. The pure-Dart work that is *macOS's own* — the edge
   # snapping, the perception pipeline — is still exercised by `flutter test`,
-  # which runs the same Dart VM with a binding attached and nothing else.
+  # which runs the same Dart VM with a binding attached and nothing else. The
+  # pure-Dart work the three ports share is not here at all: it lives in
+  # `miaotou_capabilities_shared` and runs under `dart test`.
   flutter:
     sdk: flutter
   miaotou_capabilities:
     path: ../miaotou_capabilities
+  miaotou_capabilities_shared:
+    path: ../miaotou_capabilities_shared
 
 dev_dependencies:
   flutter_test:

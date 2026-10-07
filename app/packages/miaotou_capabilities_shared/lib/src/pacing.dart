@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 
-/// How often this port is allowed to ask the system for a frame, and what it does
+/// How often a port is allowed to ask the system for a frame, and what it does
 /// with the answers.
 ///
 /// **Timing is the implementation's business, not the caller's** (ADR-0009), and
@@ -14,11 +14,16 @@ import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 /// a battery complaint, and a callback that never returns is the difference
 /// between a panel and a hang.
 ///
+/// Keeping those three decisions on this side of the platform boundary is what
+/// makes them testable at all: the desktop ports feed pixels from Quartz and from
+/// Windows Graphics Capture, neither of which a test can drive, but the schedule
+/// around them is ordinary Dart.
+///
 /// The two codes this class produces are **ours, not the platform's** — the
-/// contract passes platform codes through untranslated, and macOS has no code
+/// contract passes platform codes through untranslated, and no port has a code
 /// for "you are asking too fast". They are negative so they can never collide
-/// with a `SCStreamError` or a `CGError` value, which is the same choice the
-/// Android port made and for the same reason.
+/// with a platform error value, which is the choice the Android port made first
+/// and for the same reason.
 ///
 /// The clock is injected so the schedule can be tested without waiting for it.
 final class CapturePacing {
@@ -67,9 +72,11 @@ final class CapturePacing {
       return minInterval;
     }
     final int shift = _failStreak - 1;
-    final int scaled = minInterval.inMilliseconds * (1 << (shift < _maxShift ? shift : _maxShift));
+    final int scaled =
+        minInterval.inMilliseconds * (1 << (shift < _maxShift ? shift : _maxShift));
     return Duration(
-      milliseconds: scaled > maxBackoff.inMilliseconds ? maxBackoff.inMilliseconds : scaled,
+      milliseconds:
+          scaled > maxBackoff.inMilliseconds ? maxBackoff.inMilliseconds : scaled,
     );
   }
 

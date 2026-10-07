@@ -32,8 +32,7 @@ void main() {
     applicationDataDirectory: storage,
     credentialBackend: MemoryWindowsCredentialBackend(),
   );
-  final WindowsMemoryStore memory =
-      capabilities.memoryStore as WindowsMemoryStore;
+  final MemoryLedger memory = capabilities.memoryStore as MemoryLedger;
 
   setUpAll(() => memory.grantConsent(confirmed: true));
   tearDownAll(() => storage.delete(recursive: true));
@@ -125,12 +124,25 @@ void main() {
   test('the bundle is wired to this package and covers all eleven', () {
     final Map<String, String> report = capabilities.describe();
     expect(report, hasLength(11));
+
+    // The three storage members are `miaotou_capabilities_shared`'s, so they carry
+    // the same class names here as on the other two ports — that is the point of
+    // the module. Everything else has to be this port's: a bundle that silently
+    // wired another platform would still compile, and this is the only place that
+    // is observable.
     expect(
-      report.values,
-      everyElement(startsWith('Windows')),
-      reason:
-          'an implementation package that silently wires another platform '
-          'would still compile',
+      report.values.where((String type) => !type.startsWith('Windows')).toSet(),
+      <String>{
+        'PreferenceLedger',
+        'KnowledgeLedger',
+        'MemoryLedger',
+        'PayloadReader',
+      },
+      reason: 'exactly the settings, knowledge and memory documents and the '
+          'payload reader come from the shared module. A fifth non-Windows name '
+          'would be a shared implementation this port did not have before, and a '
+          'member missing from this set would be one that had stopped being '
+          'Windows\'s',
     );
   });
 }
