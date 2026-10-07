@@ -8,7 +8,6 @@
       "options": {
         "cwd": "${workspaceFolder}/app/apps/miaotou_app",
         "env": {
-          "PATH": "/Users/raywang/dev/flutter-3.47.6/bin:${env:PATH}",
           "PUB_HOSTED_URL": "https://pub.dev"
         }
       },
@@ -49,7 +48,6 @@
       "options": {
         "cwd": "${workspaceFolder}/app/apps/miaotou_app",
         "env": {
-          "PATH": "/Users/raywang/dev/flutter-3.47.6/bin:${env:PATH}",
           "PUB_HOSTED_URL": "https://pub.dev"
         }
       },

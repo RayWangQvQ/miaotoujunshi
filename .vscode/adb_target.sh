@@ -52,7 +52,7 @@
 # Environment
 # -----------
 #   ADB             adb binary to use (default: PATH, then ANDROID_HOME /
-#                   ANDROID_SDK_ROOT / ~/Library/Android/sdk)
+#                   ANDROID_SDK_ROOT, then the platform's default SDK location)
 #   ANDROID_SERIAL  when set it wins, provided the transport is attached
 
 set -u
@@ -63,7 +63,14 @@ resolve_adb() {
   if [ -n "${ADB:-}" ] && [ -x "${ADB}" ]; then printf '%s\n' "$ADB"; return 0; fi
   if [ -n "${ADB:-}" ] && command -v "$ADB" >/dev/null 2>&1; then command -v "$ADB"; return 0; fi
   if command -v adb >/dev/null 2>&1; then command -v adb; return 0; fi
-  for root in "${ANDROID_HOME:-}" "${ANDROID_SDK_ROOT:-}" "$HOME/Library/Android/sdk"; do
+  # The last three are the platform defaults: macOS, Windows, Linux. Each is
+  # tried only when it exists, so an absent one costs nothing.
+  for root in \
+    "${ANDROID_HOME:-}" \
+    "${ANDROID_SDK_ROOT:-}" \
+    "$HOME/Library/Android/sdk" \
+    "${LOCALAPPDATA:-$HOME/AppData/Local}/Android/Sdk" \
+    "$HOME/Android/Sdk"; do
     [ -n "$root" ] || continue
     if [ -x "$root/platform-tools/adb" ]; then printf '%s\n' "$root/platform-tools/adb"; return 0; fi
   done

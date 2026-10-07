@@ -16,11 +16,14 @@ val copySharedMaterial by tasks.registering(Sync::class) {
     from(File(repoRoot, "goutoujunshi")) { into("goutoujunshi") }
     into(sharedAssets)
 }
+// `python3` is not an executable name on Windows; PYTHON overrides it there.
+val pythonExecutable = providers.environmentVariable("PYTHON").getOrElse("python3")
+
 val validateSharedPayload by tasks.registering(Exec::class) {
     description = "Asserts every runtime payload key is present in Android assets"
     dependsOn(copySharedMaterial)
     commandLine(
-        "python3",
+        pythonExecutable,
         File(
             repoRoot,
             "app/apps/miaotou_app/macos/Runner/validate_payload_keys.py",

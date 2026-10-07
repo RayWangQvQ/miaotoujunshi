@@ -1,25 +1,22 @@
 {
-  "dart.flutterSdkPath": "/Users/raywang/dev/flutter-3.47.6",
-  // This machine's shell profile points PUB_HOSTED_URL at an employer-internal
-  // Artifactory that only resolves on that employer's network. Nothing in this
-  // repository comes from there, and off that network every launch aborts at
-  // "Resolving dependencies" before the app starts. Pin the public registry for
-  // this workspace so a debug session does not depend on which network the
-  // machine happens to be on. `dart.env` reaches every Dart/Flutter process the
-  // extensions spawn, including the pub get they run before launching.
+  // PUB_HOSTED_URL is pinned to the public registry for the whole workspace.
+  // Some shell profiles point it at an employer-internal Artifactory that
+  // resolves only on that employer's network, where every launch would abort at
+  // "Resolving dependencies" before the app starts. `dart.env` reaches every
+  // Dart/Flutter process the extensions spawn, including the pub get they run
+  // before launching.
   "dart.env": {
     "PUB_HOSTED_URL": "https://pub.dev"
   },
+  // The Flutter SDK and the JDK are taken from the machine, not pinned to one
+  // developer's install: the Dart extension finds `flutter` on PATH, and the
+  // Java extension finds the JDK through JAVA_HOME / PATH.
+  //
+  // The Android run tasks are bash scripts, so on Windows they are run under
+  // Git Bash chosen by profile name rather than a hard-coded executable path.
+  "terminal.integrated.defaultProfile.windows": "Git Bash",
   "python.analysis.exclude": [
     "**/.venv"
-  ],
-  "java.jdt.ls.java.home": "/Users/raywang/dev/jdk/Contents/Home",
-  "java.configuration.runtimes": [
-    {
-      "name": "JavaSE-17",
-      "path": "/Users/raywang/dev/jdk/Contents/Home",
-      "default": true
-    }
   ],
   "files.exclude": {
     "**/__pycache__": true,
