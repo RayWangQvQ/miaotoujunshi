@@ -5,6 +5,11 @@ coverage/
 *.iml
 .idea/
 
+# Gradle's own per-project caches. The app module carries its own rule in
+# apps/miaotou_app/android/.gitignore; plugin packages under packages/ have
+# no android/.gitignore of their own, so the rule lives here for all of them.
+.gradle/
+
 # The macOS and Windows runners generate their plugin registrant at build time.
 apps/*/macos/Flutter/ephemeral/
 apps/*/windows/flutter/ephemeral/
