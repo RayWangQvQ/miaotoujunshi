@@ -80,6 +80,7 @@ ALLOWED: dict[str, tuple[str, str]] = {
         "channel and its device resolver travel with the code",
     ),
     ".gitignore": (GOVERNANCE, "git ignore rules"),
+    ".gitattributes": (GOVERNANCE, "checkout line-ending rules"),
     "AGENTS.md": (GOVERNANCE, "agent instructions"),
     "GLOSSARY.md": (GOVERNANCE, "domain glossary"),
     "LICENSE": (GOVERNANCE, "licence for the code written in this repository"),
