@@ -88,7 +88,7 @@ final class ReviewSession {
   TextEditingValue deleteLine(TextEditingValue value) {
     final String text = value.text;
     final int caret = value.selection.start < 0 ? 0 : value.selection.start;
-    final int lineStart = text.lastIndexOf('\n', caret - 1) + 1;
+    final int lineStart = _lineStartOf(text, caret);
     final int lineEnd = text.indexOf('\n', caret); // -1 on the last line
 
     final int delStart;
@@ -117,7 +117,7 @@ final class ReviewSession {
     final int end = value.selection.end < 0 ? start : value.selection.end;
     // The first line the selection touches, and the line its extent is on. A
     // collapsed caret sets start == end and so a single line.
-    final int lineStart = text.lastIndexOf('\n', start - 1) + 1;
+    final int lineStart = _lineStartOf(text, start);
     int lineEnd = text.indexOf('\n', end);
     if (lineEnd == -1) {
       lineEnd = text.length;
@@ -128,7 +128,7 @@ final class ReviewSession {
     return TextEditingValue(
       text: rewritten,
       selection: TextSelection.collapsed(
-        offset: _caretAfter(rewritten, lineStart, prefix, end),
+        offset: _caretAfter(rewritten, prefix, end),
       ),
     );
   }
@@ -150,11 +150,35 @@ final class ReviewSession {
   }
 
   /// Where the caret should land after a rewrite: at the end of the original
-  /// selection's extent, but never before the new prefix of that line.
-  int _caretAfter(String replacement, int lineStart, String prefix, int end) {
-    final int endLineStart = replacement.lastIndexOf('\n', end - 1) + 1;
+  /// selection's extent, but never before the new prefix of that line, and never
+  /// past the block a shorter prefix left behind.
+  int _caretAfter(String replacement, String prefix, int end) {
+    final int endLineStart = _lineStartOf(replacement, end);
     final int prefixEnd = endLineStart + prefix.length;
-    return end < prefixEnd ? prefixEnd : end;
+    final int wanted = end < prefixEnd ? prefixEnd : end;
+    return wanted < replacement.length ? wanted : replacement.length;
+  }
+
+  /// The first index of the line containing [offset]: just past the nearest
+  /// newline before it, or 0 on the first line.
+  ///
+  /// `lastIndexOf` cannot say "there is nothing before the start" the way
+  /// `indexOf` can — a negative `start` is a `RangeError`, not an empty search —
+  /// and 0 is not the edge case it looks like. Assigning `text` onto a
+  /// controller leaves its selection invalid, an invalid selection is read as 0
+  /// by the callers above, and a user tapping the very start of the block asks
+  /// for offset 0 as well. Spelled out at each site, all three found a newline
+  /// at -1 and threw.
+  ///
+  /// An offset past the end is answered as the end, which is where [setSpeaker]
+  /// can leave it: rewriting a prefix onto a shorter one makes the block shorter
+  /// than the selection that asked for it.
+  int _lineStartOf(String text, int offset) {
+    if (offset <= 0) {
+      return 0;
+    }
+    final int at = offset < text.length ? offset : text.length;
+    return text.lastIndexOf('\n', at - 1) + 1;
   }
 
   /// The whole batch as one string, so that "is this the same batch" is one

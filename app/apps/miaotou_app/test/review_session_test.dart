@@ -212,6 +212,24 @@ void main() {
       expect(out.text, '对方：在吗\n对方：在的');
     });
 
+    test('a rewrite that shortens the block keeps the caret inside it', () {
+      // 对方： is one character wider than 我：, so a selection reaching the end
+      // of the block asks for an offset the rewritten block no longer has. A
+      // caret past the end is a value the field cannot hold.
+      const String long = '对方：abcdef';
+      final TextEditingValue out = ReviewSession(copy).setSpeaker(
+        selectionOver(long, 0, long.length),
+        Speaker.me,
+      );
+
+      expect(out.text, '我：abcdef');
+      expect(
+        out.selection,
+        const TextSelection.collapsed(offset: 8),
+        reason: 'the caret goes to the end of the block that survived',
+      );
+    });
+
     test('a line typed without a prefix gets one', () {
       // The block is the source of truth, so a line the user typed arrives
       // bare; the shortcut has to make it a message rather than prepend to
