@@ -53,6 +53,14 @@
 ///   application and moved here when the runtime's decisions did: the first
 ///   because it never touched anything but a frame, the second because the
 ///   engine reads it to decide whether a round may run at all.
+/// * **The runtime's state machine.** [ConversationEngine] is what the panel is
+///   showing and why: one event in, a list of [ConversationEffect] out, and
+///   nothing awaited in between. It is the *what* half of ADR-0009 decision 3 —
+///   the pacing, the hiding and the watchdog stay in the implementations — and
+///   the reasons the panel says 识别中 or 分析中, refuses a second round, ends a
+///   review or offers a way out of a refusal are all in it. Its notes travel as
+///   [NoteCode]s rather than as words, because no sentence a screen shows is in
+///   this package.
 ///
 /// ## The one thing worth knowing before adding to it
 ///
@@ -71,6 +79,8 @@ library;
 export 'src/advice.dart';
 export 'src/analysis.dart';
 export 'src/conversation.dart';
+export 'src/conversation_engine.dart';
+export 'src/conversation_note.dart';
 export 'src/csv.dart';
 export 'src/errors.dart';
 export 'src/injection_filter.dart';

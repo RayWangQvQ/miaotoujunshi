@@ -167,6 +167,62 @@ List<CapturedLine> _withoutOcrDoubt(List<CapturedLine> lines) => <CapturedLine>[
     CapturedLine(speaker: line.speaker, text: line.text, sender: line.sender),
 ];
 
+/// A reading of the screen as the domain's own snapshot — **the one door**.
+///
+/// [source] is how the lines were obtained, and it decides the confidence every
+/// line carries, because that is the only thing the two paths disagree about:
+///
+/// * `'ocr'` — a whole-frame capture. ML Kit's Chinese recogniser reports no
+///   per-line score at all, so the engine cannot vouch for the text and must not
+///   be made to. The confidence is [double.nan] rather than null, and the
+///   difference is load-bearing: the domain reads a *null* as "not from OCR" and
+///   a *non-finite* one as below the threshold, so a NaN is what puts the
+///   marker on every line and what makes the review gate refuse.
+/// * anything else — a tree read, which either carried a confidence or carried
+///   none to carry.
+///
+/// **One implementation for every caller**, because they all depend on the same
+/// provenance rule and there is no second place in which to spell it: the
+/// analysis hands this to the model, and the refusal's own remedy asks the gate
+/// what it would say about the same lines, so the two must not be built twice.
+/// They were, once — the remedy rendered the transcript itself, which kept
+/// `[OCR待核对]` on a batch the user had just confirmed and offered 「去核对」
+/// for a refusal no review can fix (ADR-0024).
+Snapshot snapshotOf({
+  required String? title,
+  required List<ChatLine> lines,
+  required String source,
+  required bool reviewed,
+}) =>
+    Snapshot.fromCaptured(
+      title: title,
+      source: source,
+      lines: <CapturedLine>[
+        for (final ChatLine line in lines)
+          CapturedLine(
+            speaker: line.speaker,
+            text: line.text,
+            confidence: source == capturedByCapture ? double.nan : null,
+          ),
+      ],
+      reviewed: reviewed,
+    );
+
+/// The `source` value a manual whole-frame capture writes.
+///
+/// A string rather than an enum because it is a field on [Snapshot] that travels
+/// to the model in the prompt, and it has been a string since the three ports
+/// agreed on it. The comparison in [snapshotOf] is the only thing in this
+/// package that reads it.
+const String capturedByCapture = 'ocr';
+
+/// The `source` value an accessibility-tree read writes.
+///
+/// The other half of the same vocabulary, and named for the same reason: a
+/// batch carries its provenance, and "which of the two doors did these lines
+/// come through" is the whole of what the field means.
+const String pushedByTree = 'accessibility';
+
 /// The label a speaker is written as in a transcript.
 ///
 /// These are the **display** words, and they are not the wire vocabulary

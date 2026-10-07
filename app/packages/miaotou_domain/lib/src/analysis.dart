@@ -3,8 +3,10 @@ import 'errors.dart';
 import 'injection_filter.dart';
 import 'judging.dart';
 import 'model_gateway.dart';
+import 'model_settings.dart';
 import 'preferences.dart';
 import 'prompts.dart';
+import 'relationship.dart';
 import 'scoring.dart';
 import 'shared_material.dart';
 import 'snapshot.dart';
@@ -116,6 +118,98 @@ Future<Advice> analyzeSnapshot({
     background: background,
     advice: advice,
     preferences: preferences,
+  );
+}
+
+/// One round, from the settings a person chose.
+///
+/// The entry point for a caller that has a [ModelSettings] rather than six
+/// prepared arguments. Resolving the settings into a scene, a background, a
+/// reply preference and a strategy route is a decision — which scene the goal
+/// names, whether the background fits, which of the two independent steps runs
+/// — and ADR-0009 puts the decisions on this side. So does the profile the
+/// background is built from, which is what the goal and the relationship
+/// background are for.
+///
+/// [analyzeSnapshot] stays the lower-level door and is unchanged: a caller that
+/// has already resolved these — a test driving one prompt, a future paste path
+/// with no conversation behind it — should not be made to invent settings to
+/// reach it.
+Future<Advice> analyzeConfigured({
+  required ModelTransport transport,
+  required SharedMaterial material,
+  required Snapshot snapshot,
+  required ModelSettings settings,
+}) {
+  final _Round round = _roundOf(
+    settings: settings,
+    material: material,
+    snapshot: snapshot,
+  );
+  return analyzeSnapshot(
+    transport: transport,
+    material: material,
+    snapshot: snapshot,
+    scene: round.scene,
+    background: round.background,
+    replyModel: settings.replyModel,
+    strategyRoute: round.strategyRoute,
+    preferences: round.preferences,
+  );
+}
+
+/// Everything [analyzeSnapshot] needs that the settings and the snapshot do not
+/// already say.
+final class _Round {
+  const _Round({
+    required this.scene,
+    required this.background,
+    required this.preferences,
+    this.strategyRoute,
+  });
+
+  final String scene;
+  final String background;
+  final ReplyPreferences preferences;
+  final StrategyRoute? strategyRoute;
+}
+
+_Round _roundOf({
+  required ModelSettings settings,
+  required SharedMaterial material,
+  required Snapshot snapshot,
+}) {
+  // The profile is what a person's goal and relationship background are for,
+  // and `Profile.empty` is the "no stored partner" case — which is the only
+  // case this path has, because the knowledge store is a separate surface and
+  // nothing here reads it. `id` is deliberately left empty rather than filled
+  // with something that looks like an identity: it is the store's own handle,
+  // it is not in [profileFields], and so it never reaches the model.
+  final Profile profile = Profile.empty(id: '', label: snapshot.title)
+      .withValue('goal', settings.goal)
+      .withValue('background', settings.relationshipBackground);
+  return _Round(
+    scene: material.vocabulary.relationship.sceneFor(profile.goal),
+    background: buildBackground(
+      profile: profile,
+      snapshotText: snapshot.transcript,
+    ),
+    preferences: material.vocabulary.reply.resolve(
+      tone: settings.tone,
+      length: settings.length,
+      count: settings.candidateCount,
+    ),
+    strategyRoute: switch (settings.strategyProvider) {
+      StrategyProvider.none => null,
+      StrategyProvider.jev => StrategyRoute(
+        engine: StrategyEngine.jev,
+        model: settings.strategyModel,
+      ),
+      StrategyProvider.deepseek => StrategyRoute(
+        engine: StrategyEngine.deepseek,
+        model: settings.strategyModel,
+      ),
+    },
   );
 }
 
