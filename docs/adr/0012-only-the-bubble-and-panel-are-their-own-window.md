@@ -39,6 +39,22 @@ route in the main window.**
    frame. "Only transient view state" is about what the panel *owns*, and it still
    owns nothing: the value is pushed by the main window, which is the only holder
    of `Preferences`, and the panel reads no store to render its surface.
+   **Amended (2026-10-07):** "a view plus a command channel" is now **one interface
+   per side of the protocol** — `PanelViewChannel` for the panel engine's end and
+   `PanelMainChannel` for the main window's, both in the application's
+   `protocol.dart` — rather than six classes with no common supertype. Which port's
+   channel carries the protocol is one fact, in `capability_registry.dart`'s
+   `PanelWiring`, together with how the panel engine finds its own window and where
+   the ball lands first; that is *all* the three ports differ in, so the two entry
+   points that start the panel have one body each. The decision itself is unchanged
+   — the panel still holds no state and still renders what it is given. What the
+   amendment records is why the shape was worth forcing: the two branches that were
+   line-identical apart from a class name differed in one call, `appResumed`, and
+   nothing in the code said whether that was a decision or an omission. Android is
+   the port whose host starts an engine without a window, so Android is the port
+   that has to be told it resumed; the macOS host does not implement the call and
+   would answer a missing-plugin error. Two copies of one shape cannot carry that
+   distinction, and a value can.
 3. **The read-only state is derived in the main window, not in the panel.** ADR-0002
    puts the derivation where the conversation identity is known and leaves the
    renderer with nothing to decide; on desktop that owner is the main window, the

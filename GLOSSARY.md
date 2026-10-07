@@ -124,6 +124,7 @@
 | 提示码 | 引擎要面板说的一句话，以 `NoteCode` 而不是字符串传递（`conversation_note.dart`）。领域层不持有任何屏幕会显示的句子，`app/apps/miaotou_app/lib/src/panel/translation.dart` 是码到 `CopyKey` 的唯一映射，且是穷尽 `switch`——引擎能决定的码少一句文案就编译不过。平台自己写的句子（拒绝原因、领域 `DomainException`）走 `LiteralNote`，逐字照显 |
 | 面板窗 / 主窗路由 | 桌面端界面的两类落点：必须独立成窗的（悬浮球、面板、详情浮层）与收进主窗口的页面（设置、趋势） |
 | 面板设置 | 面板自己的偏好：不透明度与停靠位置。存在 `Preferences`，键前缀 `panel.`，**由主窗读写**；面板引擎不读它（见 `docs/adr/0020`） |
+| 面板接线 | 三端各自与面板协议打交道的那三件事，收在一个值里（`app/apps/miaotou_app/lib/src/capability_registry.dart` 的 `PanelWiring`）：主窗走哪条通道、面板引擎怎么找到自己那块窗、球首次落在哪。由 `wiringFor(Port)` 从端口枚举算出，所以两个面板入口函数各只有一份函数体，且三端分支都能在测试里各走一遍。**三端差异只有这三件事**；`markResumed` 属 Android 独有——宿主自己起的引擎不会自己收到 resume（`docs/adr/0012` 决定 2 的 2026-10-07 修订）。端口枚举 `Port` 由 `portForCurrentPlatform()` 产生，**这是应用里唯一一次问平台是什么** |
 | 面板不透明度 | 面板**填充色**的 alpha：球、面板外框、候选回复卡共用同一个值。40–100，默认 80。**文字与只读横幅不受它影响** |
 | 窗口透明度 | 原生整窗的 alpha（Android `window.alpha`、macOS `NSWindow.alphaValue`、Windows 分层窗口）。**面板不使用它**：它连文字一起压淡，且与截屏时的 0f/1f 相撞 |
 | 权限接口 | 契约里唯一一个**只读状态、只跳系统页、不代为授权**的成员（`Permissions` 的 `read()` 与 `openSettings(kind)`）。没有 `request`：系统页跳完不给结果，接口不许假装它是请求（`docs/adr/0021`） |

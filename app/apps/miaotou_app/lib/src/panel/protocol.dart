@@ -346,6 +346,69 @@ abstract class PanelChannel {
   void send(PanelCommand command);
 }
 
+/// The panel engine's end of the protocol, as the runtime needs it.
+///
+/// [PanelChannel] is the seam a panel *widget* is driven through; this is the
+/// seam a panel *engine* is started through, and the difference is the four
+/// members below. `attachPanelWindow` used to spell those four out once per port
+/// because the ports' view channels shared no supertype; with one, which port's
+/// channel this is becomes a single fact (`capability_registry.dart`'s
+/// `PanelWiring`) and each port can be driven on its own in a test.
+///
+/// **Two of the three ports implement it.** Android and macOS ask their host which
+/// engine this is and start the panel engine in this process, so their view
+/// channel carries the window semantics too. Windows' view channel is a plain
+/// [PanelChannel]: the frames arrive and the commands leave over it, but
+/// `setExpanded` / `startDragging` / `setFocusable` come from
+/// `WindowsPanelWindowBinding`, because on that port the panel engine already *is*
+/// a window and has a native handle to drive rather than a host to ask.
+///
+/// Those three are window semantics (ADR-0012 decision 2): the panel says what it
+/// wants, and how a frameless window is dragged or focused stays with the port.
+abstract class PanelViewChannel implements PanelChannel {
+  /// Registers this engine's handlers, and tells the far side it is up.
+  ///
+  /// `panelReady` is part of it rather than a separate call because the value
+  /// that arrives before this point is lost: the main window pushed the first
+  /// frame while the panel engine was still starting.
+  Future<void> initialize();
+
+  /// Grows the window into the panel or shrinks it back into the ball.
+  Future<void> setExpanded(bool expanded);
+
+  /// Hands the current drag to the platform's own window mover.
+  Future<void> startDragging();
+
+  /// Allows or refuses the panel taking keyboard focus.
+  Future<void> setFocusable(bool focusable);
+}
+
+/// The main window's end of the panel protocol.
+///
+/// The mirrors of the four facts [PanelViewChannel] carries, going the other
+/// way: this engine pushes both down-streams out and reads commands off one
+/// stream in. A port implements it so that *which* channel carries them is one
+/// fact per port rather than three copies of the same six calls
+/// (`capability_registry.dart`'s `PanelWiring`).
+///
+/// Android's implementation does not buffer and the two desktop ports' do,
+/// because the host that relays the protocol is Kotlin on one port and the panel
+/// engine itself on the others. That difference stays inside the class and not in
+/// this interface, which is why the interface has no `flush`.
+abstract class PanelMainChannel {
+  /// Registers this engine's handler for commands.
+  Future<void> initialize();
+
+  /// Commands coming up.
+  Stream<PanelCommand> get commands;
+
+  /// A frame going down.
+  Future<void> push(PanelFrame frame);
+
+  /// An appearance going down, beside the frames.
+  Future<void> pushAppearance(PanelAppearance appearance);
+}
+
 /// A channel with both ends in one process. For tests, and for the gallery.
 final class InMemoryPanelChannel implements PanelChannel {
   final StreamController<PanelFrame> _frames =

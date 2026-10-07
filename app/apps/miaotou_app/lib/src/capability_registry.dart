@@ -21,25 +21,44 @@ import 'runtime/panel_settings.dart';
 /// takes a [CapabilitySet] as a parameter, and nothing else in `lib/` imports a
 /// platform package or `dart:io`.
 ///
+/// **One question to the operating system, three answers to it.**
+/// [portForCurrentPlatform] is the only function here that asks anything; the
+/// three entries below switch on its answer rather than repeating the question,
+/// so each port's branch is a value a test can name ([PanelWiring]) instead of a
+/// branch only that port's host could ever enter.
+///
 /// There is no per-target selection in `pubspec.yaml` to do this for us: the
 /// interface package is pure Dart by decision, so there is no federated plugin
 /// and no `default_package` for the tool to read.
-CapabilitySet capabilitiesForCurrentPlatform() {
+Port portForCurrentPlatform() {
   if (Platform.isAndroid) {
-    return androidCapabilities();
+    return Port.android;
   }
-
   if (Platform.isMacOS) {
-    return macosCapabilities();
+    return Port.macos;
   }
   if (Platform.isWindows) {
-    return windowsCapabilities();
+    return Port.windows;
   }
   throw UnsupportedError(
     'this application is built for Android, Windows and macOS; it is running on '
     '${Platform.operatingSystem}',
   );
 }
+
+/// Which build target this process is.
+///
+/// A value rather than three booleans, because the two entries below are switches
+/// over it: a test can hand either one a port and reach a branch this machine
+/// could not otherwise run.
+enum Port { android, macos, windows }
+
+CapabilitySet capabilitiesForCurrentPlatform() =>
+    switch (portForCurrentPlatform()) {
+      Port.android => androidCapabilities(),
+      Port.macos => macosCapabilities(),
+      Port.windows => windowsCapabilities(),
+    };
 
 final class PanelWindowRuntime {
   const PanelWindowRuntime({
@@ -55,6 +74,89 @@ final class PanelWindowRuntime {
   final Future<void> Function(bool focusable) setFocusable;
 }
 
+/// What the two panel functions need to know about the port they are running on.
+///
+/// The three ports differ in exactly three things about the panel, and this is all
+/// of them: which channel carries the protocol to the main window, how the panel
+/// engine attaches — or finds itself already attached — on its own window, and
+/// where the collapsed ball lands the first time. Everything else is the same on
+/// all three and lives once, in [startPanel] and [attachPanelWindow].
+///
+/// A value rather than three `if (Platform.isX)` branches inside those functions,
+/// and that is the point. [wiringFor] is a pure function over [Port], so the
+/// Android and macOS wirings can be driven on any machine, and the two functions
+/// have one body each instead of three copies of the same six calls — three copies
+/// that had already drifted apart in the one place that mattered
+/// (`markResumed` is Android's alone).
+final class PanelWiring {
+  const PanelWiring({
+    required this.mainChannel,
+    required this.attachPanelSide,
+    required this.firstRun,
+  });
+
+  /// The main window's end of the panel protocol, built but not yet initialized.
+  ///
+  /// A factory rather than a value, because a channel binds its call handler when
+  /// it is initialized: one already spoken to could not serve a second show.
+  final PanelMainChannel Function() mainChannel;
+
+  /// The panel engine's runtime, or null when this process is the main window.
+  ///
+  /// The three ports answer "which side am I?" in three shapes — two ask their
+  /// host, one reads the window arguments it was created with — so this is a
+  /// function rather than a flag.
+  final Future<PanelWindowRuntime?> Function() attachPanelSide;
+
+  /// Where the ball goes on a port that has no saved placement.
+  ///
+  /// The two shapes are genuinely different: Android and macOS start inset into
+  /// the top-left corner, and Windows starts free — the anchor that means "the
+  /// next show resolves where I was left" (ADR-0020).
+  final PanelPlacement firstRun;
+}
+
+/// The first-run corner of the ports that inset the ball.
+const PanelPlacement _insetCorner = PanelPlacement(
+  anchor: PanelAnchor.topLeft,
+  dx: 12,
+  dy: 56,
+);
+
+/// The first-run placement of the ports that let the window decide.
+const PanelPlacement _freePlacement = PanelPlacement(anchor: PanelAnchor.free);
+
+/// The three things that differ by port, resolved.
+///
+/// Android and macOS share [PanelWiring.attachPanelSide]'s shape and differ in one
+/// fact — Android's host has to be told the panel engine resumed, because an
+/// engine started without a window does not get that callback on its own.
+PanelWiring wiringFor(Port port) => switch (port) {
+  Port.android => PanelWiring(
+    mainChannel: AndroidPanelMainChannel.new,
+    attachPanelSide: () => _attachPanelViaHost(
+      bootstrapChannelName: PanelEngineBootstrap.androidChannelName,
+      markResumed: true,
+      viewChannel: AndroidPanelViewChannel.new,
+    ),
+    firstRun: _insetCorner,
+  ),
+  Port.macos => PanelWiring(
+    mainChannel: MacosPanelMainChannel.new,
+    attachPanelSide: () => _attachPanelViaHost(
+      bootstrapChannelName: PanelEngineBootstrap.macosChannelName,
+      markResumed: false,
+      viewChannel: MacosPanelViewChannel.new,
+    ),
+    firstRun: _insetCorner,
+  ),
+  Port.windows => PanelWiring(
+    mainChannel: WindowsPanelMainChannel.new,
+    attachPanelSide: _attachWindowsPanel,
+    firstRun: _freePlacement,
+  ),
+};
+
 /// Which side of the panel this process is, or null when it is the main window.
 ///
 /// The panel engine runs the same `main` the main window does, on every port:
@@ -63,43 +165,55 @@ final class PanelWindowRuntime {
 /// arrives, the two engines get the same widget with a different channel and
 /// nothing else — which is what keeps the panel a view rather than a second
 /// application (ADR-0012).
-Future<PanelWindowRuntime?> attachPanelWindowForCurrentPlatform() async {
-  if (Platform.isAndroid) {
-    final PanelEngineBootstrap bootstrap = PanelEngineBootstrap(
-      channelName: PanelEngineBootstrap.androidChannelName,
-    );
-    if (await bootstrap.role() == PanelEngineRole.main) {
-      return null;
-    }
-    await bootstrap.markResumed();
-    final AndroidPanelViewChannel channel = AndroidPanelViewChannel();
-    await channel.initialize();
-    return PanelWindowRuntime(
-      channel: channel,
-      setExpanded: channel.setExpanded,
-      startDragging: channel.startDragging,
-      setFocusable: channel.setFocusable,
-    );
-  }
-  if (Platform.isMacOS) {
-    final PanelEngineBootstrap bootstrap = PanelEngineBootstrap(
-      channelName: PanelEngineBootstrap.macosChannelName,
-    );
-    if (await bootstrap.role() == PanelEngineRole.main) {
-      return null;
-    }
-    final MacosPanelViewChannel channel = MacosPanelViewChannel();
-    await channel.initialize();
-    return PanelWindowRuntime(
-      channel: channel,
-      setExpanded: channel.setExpanded,
-      startDragging: channel.startDragging,
-      setFocusable: channel.setFocusable,
-    );
-  }
-  if (!Platform.isWindows) {
+Future<PanelWindowRuntime?> attachPanelWindowForCurrentPlatform() =>
+    attachPanelWindow(wiringFor(portForCurrentPlatform()));
+
+/// The same, for a wiring a test can name.
+Future<PanelWindowRuntime?> attachPanelWindow(PanelWiring wiring) =>
+    wiring.attachPanelSide();
+
+/// Asks a host-owned engine which side of the panel it is, and wires up the panel
+/// end of it.
+///
+/// Android and macOS are this shape: the host starts a second `FlutterEngine` in
+/// this process, so this side has to ask which one it is before it can build a
+/// channel — and Android has to be told the engine resumed, which is why that is a
+/// parameter and not a call every port makes.
+Future<PanelWindowRuntime?> _attachPanelViaHost({
+  required String bootstrapChannelName,
+  required bool markResumed,
+  required PanelViewChannel Function() viewChannel,
+}) async {
+  final PanelEngineBootstrap bootstrap = PanelEngineBootstrap(
+    channelName: bootstrapChannelName,
+  );
+  if (await bootstrap.role() == PanelEngineRole.main) {
     return null;
   }
+  if (markResumed) {
+    await bootstrap.markResumed();
+  }
+  final PanelViewChannel channel = viewChannel();
+  await channel.initialize();
+  return PanelWindowRuntime(
+    channel: channel,
+    setExpanded: channel.setExpanded,
+    startDragging: channel.startDragging,
+    setFocusable: channel.setFocusable,
+  );
+}
+
+/// Windows' panel end: the window carries its kind in the arguments the host
+/// created it with, and the window semantics come from the binding rather than
+/// from the channel.
+///
+/// **Not reachable from a widget test.** `attachIfPanel()` asks the plugin for the
+/// current window and then makes it frameless, always on top and absent from the
+/// taskbar; a machine that is not running a real Windows host never gets past the
+/// first of those. `panel_wiring_test.dart` pins the wiring this branch is handed
+/// and says so, in the same spirit as `panel_window_test.dart`'s device-only
+/// cases.
+Future<PanelWindowRuntime?> _attachWindowsPanel() async {
   final WindowsPanelWindowBinding? panel =
       await WindowsPanelWindowBinding.attachIfPanel();
   if (panel == null) {
@@ -128,71 +242,39 @@ Future<void> startPanelForCurrentPlatform(
   CapabilitySet capabilities,
   PanelSession panel, {
   AppCopy copy = AppCopy.zh,
+}) => startPanel(
+  wiringFor(portForCurrentPlatform()),
+  capabilities,
+  panel,
+  copy: copy,
+);
+
+/// The same, for a wiring a test can name.
+///
+/// One body for all three ports, because the sequence is the same on all three and
+/// always was: read the settings, show the window, connect the two down-streams.
+/// What differs is [PanelWiring] and only that.
+Future<void> startPanel(
+  PanelWiring wiring,
+  CapabilitySet capabilities,
+  PanelSession panel, {
+  AppCopy copy = AppCopy.zh,
 }) async {
   final PanelSettings settings = await PanelSettings.load(
     capabilities.preferences,
   );
 
-  if (Platform.isAndroid) {
-    final AndroidPanelMainChannel channel = AndroidPanelMainChannel();
-    await channel.initialize();
-    await _showPanel(
-      capabilities: capabilities,
-      panel: panel,
-      copy: copy,
-      placement: _placement(
-        settings,
-        const PanelPlacement(anchor: PanelAnchor.topLeft, dx: 12, dy: 56),
-      ),
-    );
-    return _connect(
-      panel: panel,
-      pushFrame: channel.push,
-      pushAppearance: channel.pushAppearance,
-      commands: channel.commands,
-      floating: capabilities.floatingPanel,
-      appearance: settings.appearance,
-    );
-  }
-
-  if (Platform.isMacOS) {
-    final MacosPanelMainChannel channel = MacosPanelMainChannel();
-    await channel.initialize();
-    await _showPanel(
-      capabilities: capabilities,
-      panel: panel,
-      copy: copy,
-      placement: _placement(
-        settings,
-        const PanelPlacement(anchor: PanelAnchor.topLeft, dx: 12, dy: 56),
-      ),
-    );
-    return _connect(
-      panel: panel,
-      pushFrame: channel.push,
-      pushAppearance: channel.pushAppearance,
-      commands: channel.commands,
-      floating: capabilities.floatingPanel,
-      appearance: settings.appearance,
-    );
-  }
-
-  if (!Platform.isWindows) {
-    return;
-  }
-  final WindowsPanelMainChannel channel = WindowsPanelMainChannel();
+  final PanelMainChannel channel = wiring.mainChannel();
   await channel.initialize();
   await _showPanel(
     capabilities: capabilities,
     panel: panel,
     copy: copy,
-    placement: _placement(settings, const PanelPlacement(anchor: PanelAnchor.free)),
+    placement: _placement(settings, wiring.firstRun),
   );
   return _connect(
     panel: panel,
-    pushFrame: channel.push,
-    pushAppearance: channel.pushAppearance,
-    commands: channel.commands,
+    channel: channel,
     floating: capabilities.floatingPanel,
     appearance: settings.appearance,
   );
@@ -294,9 +376,10 @@ const double _collapsedSide = 56;
 
 /// A stored placement, or the port's own first-run corner.
 ///
-/// The corner is a parameter because the two shapes are genuinely different: the
-/// phone ports start inset from a corner and the two desktop ports start free,
-/// which is the anchor that means "the next show resolves where I was left".
+/// The corner is a parameter ([PanelWiring.firstRun]) because the shapes are
+/// genuinely different: Android and macOS start inset into the top-left corner and
+/// Windows starts free, which is the anchor that means "the next show resolves
+/// where I was left".
 PanelPlacement _placement(PanelSettings settings, PanelPlacement firstRun) {
   final PanelPlacement? saved = settings.placement;
   return PanelPlacement(
@@ -332,22 +415,20 @@ void _rememberPlacement(CapabilitySet capabilities) {
 /// Both down-streams out, commands in.
 Future<void> _connect({
   required PanelSession panel,
-  required Future<void> Function(PanelFrame frame) pushFrame,
-  required Future<void> Function(PanelAppearance appearance) pushAppearance,
-  required Stream<PanelCommand> commands,
+  required PanelMainChannel channel,
   required FloatingPanel floating,
   required PanelAppearance appearance,
 }) async {
   // Into the session first so it is the one holder of the value, then out to a
   // window that may not be listening yet — the channel holds it either way.
   panel.publishAppearance(appearance);
-  await pushAppearance(panel.appearance);
-  await pushFrame(panel.current);
-  panel.frames.listen((PanelFrame frame) => unawaited(pushFrame(frame)));
+  await channel.pushAppearance(panel.appearance);
+  await channel.push(panel.current);
+  panel.frames.listen((PanelFrame frame) => unawaited(channel.push(frame)));
   panel.appearances.listen(
-    (PanelAppearance value) => unawaited(pushAppearance(value)),
+    (PanelAppearance value) => unawaited(channel.pushAppearance(value)),
   );
-  commands.listen((PanelCommand command) {
+  channel.commands.listen((PanelCommand command) {
     panel.receive(command);
     if (command.kind == PanelCommandKind.close) {
       unawaited(floating.hide());

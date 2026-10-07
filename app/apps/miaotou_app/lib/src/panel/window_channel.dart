@@ -127,7 +127,7 @@ final class PanelDownlink {
   }
 }
 
-final class AndroidPanelMainChannel {
+final class AndroidPanelMainChannel implements PanelMainChannel {
   AndroidPanelMainChannel({MethodChannel? channel})
     : _channel = channel ?? const MethodChannel(_androidChannelName);
 
@@ -135,8 +135,10 @@ final class AndroidPanelMainChannel {
   final StreamController<PanelCommand> _commands =
       StreamController<PanelCommand>.broadcast();
 
+  @override
   Stream<PanelCommand> get commands => _commands.stream;
 
+  @override
   Future<void> initialize() async {
     _channel.setMethodCallHandler((MethodCall call) async {
       if (call.method != 'command') {
@@ -148,16 +150,18 @@ final class AndroidPanelMainChannel {
     });
   }
 
+  @override
   Future<void> push(PanelFrame frame) =>
       _channel.invokeMethod<void>('frame', PanelWireCodec.encodeFrame(frame));
 
   /// No buffer here: the Android host holds both values in Kotlin and replays
   /// them when the panel engine reports that it is ready.
+  @override
   Future<void> pushAppearance(PanelAppearance appearance) => _channel
       .invokeMethod<void>('appearance', PanelWireCodec.encodeAppearance(appearance));
 }
 
-final class AndroidPanelViewChannel implements PanelChannel {
+final class AndroidPanelViewChannel implements PanelViewChannel {
   AndroidPanelViewChannel({MethodChannel? channel})
     : _channel = channel ?? const MethodChannel(_androidChannelName);
 
@@ -167,6 +171,7 @@ final class AndroidPanelViewChannel implements PanelChannel {
   final StreamController<PanelAppearance> _appearance =
       StreamController<PanelAppearance>.broadcast();
 
+  @override
   Future<void> initialize() async {
     _channel.setMethodCallHandler((MethodCall call) async {
       switch (call.method) {
@@ -181,13 +186,16 @@ final class AndroidPanelViewChannel implements PanelChannel {
     await _channel.invokeMethod<void>('panelReady');
   }
 
+  @override
   Future<void> setExpanded(bool expanded) => _channel.invokeMethod<void>(
     'setExpanded',
     <String, Object?>{'value': expanded},
   );
 
+  @override
   Future<void> startDragging() => _channel.invokeMethod<void>('startDragging');
 
+  @override
   Future<void> setFocusable(bool focusable) => _channel.invokeMethod<void>(
     'setFocusable',
     <String, Object?>{'value': focusable},
@@ -210,7 +218,7 @@ final class AndroidPanelViewChannel implements PanelChannel {
   }
 }
 
-final class WindowsPanelMainChannel {
+final class WindowsPanelMainChannel implements PanelMainChannel {
   WindowsPanelMainChannel({WindowMethodChannel? channel})
     : _channel = channel ?? const WindowMethodChannel(_windowsChannelName);
 
@@ -223,8 +231,10 @@ final class WindowsPanelMainChannel {
         _channel.invokeMethod<void>(method, arguments),
   );
 
+  @override
   Stream<PanelCommand> get commands => _commands.stream;
 
+  @override
   Future<void> initialize() => _channel.setMethodCallHandler((
     MethodCall call,
   ) async {
@@ -238,8 +248,10 @@ final class WindowsPanelMainChannel {
     }
   });
 
+  @override
   Future<void> push(PanelFrame frame) => _downlink.pushFrame(frame);
 
+  @override
   Future<void> pushAppearance(PanelAppearance appearance) =>
       _downlink.pushAppearance(appearance);
 }
@@ -260,6 +272,9 @@ final class WindowsPanelViewChannel implements PanelChannel {
   @override
   Stream<PanelAppearance> get appearance => _appearance.stream;
 
+  /// Windows' view channel has no window semantics to carry — the binding above
+  /// supplies those — so this is [PanelChannel]'s seam plus `panelReady` and
+  /// nothing else.
   Future<void> initialize() async {
     await _channel.setMethodCallHandler((MethodCall call) async {
       switch (call.method) {
@@ -295,7 +310,7 @@ final class WindowsPanelViewChannel implements PanelChannel {
 /// macOS is Android's shape rather than Windows': the host owns the second
 /// engine, so it owns both channel ends and relays between them, which is why
 /// the buffering lives in Dart here rather than in Kotlin.
-final class MacosPanelMainChannel {
+final class MacosPanelMainChannel implements PanelMainChannel {
   MacosPanelMainChannel({MethodChannel? channel})
     : _channel = channel ?? const MethodChannel(macosPanelProtocolChannelName);
 
@@ -308,8 +323,10 @@ final class MacosPanelMainChannel {
         _channel.invokeMethod<void>(method, arguments),
   );
 
+  @override
   Stream<PanelCommand> get commands => _commands.stream;
 
+  @override
   Future<void> initialize() async {
     _channel.setMethodCallHandler((MethodCall call) async {
       switch (call.method) {
@@ -323,13 +340,15 @@ final class MacosPanelMainChannel {
     });
   }
 
+  @override
   Future<void> push(PanelFrame frame) => _downlink.pushFrame(frame);
 
+  @override
   Future<void> pushAppearance(PanelAppearance appearance) =>
       _downlink.pushAppearance(appearance);
 }
 
-final class MacosPanelViewChannel implements PanelChannel {
+final class MacosPanelViewChannel implements PanelViewChannel {
   MacosPanelViewChannel({MethodChannel? channel})
     : _channel = channel ?? const MethodChannel(macosPanelProtocolChannelName);
 
@@ -339,6 +358,7 @@ final class MacosPanelViewChannel implements PanelChannel {
   final StreamController<PanelAppearance> _appearance =
       StreamController<PanelAppearance>.broadcast();
 
+  @override
   Future<void> initialize() async {
     _channel.setMethodCallHandler((MethodCall call) async {
       switch (call.method) {
@@ -353,13 +373,16 @@ final class MacosPanelViewChannel implements PanelChannel {
     await _channel.invokeMethod<void>('panelReady');
   }
 
+  @override
   Future<void> setExpanded(bool expanded) => _channel.invokeMethod<void>(
     'setExpanded',
     <String, Object?>{'value': expanded},
   );
 
+  @override
   Future<void> startDragging() => _channel.invokeMethod<void>('startDragging');
 
+  @override
   Future<void> setFocusable(bool focusable) => _channel.invokeMethod<void>(
     'setFocusable',
     <String, Object?>{'value': focusable},
