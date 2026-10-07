@@ -13,6 +13,7 @@ import '../widgets/empty_state.dart';
 import '../widgets/status_badge.dart';
 import 'protocol.dart';
 import 'review_block.dart';
+import 'review_session.dart';
 
 /// The conversation label as the header prints it, built out of copy.
 ///
@@ -53,13 +54,20 @@ String _fill(String template, {String app = '', String title = ''}) =>
 ///
 /// ## What lives here and what does not
 ///
-/// **Only transient state lives here.** [_PanelPageState] holds two fields —
-/// whether the panel is expanded, and where the user last dropped it — and both
-/// are facts about this window's surface, lost when it goes away. The advice,
-/// the conversation and the verdict are all in [PanelPage.frame] and are
-/// somebody else's to change; this widget renders what it is handed and asks for
-/// what it wants through [PanelPage.onCommand]. That is #12, AC1, and
-/// `test/panel_test.dart` scans this file for a field that would break it.
+/// **Only transient state lives here.** [_PanelPageState] holds whether the
+/// panel is expanded, where the user last dropped it, and the block the user is
+/// editing in the review — three facts about this window's surface, all lost
+/// when it goes away. The advice, the conversation, the verdict and the batch
+/// are all in [PanelPage.frame] and are somebody else's to change; this widget
+/// renders what it is handed and asks for what it wants through
+/// [PanelPage.onCommand]. That is #12, AC1, and `test/panel_test.dart` scans
+/// this file and [ReviewSession] for a field that would break it.
+///
+/// **The review's rules are not here.** What the block starts as, what 我 / 对方
+/// / 删行 do to the caret's line, and whether a frame carries a batch the field
+/// does not are all [ReviewSession]'s — including the one question this widget
+/// cannot answer on its own, because it is about the batch and not about the
+/// surface: *a republish that repeats it must not wipe an edit in progress.*
 ///
 /// **No capability is called from here.** The panel cannot ask which
 /// application is in front, because asking would put a second source of truth
@@ -102,59 +110,67 @@ class _PanelPageState extends State<PanelPage> {
   /// Transient: where the user dragged the panel to.
   Offset _landing = Offset.zero;
 
-  /// Transient: the batch as the user is editing it, and nothing else.
+  /// Transient: the block as the user is typing it, and nothing else.
   ///
   /// The review is a surface over a batch the main engine owns, so what lives
   /// here is only the edit in progress. Confirming sends it up; leaving the
-  /// state throws it away. The whole batch is one editable block (ADR-0025),
-  /// so the edit is a single controller; [_reviewSource] is the batch the block
-  /// was built from, which is how a republish of the same batch is told from a
-  /// new one.
+  /// state throws it away. The whole batch is one editable block (ADR-0025), so
+  /// the edit is a single controller — and which line the caret is on is read
+  /// off that controller when a shortcut is pressed, not mirrored into a field
+  /// here.
   final TextEditingController _reviewController = TextEditingController();
   final FocusNode _reviewFocus = FocusNode();
-  List<PanelLine> _reviewSource = const <PanelLine>[];
+
+  /// The review's rules, built on the first frame that can read the copy.
+  ///
+  /// **Lazy rather than created in `initState`**, because the block is made of
+  /// copy and [CopyScope] is an inherited widget — the same reason the first
+  /// block could not be built there either. **Built once**, because a later
+  /// `didChangeDependencies` is a dependency change and not a new review: a
+  /// second module would have no memory of the batch it built, and would put the
+  /// raw batch back in the field under the user's hands.
+  late final ReviewSession _review = ReviewSession(CopyScope.of(context));
 
   @override
   void initState() {
     super.initState();
     _expanded = widget.initialExpanded;
-    // Only the source is recorded here: turning it into the block needs the
-    // copy, and an inherited widget cannot be read from `initState`. The block
-    // itself is written once the dependencies exist ([didChangeDependencies]).
-    _reviewSource = widget.frame.transcript;
     // The speaker buttons gate on the block having a caret, and focus does not
     // rebuild on its own, so a change to it has to ask for one.
     _reviewFocus.addListener(() => setState(() {}));
   }
 
-  bool _reviewLoaded = false;
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // The first build of the block needs the copy, which is why it waits for
-    // this rather than `initState`. A republish that changed the batch still
-    // goes through [_replaceReview] below.
-    if (!_reviewLoaded) {
-      _reviewLoaded = true;
-      _reviewController.text = ReviewBlock.fromLines(
-        _reviewSource,
-        CopyScope.of(context),
-      );
-    }
+    // The first frame that can build the block, because the copy it is made of
+    // lives in an inherited widget and `initState` cannot read one.
+    _syncReview();
   }
 
   @override
   void didUpdateWidget(PanelPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Entering the state, or being handed a different batch while in it. Both
-    // are the same question — "are these rows still the batch on the panel?" —
-    // and a frame that only repeated what is already loaded must not wipe an
-    // edit in progress.
-    if (widget.frame.reviewing &&
-        (!oldWidget.frame.reviewing ||
-            !_sameLines(widget.frame.transcript, _reviewSource))) {
-      _replaceReview();
+    // Every frame goes through the review, in both states — see [_syncReview].
+    _syncReview();
+  }
+
+  /// Hands the frame to the review and writes back the block it asks for.
+  ///
+  /// Called in **both** states, including the frames where the review is not up,
+  /// because that is where the review's memory of the batch it built is cleared
+  /// — and clearing it is what makes coming back to the review a fresh block
+  /// rather than last time's edit resurrected under the caret. Which of the two
+  /// questions a frame raises is the module's to answer, not this widget's:
+  /// *the batch on the panel is the batch in the field* means leave the edit
+  /// alone, and anything else means start again.
+  void _syncReview() {
+    final String? block = _review.blockFor(
+      reviewing: widget.frame.reviewing,
+      batch: widget.frame.transcript,
+    );
+    if (block != null) {
+      _reviewController.text = block;
     }
   }
 
@@ -474,7 +490,7 @@ class _PanelPageState extends State<PanelPage> {
   /// it is the same one.
   Widget _bottomRow(AppCopy copy, PanelView view) {
     if (widget.frame.reviewing) {
-      final bool empty = _reviewIsEmpty(copy);
+      final bool empty = _review.lines(_reviewController.text).isEmpty;
       return Padding(
         padding: AppSpacing.panel,
         child: Column(
@@ -498,7 +514,7 @@ class _PanelPageState extends State<PanelPage> {
               _recogniseButton(copy),
               FilledButton(
                 key: const Key('panel-review-confirm'),
-                onPressed: empty ? null : () => _confirmReview(copy),
+                onPressed: empty ? null : _confirmReview,
                 style: _compactButtonStyle(),
                 child: Text(copy.text(CopyKey.panelActionConfirmReview)),
               ),
@@ -699,8 +715,17 @@ class _PanelPageState extends State<PanelPage> {
           key: ValueKey<String>('panel-review-set-${speaker.name}'),
           // No caret, no line to act on: the buttons stay disabled until the block
           // has been focused once.
+          //
+          // The caret is read off the controller at press time, so nothing has to
+          // rebuild for the button to act on it — the parse the button's state
+          // came from is the one it edits.
           onPressed: _reviewFocus.hasFocus
-              ? () => _setSpeaker(speaker, copy)
+              ? () => setState(() {
+                  _reviewController.value = _review.setSpeaker(
+                    _reviewController.value,
+                    speaker,
+                  );
+                })
               : null,
           style: OutlinedButton.styleFrom(
             visualDensity: VisualDensity.compact,
@@ -730,7 +755,11 @@ class _PanelPageState extends State<PanelPage> {
       key: const Key('panel-review-delete-line'),
       onPressed:
           _reviewFocus.hasFocus && _reviewController.text.trim().isNotEmpty
-          ? () => _deleteLine()
+          ? () => setState(() {
+              _reviewController.value = _review.deleteLine(
+                _reviewController.value,
+              );
+            })
           : null,
       style: OutlinedButton.styleFrom(
         visualDensity: VisualDensity.compact,
@@ -744,123 +773,16 @@ class _PanelPageState extends State<PanelPage> {
     ),
   );
 
-  /// Deletes the physical line the caret is on.
+  /// Sends the block up as the user left it.
   ///
-  /// "Physical" is deliberate: a chat message that wrapped is several physical
-  /// lines, and the user asked to delete the line they can see, not the message
-  /// the model will later read. A non-last line goes with its trailing newline,
-  /// a last line with its preceding newline, so the two neighbours meet rather
-  /// than leaving a blank line behind. The caret falls back to the start of the
-  /// deleted span, so tapping 删行 again removes the next line.
-  void _deleteLine() {
-    final TextEditingValue value = _reviewController.value;
-    final String text = value.text;
-    final TextSelection selection = value.selection;
-    final int caret = selection.start < 0 ? 0 : selection.start;
-    final int lineStart = text.lastIndexOf('\n', caret - 1) + 1;
-    final int lineEnd = text.indexOf('\n', caret); // -1 when the caret is on the last line
-
-    final int delStart;
-    final int delEnd;
-    if (lineEnd != -1) {
-      // Not the last line: the line plus its trailing newline.
-      delStart = lineStart;
-      delEnd = lineEnd + 1;
-    } else if (lineStart > 0) {
-      // The last line: its preceding newline plus the line.
-      delStart = lineStart - 1;
-      delEnd = text.length;
-    } else {
-      // The only line there is.
-      delStart = 0;
-      delEnd = text.length;
-    }
-
-    setState(() {
-      _reviewController.value = TextEditingValue(
-        text: text.replaceRange(delStart, delEnd, ''),
-        selection: TextSelection.collapsed(offset: delStart),
-      );
-    });
-  }
-
-  /// Rewrites the prefix of the caret's line — or of every line the selection
-  /// covers — to [speaker].
-  void _setSpeaker(Speaker speaker, AppCopy copy) {
-    final TextEditingValue value = _reviewController.value;
-    final String text = value.text;
-    final TextSelection selection = value.selection;
-    final int start = selection.start < 0 ? 0 : selection.start;
-    final int end = selection.end < 0 ? start : selection.end;
-    // The first line the selection touches, and the one after its end. A
-    // collapsed caret sets start == end and so a single line.
-    final int lineStart = text.lastIndexOf('\n', start - 1) + 1;
-    int lineEnd = text.indexOf('\n', end);
-    if (lineEnd == -1) {
-      lineEnd = text.length;
-    }
-
-    final String prefix = '${ReviewBlock.wordOf(speaker, copy)}：';
-    final String replacement = _rewriteSpan(
-      text,
-      lineStart,
-      lineEnd,
-      prefix,
-      copy,
-    );
-    final int caret = _caretAfter(
-      replacement,
-      lineStart,
-      prefix,
-      end,
-    );
-    setState(() {
-      _reviewController.value = TextEditingValue(
-        text: replacement,
-        selection: TextSelection.collapsed(offset: caret),
-      );
-    });
-  }
-
-  /// Replaces the speaker prefix of every line in `[lineStart, lineEnd)`.
-  String _rewriteSpan(
-    String text,
-    int lineStart,
-    int lineEnd,
-    String prefix,
-    AppCopy copy,
-  ) {
-    final String span = text.substring(lineStart, lineEnd);
-    final List<String> rewritten = <String>[];
-    for (final String raw in span.split('\n')) {
-      final String line = raw.trim();
-      final Speaker? matched = ReviewBlock.speakerOf(line, copy);
-      if (matched == null) {
-        rewritten.add('$prefix$line');
-      } else {
-        rewritten.add('$prefix${ReviewBlock.bodyOf(line, matched, copy)}');
-      }
-    }
-    return text.replaceRange(lineStart, lineEnd, rewritten.join('\n'));
-  }
-
-  /// Where the caret should land after a rewrite: at the end of the original
-  /// selection's extent, but never before the new prefix of that line.
-  int _caretAfter(String replacement, int lineStart, String prefix, int end) {
-    final int endLineStart = replacement.lastIndexOf('\n', end - 1) + 1;
-    final int prefixEnd = endLineStart + prefix.length;
-    return end < prefixEnd ? prefixEnd : end;
-  }
-
-  /// Whether the block has nothing left to analyse in it.
-  bool _reviewIsEmpty(AppCopy copy) =>
-      ReviewBlock.toLines(_reviewController.text, copy).isEmpty;
-
-  void _confirmReview(AppCopy copy) {
+  /// The command and the confirm button's own enablement read the same door
+  /// ([ReviewSession.lines]), so the batch cannot arrive empty on the one frame
+  /// the button said it would not (ADR-0025 decision 15).
+  void _confirmReview() {
     widget.onCommand(
       PanelCommand(
         PanelCommandKind.confirmTranscript,
-        lines: ReviewBlock.toLines(_reviewController.text, copy),
+        lines: _review.lines(_reviewController.text),
       ),
     );
   }
@@ -944,32 +866,5 @@ class _PanelPageState extends State<PanelPage> {
   void _toggleExpanded() {
     setState(() => _expanded = !_expanded);
     widget.onExpandedChanged?.call(_expanded);
-  }
-
-  /// Loads the editable block out of the batch the main engine sent down.
-  ///
-  /// Called from [didUpdateWidget], where a rebuild is already on its way, and
-  /// where the copy is readable. Every call is a fresh copy of the batch, so
-  /// any edit in progress goes with the old one, which is the point: the block
-  /// is only ever the batch that is actually on the panel.
-  void _replaceReview() {
-    _reviewSource = widget.frame.transcript;
-    _reviewController.text = ReviewBlock.fromLines(
-      _reviewSource,
-      CopyScope.of(context),
-    );
-  }
-
-  static bool _sameLines(List<PanelLine> before, List<PanelLine> after) {
-    if (before.length != after.length) {
-      return false;
-    }
-    for (int index = 0; index < before.length; index++) {
-      if (before[index].speaker != after[index].speaker ||
-          before[index].text != after[index].text) {
-        return false;
-      }
-    }
-    return true;
   }
 }

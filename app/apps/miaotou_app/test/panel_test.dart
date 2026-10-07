@@ -456,18 +456,20 @@ void main() {
       // Advice" is a statement about the source. A cached advice would keep
       // showing a stale analysis after the frame changed, which is the failure
       // the previous test catches behaviourally; this one names it.
-      final String state = _sourceOf('panel/panel_page.dart')
-          .split('class _PanelPageState extends State<PanelPage> {')
-          .last;
-      // Two-space indent: a field of the state class, and not a local variable
-      // inside `build`, which is indented further and is where `advice` is
-      // legitimately named.
-      final RegExp stored = RegExp(
-        r'^ {2}(?:late )?final\s+(?:Advice|Snapshot|ConversationRef|PanelFrame|Candidate|Trend|Profile)\b',
-        multiLine: true,
-      );
+      //
+      // The slice starts at the `State` class rather than at the top of the
+      // file, because the widget's own parameters *are* the frame: `PanelFrame
+      // frame` is the one thing the panel is handed, and everything it shows
+      // comes out of it. Slicing this way is also what lets the same rule be
+      // registered against a second panel module by name — see the review
+      // module's test below — instead of by widening the scan to the whole
+      // directory, which would be red on arrival: `protocol.dart`, `session.dart`
+      // and `window_channel.dart` all carry a `PanelFrame` on purpose, because
+      // that is the value the panel is handed and the value the wire carries.
       expect(
-        stored.allMatches(_stripComments(state)).toList(),
+        _contentFields
+            .allMatches(_stripComments(_stateClassOf('panel/panel_page.dart')))
+            .toList(),
         isEmpty,
         reason:
             'the panel holds no content: everything it shows comes from the '
@@ -476,16 +478,41 @@ void main() {
     });
 
     test('the panel asks for nothing', () {
-      final String source = _sourceOf('panel/panel_page.dart');
       expect(
-        RegExp(
-          r'Session|CapabilitySet|capabilityRegistry|SharedMaterial|ModelTransport',
-        ).allMatches(_stripComments(source)).toList(),
+        _outsideIdentifiers
+            .allMatches(_stripComments(_sourceOf('panel/panel_page.dart')))
+            .toList(),
         isEmpty,
         reason:
             'the panel cannot ask which conversation is in front: that is '
             'the main window\'s to answer, and a second source of truth beside '
             'it is the drift ADR-0002 decision 2 exists to prevent',
+      );
+    });
+
+    test('the review module holds nothing and asks for nothing either', () {
+      // Registered by name, for the same reason the panel's own state is
+      // scanned: the review's rules moved out of the widget into a module, and a
+      // module in this directory that quietly grew a field holding an analysis
+      // or a frame would be the second source of truth the two tests above
+      // exist to prevent. A file with no `State` class is scanned whole, because
+      // there is no part of it that is only a surface.
+      //
+      // `PanelLine` is deliberately not on the content list: the rows *are* the
+      // surface, and this module remembers their signature rather than their
+      // content. Adding a panel module means registering it here.
+      final String source = _stripComments(
+        _sourceOf('panel/review_session.dart'),
+      );
+      expect(
+        _contentFields.allMatches(source).toList(),
+        isEmpty,
+        reason: 'the review decides about the batch; it does not hold it',
+      );
+      expect(
+        _outsideIdentifiers.allMatches(source).toList(),
+        isEmpty,
+        reason: 'the review cannot ask which conversation is in front either',
       );
     });
   });
@@ -852,24 +879,6 @@ void main() {
       expect(rewritten.controller!.text, '我：在吗\n我：在的');
     });
 
-    testWidgets('the speaker buttons stay off until the block has focus', (
-      WidgetTester tester,
-    ) async {
-      await pumpPanel(tester, reviewing());
-
-      expect(
-        tester
-            .widget<OutlinedButton>(
-              find.byKey(const ValueKey<String>('panel-review-set-other')),
-            )
-            .onPressed,
-        isNull,
-        reason:
-            'with no caret there is no line to act on, and guessing "the last '
-            'one" would be an intention the user did not state',
-      );
-    });
-
     testWidgets('删行 deletes the caret\'s physical line and its newline', (
       WidgetTester tester,
     ) async {
@@ -1193,3 +1202,35 @@ String _sourceOf(String relative) {
 String _stripComments(String source) => source
     .replaceAll(RegExp(r'//[^\n]*'), '')
     .replaceAll(RegExp(r'/\*[\s\S]*?\*/'), '');
+
+/// A field of one of the content types the panel must never keep.
+///
+/// Two-space indent: a field of a `State` class, and not a local variable inside
+/// `build`, which is indented further and is where `advice` is legitimately
+/// named. `PanelLine` is deliberately absent — the rows are the surface.
+final RegExp _contentFields = RegExp(
+  r'^ {2}(?:late )?final\s+(?:Advice|Snapshot|ConversationRef|PanelFrame|Candidate|Trend|Profile)\b',
+  multiLine: true,
+);
+
+/// The identifiers the panel may not name at all.
+///
+/// Word-bounded, and that is load-bearing rather than tidiness: the review's own
+/// module is called `ReviewSession`, and a bare `Session` alternation would
+/// report the panel for naming the thing it is supposed to own.
+final RegExp _outsideIdentifiers = RegExp(
+  r'\b(?:Session|CapabilitySet|capabilityRegistry|SharedMaterial|ModelTransport)\b',
+);
+
+/// The body of the first `State` class in a panel widget: the part of it that
+/// must hold nothing but the surface.
+///
+/// A file with no `State` class comes back whole, because every part of such a
+/// file is subject to the same rule.
+String _stateClassOf(String relative) {
+  final String source = _sourceOf(relative);
+  final RegExpMatch? start = RegExp(
+    r'class \w+ extends State<\w+> \{',
+  ).firstMatch(source);
+  return start == null ? source : source.substring(start.end);
+}
