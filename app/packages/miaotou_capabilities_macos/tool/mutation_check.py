@@ -317,26 +317,28 @@ MUTATIONS = (
     ),
     Mutation(
         26,
-        "the sync: the assertion is looked for beside SRCROOT instead of in Runner",
+        "the sync: the assertion is looked for beside SRCROOT instead of in tool/",
         "../../apps/miaotou_app/macos/Runner/sync_shared_payload.sh",
         # Realigned from "the phase no longer calls the assertion" when F1 fixed
-        # the path. The old claim was the weaker one: `echo`-ing instead of
-        # calling is a change no path can hide, and the build-phase test that
-        # *runs* the script already fails on it. Dropping `Runner/` is the
-        # regression that actually happened — `SRCROOT` is `…/macos` and the
-        # script lives in `…/macos/Runner`, so the step is load-bearing — and it
-        # is caught only by the tests that execute the phase, because the static
+        # the path, and realigned again by ADR-0027, which moved the assertion into
+        # the application's `tool/` and moved its interpreter from Python to the
+        # Dart SDK Flutter already ships. The old claim was the weaker one:
+        # `echo`-ing instead of calling is a change no path can hide, and the
+        # build-phase test that *runs* the script already fails on it. Dropping the
+        # `../tool/` step is the regression that actually happened — `SRCROOT` is
+        # `…/macos` and the assertion is one level up and across — and it is caught
+        # only by the tests that execute the phase, because the static
         # SRCROOT-shape test never reads this expression.
-        'python3 "$SRCROOT/Runner/validate_payload_keys.py"',
-        'python3 "$SRCROOT/validate_payload_keys.py"',
+        '"$SRCROOT/../tool/validate_payload_keys.dart"',
+        '"$SRCROOT/validate_payload_keys.dart"',
         "the build phase runs, and it passes",
     ),
     Mutation(
         27,
         "the payload map: a scene document is dropped from the key set",
-        "../../apps/miaotou_app/macos/Runner/validate_payload_keys.py",
-        "_MAP_MAP_KEYS = (\"scene_knowledge\",)",
-        "_MAP_MAP_KEYS = ()",
+        "../../apps/miaotou_app/tool/validate_payload_keys.dart",
+        "_mapMapKeys = <String>['scene_knowledge'];",
+        "_mapMapKeys = <String>[];",
         "the key set is derived from the domain and the payload map",
     ),
 )

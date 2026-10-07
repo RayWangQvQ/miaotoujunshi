@@ -32,10 +32,10 @@
 # ## What this script does NOT do
 #
 # It does not decide *which* keys matter. That set is derived, in
-# `validate_payload_keys.py`, from the domain layer's own constants and from
-# `payload-map.json`. Transcribing it here would be the second hand-copied member
-# list the whole arrangement exists to eliminate — and a new payload file would
-# then need this file edited, which is the invariant being protected.
+# `tool/validate_payload_keys.dart`, from the domain layer's own constants and
+# from `payload-map.json`. Transcribing it here would be the second hand-copied
+# member list the whole arrangement exists to eliminate — and a new payload file
+# would then need this file edited, which is the invariant being protected.
 
 # ## Why there is no default for `SRCROOT`
 #
@@ -50,9 +50,9 @@
 # `…/macos`. The fallback made a hand-run succeed — the manual invocation took a
 # branch the build never took, printed `payload assertion passed`, and proved
 # nothing about the build. The bug it hid was a wrong path to the assertion
-# script, so **every** `flutter build macos` died at this phase with
-# `can't open file …/macos/validate_payload_keys.py`, while hand-running the same
-# script said everything was fine.
+# script, so **every** `flutter build macos` died at this phase with an
+# interpreter that could not open the file it was given, while hand-running the
+# same script said everything was fine.
 #
 # So the rule here is the one `native.dart` argues for and `payload.dart` keeps:
 # a value that cannot be right must not be guessed, because a guess is
@@ -60,9 +60,10 @@
 
 set -eu
 
-# `SRCROOT` is the macOS project directory: `…/apps/miaotou_app/macos`. The two
-# scripts of this phase live one level down, in `Runner/`, which is why every
-# reference to the other one below spells that `Runner/` step out.
+# `SRCROOT` is the macOS project directory: `…/apps/miaotou_app/macos`. This script
+# is one level down in `Runner/`, and the assertion it runs is one level *up* and
+# across, in the application's `tool/` — which is why every reference to the other
+# one below spells its own step out instead of trusting the working directory.
 if [ -z "${SRCROOT:-}" ]; then
   echo "error: SRCROOT is not set, so this script does not know where it is." >&2
   echo "       Xcode sets it for every build. To run this by hand, pass the" >&2
@@ -135,13 +136,42 @@ for tree in miaotoujunshi goutoujunshi; do
   rsync -a --delete "$REPO_ROOT/$tree/" "$RESOURCES/$tree/"
 done
 
+# The Dart VM that runs the assertion, found rather than assumed.
+#
+# ADR-0027: the assertion is a Dart script, so the interpreter is the SDK that
+# ships with Flutter — no Python, and nothing extra to install. `FLUTTER_ROOT` is
+# the SDK this build is already running on: Flutter writes it into the generated
+# xcconfig and the phase inherits it. A `dart` on `PATH` is the second choice, and
+# `DART` overrides both for a build that keeps the SDK somewhere else.
+#
+# `bin/cache/dart-sdk/bin/dart` is the VM itself rather than the `bin/dart`
+# launcher beside it: the launcher is a shell script that goes looking for the SDK
+# before it execs, and this phase's environment is Xcode's, not a terminal's. The
+# VM needs nothing found first.
+#
+# No interpreter is an error, not a skip. The assertion is the whole point of this
+# phase, and a phase that quietly stopped asserting is the failure mode ADR-0008
+# exists to remove — reported as a green build.
+DART_BIN="${DART:-}"
+if [ -z "$DART_BIN" ] && [ -x "${FLUTTER_ROOT:-}/bin/cache/dart-sdk/bin/dart" ]; then
+  DART_BIN="${FLUTTER_ROOT}/bin/cache/dart-sdk/bin/dart"
+fi
+if [ -z "$DART_BIN" ]; then
+  DART_BIN=$(command -v dart || true)
+fi
+if [ -z "$DART_BIN" ]; then
+  echo "error: no Dart executable. Set DART, or put the Flutter SDK's bin/ on" >&2
+  echo "       PATH, or stop hiding FLUTTER_ROOT from this phase." >&2
+  exit 2
+fi
+
 # The assertion. Its own output goes to stderr on failure so it appears in the
 # build log above the noise, and its non-zero exit fails the build phase.
 #
-# `$SRCROOT` is `…/apps/miaotou_app/macos` and this script is in `…/macos/Runner`,
-# so the assertion — which sits beside this file — is one `Runner/` down. The
-# `Runner/` step is written out rather than folded into a variable because a
-# variable holding half a path is how the wrong one survived a manual run: the
-# earlier `"$SRCROOT/validate_payload_keys.py"` resolved to a file that does not
-# exist, and every build failed here while hand-running the script passed.
-python3 "$SRCROOT/Runner/validate_payload_keys.py" "$REPO_ROOT" "$RESOURCES"
+# `$SRCROOT` is `…/apps/miaotou_app/macos`, so the assertion — in the
+# application's `tool/` — is one `../` across and one `tool/` down. Both steps are
+# written into the path rather than folded into a variable, because a variable
+# holding half a path is how the wrong one survived a manual run: the phase once
+# resolved the assertion beside `SRCROOT` instead of below it, every build failed
+# here, and hand-running the same script passed.
+"$DART_BIN" "$SRCROOT/../tool/validate_payload_keys.dart" "$REPO_ROOT" "$RESOURCES"

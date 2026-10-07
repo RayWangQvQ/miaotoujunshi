@@ -127,10 +127,12 @@ files are release inputs and are never fetched while the application is
 running.
 
 `native_bridge` itself — the Rust process that hosts Windows capture, OCR and
-injection — is MIT, like the rest of this repository. Python 3 is a build-time
-tool: the Android and macOS builds use it to copy the shared payload, and the
-Windows packaging step uses it to assert the payload keys at install time. It is
-not shipped inside any artifact.
+injection — is MIT, like the rest of this repository. No runtime beyond Flutter's
+own is a build input: the payload assertion that the macOS, Windows and Android
+builds each run is a Dart script, executed by the Dart SDK that ships with Flutter
+(ADR-0027), so packaging installs no interpreter beside the toolchain. The
+repository's own validation scripts under `scripts/` are Python 3; they run from
+CI or by hand, and are not part of any artifact.
 
 ## Brand boundary
 

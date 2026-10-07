@@ -135,6 +135,11 @@ exception.**
   `_WORKSPACE` and `build.gradle.kts`'s reference to that script — so a future move has to
   find them by grep rather than by compiler error. Recorded because it is the one cost
   this move adds to the next one.
+  **[ADR-0027](0027-run-the-payload-assertion-on-flutters-own-dart-sdk.md) paid it once
+  more:** the assertion is now `app/apps/miaotou_app/tool/validate_payload_keys.dart`, its
+  interpreter is the Dart SDK Flutter already ships, and the literals moved with it — three
+  of them, the added one being the macOS phase's `$SRCROOT/../tool/…`. The claim is
+  unchanged: grep, not the compiler, finds them.
 - **`docs/` now carries two kinds of material, and `validate_layout.py` cannot see it.**
   The allowlist registers one layer per root entry, so the mix is invisible to the gate.
   This ADR and `GLOSSARY.md`'s boundary rules are what record it; a future reader looking

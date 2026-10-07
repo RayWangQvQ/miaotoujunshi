@@ -112,11 +112,42 @@ install(DIRECTORY "${MIAOTOU_REPOSITORY_ROOT}/miaotoujunshi"
 install(DIRECTORY "${MIAOTOU_REPOSITORY_ROOT}/goutoujunshi"
   DESTINATION "${CMAKE_INSTALL_PREFIX}" COMPONENT Runtime)
 
-find_package(Python3 REQUIRED COMPONENTS Interpreter)
+# The Dart VM the payload assertion runs on — the SDK that ships with Flutter, so
+# nothing else has to be installed before a release can be packaged (ADR-0027).
+#
+# `FLUTTER_ROOT` is not in this file's scope. Flutter writes it into the generated
+# config that `windows/flutter/CMakeLists.txt` includes, and a subdirectory's
+# variables do not travel up to its parent. Reading that same generated file is
+# what keeps this step on the SDK the build is already using, instead of on a
+# second copy of where Flutter lives.
+#
+# `OPTIONAL`, and the two checks below rather than a bare include: the file is
+# Flutter's to create, and a configure without it has to fall through to a `dart`
+# on `PATH` and then to the error — not stop on a message about a missing include.
+include("${CMAKE_CURRENT_SOURCE_DIR}/flutter/ephemeral/generated_config.cmake"
+  OPTIONAL)
+# Normalised because this path is embedded in the `install(CODE …)` string below,
+# where a Windows backslash would be read as an escape.
+file(TO_CMAKE_PATH
+  "${FLUTTER_ROOT}/bin/cache/dart-sdk/bin/dart${CMAKE_EXECUTABLE_SUFFIX}"
+  MIAOTOU_DART)
+if(NOT EXISTS "${MIAOTOU_DART}")
+  # `unset` first: `find_program` returns immediately when its result variable
+  # already holds a value, and the line above sets one by construction.
+  unset(MIAOTOU_DART)
+  find_program(MIAOTOU_DART NAMES dart)
+endif()
+if(NOT MIAOTOU_DART)
+  message(FATAL_ERROR
+    "no Dart executable: looked for "
+    "${FLUTTER_ROOT}/bin/cache/dart-sdk/bin/dart${CMAKE_EXECUTABLE_SUFFIX} and for "
+    "`dart` on PATH. The payload assertion below is a Dart script and runs on the "
+    "SDK that ships with Flutter (ADR-0027).")
+endif()
 install(CODE "
   execute_process(
-    COMMAND \"${Python3_EXECUTABLE}\"
-      \"${CMAKE_CURRENT_SOURCE_DIR}/../macos/Runner/validate_payload_keys.py\"
+    COMMAND \"${MIAOTOU_DART}\"
+      \"${CMAKE_CURRENT_SOURCE_DIR}/../tool/validate_payload_keys.dart\"
       \"${MIAOTOU_REPOSITORY_ROOT}\"
       \"${CMAKE_INSTALL_PREFIX}\"
     RESULT_VARIABLE payload_validation

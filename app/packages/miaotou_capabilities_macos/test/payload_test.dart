@@ -21,12 +21,12 @@ import 'package:miaotou_capabilities_macos/testing.dart';
 /// bundle path — so AC4 is checked by the test suite and not only by a build.
 ///
 /// The reason for running it rather than reading it is this file's own history.
-/// The guard used to assert that the script's text mentioned
-/// `validate_payload_keys.py`, which was true of a path pointing at the real file
-/// *and* of one pointing at a file that does not exist — and the second one is
-/// what shipped, failing every macOS build while this suite stayed green. A
-/// guard blind to the exact defect it exists to catch is worse than none, because
-/// it is reported as coverage.
+/// The guard used to assert that the script's text mentioned the assertion's file
+/// name, which was true of a path pointing at the real file *and* of one pointing
+/// at a file that does not exist — and the second one is what shipped, failing
+/// every macOS build while this suite stayed green. A guard blind to the exact
+/// defect it exists to catch is worse than none, because it is reported as
+/// coverage.
 void main() {
   late Directory payload;
   late FakeMacosNative native;
@@ -317,12 +317,12 @@ void main() {
     // same script, same environment variables, same working directory.
     //
     // Reading the script is not enough, and the previous version of this file
-    // learned that the expensive way. It asserted the phase's text
-    // `contains('validate_payload_keys.py')`, which was true whether the path
-    // pointed at the real file or at one that does not exist — so the guard passed
-    // over a phase that failed **every** build with `can't open file
-    // …/macos/validate_payload_keys.py`. A guard that cannot tell a working path
-    // from a broken one is not a guard, so the test below runs the thing.
+    // learned that the expensive way. It asserted the phase's text named the
+    // assertion's file, which was true whether the path pointed at the real file or
+    // at one that does not exist — so the guard passed over a phase that failed
+    // **every** build with an interpreter that could not open the file it was
+    // given. A guard that cannot tell a working path from a broken one is not a
+    // guard, so the test below runs the thing.
     const String runner = 'macos/Runner';
 
     /// The repository root, found by walking up as the build phase does.
@@ -334,6 +334,11 @@ void main() {
     /// The macOS project directory — Xcode's `SRCROOT`.
     late Directory srcroot;
 
+    /// The Flutter SDK this suite is running inside, which the phase is given as
+    /// `FLUTTER_ROOT` because the environment below deliberately has nothing else
+    /// on `PATH` to find it with.
+    late String flutterRoot;
+
     setUpAll(() {
       repository = Directory.current.absolute;
       while (!Directory('${repository.path}/goutoujunshi').existsSync()) {
@@ -344,8 +349,9 @@ void main() {
       );
       srcroot = Directory('${app.path}/macos');
       script = File('${app.path}/$runner/sync_shared_payload.sh');
-      assertion = File('${app.path}/$runner/validate_payload_keys.py');
+      assertion = File('${app.path}/tool/validate_payload_keys.dart');
       pbxproj = File('${app.path}/macos/Runner.xcodeproj/project.pbxproj');
+      flutterRoot = _flutterRoot();
     });
 
     /// Runs the build phase exactly as Xcode's `PBXShellScriptBuildPhase` does.
@@ -360,6 +366,11 @@ void main() {
     /// * The working directory is `SRCROOT`, because that is where Xcode runs it.
     /// * The repository root is *not* injected, so the walk-up that the build
     ///   relies on is the one under test.
+    /// * `FLUTTER_ROOT` is injected for the reason `PATH` is minimal: Xcode's
+    ///   phase inherits it — Flutter writes it into the generated xcconfig — and
+    ///   it is how the phase finds the Dart SDK the assertion runs on (ADR-0027).
+    ///   Leaving it out would test a phase that cannot start, not the phase Xcode
+    ///   runs.
     ///
     /// A bundle path is given rather than left to `BUILT_PRODUCTS_DIR`, for the
     /// same reason: the assertion is about the phase's own logic, and a missing
@@ -378,6 +389,7 @@ void main() {
             'HOME': repository.parent.path,
             'SRCROOT': srcroot.path,
             'CODESIGNING_FOLDER_PATH': bundle,
+            'FLUTTER_ROOT': flutterRoot,
             ...extraEnvironment,
           },
           // A build log, not a test's captured output. `includeParentEnvironment`
@@ -433,17 +445,18 @@ void main() {
       );
     });
 
-    test('the phase finds its own scripts from SRCROOT, which is not where they '
-        'live', () async {
+    test('the phase resolves the assertion from SRCROOT, not from where it runs',
+        () {
       // The regression this whole group exists for, asserted as its own property
-      // so the failure names the cause. `SRCROOT` is `…/macos` and the scripts
-      // are in `…/macos/Runner`; the phase used to ask for
-      // `$SRCROOT/validate_payload_keys.py`, which does not exist, which failed
-      // every build — and which a text-matching guard read as correct.
+      // so the failure names the cause. The phase runs with `SRCROOT` as its
+      // working directory, and the assertion is not in it: it is one `../` across
+      // and one `tool/` down from `SRCROOT` (ADR-0027). The phase used to ask for
+      // the assertion beside `SRCROOT`, which does not exist, which failed every
+      // build — and which a text-matching guard read as correct.
       //
       // Both halves are checked. The run above proves the phase works; this
-      // proves it works *for the right reason*, so that deleting the `Runner/`
-      // step and compensating somewhere else cannot pass unnoticed.
+      // proves it works *for the right reason*, so that deleting the relative step
+      // and compensating somewhere else cannot pass unnoticed.
       expect(
         srcroot.uri.pathSegments
             .where((String segment) => segment.isNotEmpty)
@@ -456,16 +469,22 @@ void main() {
         assertion.parent.uri.pathSegments
             .where((String segment) => segment.isNotEmpty)
             .last,
-        'Runner',
-        reason: 'the assertion sits beside the sync script, one level below '
-            'SRCROOT — this is the step the path has to spell out',
+        'tool',
+        reason: 'the assertion lives in the application\'s `tool/`, which is the '
+            'step the path in the phase has to spell out',
       );
       expect(
-        File('${srcroot.path}/validate_payload_keys.py').existsSync(),
+        File('${srcroot.path}/validate_payload_keys.dart').existsSync(),
         isFalse,
-        reason: 'if a file ever appears at \$SRCROOT/validate_payload_keys.py, '
-            'the phase is reading a *second* copy of the assertion and the one '
-            'beside it is not being run at all',
+        reason: 'if a file ever appears at \$SRCROOT/validate_payload_keys.dart, '
+            'the phase is reading a *second* copy of the assertion and the one it '
+            'means to run is not being run at all',
+      );
+      expect(
+        File('${script.parent.path}/validate_payload_keys.dart').existsSync(),
+        isFalse,
+        reason: 'and a copy beside the phase script is the same accident one '
+            'directory further in',
       );
     });
 
@@ -627,7 +646,7 @@ void main() {
 
       expect(
         body,
-        contains('_CONST_DECLARATION'),
+        contains('_constDeclaration'),
         reason: 'the keys come from the domain layer\'s own constants, so a new '
             'payload key ships with no edit to any build script',
       );
@@ -670,8 +689,9 @@ void main() {
       // cannot run here, so this is the substitute that is actually executable —
       // it exercises the same script, over the same payload, against a tree the
       // test assembled the way `rsync` would.
+      final String dart = _dartExecutable(flutterRoot);
       final ProcessResult pass = await Process.run(
-        'python3',
+        dart,
         <String>[assertion.path, repository.path, _mirrorOfRepository(repository).path],
       );
       expect(
@@ -684,7 +704,7 @@ void main() {
       final Directory broken = _mirrorOfRepository(repository);
       File('${broken.path}/goutoujunshi/SKILL.md').deleteSync();
       final ProcessResult fail = await Process.run(
-        'python3',
+        dart,
         <String>[assertion.path, repository.path, broken.path],
       );
 
@@ -854,6 +874,52 @@ class _EmptyRoot implements MacosNative {
 
   @override
   Stream<NativePanelEvent> get events => const Stream<NativePanelEvent>.empty();
+}
+
+/// The Flutter SDK this suite is running inside.
+///
+/// The build phase is handed a deliberately minimal `PATH`, so it cannot find the
+/// toolchain the way `flutter build macos` does; what Xcode gives it instead is
+/// `FLUTTER_ROOT`, and that is what the phase's own lookup asks for first
+/// (ADR-0027). `flutter test` runs this file in that same SDK's tester, which
+/// lives at `<sdk>/bin/cache/artifacts/engine/<platform>/flutter_tester` — so the
+/// SDK is *found* by walking up to the directory that holds a Dart SDK, and not
+/// assumed. A guess here would be a different SDK from the one the build uses,
+/// which is the defect the phase's own no-default rule exists to prevent.
+String _flutterRoot() {
+  final String? fromEnvironment = Platform.environment['FLUTTER_ROOT'];
+  if (fromEnvironment != null && fromEnvironment.isNotEmpty) {
+    return fromEnvironment;
+  }
+  Directory probe = File(Platform.resolvedExecutable).parent;
+  while (probe.parent.path != probe.path) {
+    if (Directory('${probe.path}/bin/cache/dart-sdk').existsSync()) {
+      return probe.path;
+    }
+    probe = probe.parent;
+  }
+  throw StateError(
+    'no Flutter SDK above ${Platform.resolvedExecutable}: the suite cannot tell '
+    'which Dart runs the assertion',
+  );
+}
+
+/// The Dart executable the assertion runs on, inside [flutterRoot].
+///
+/// The VM under `bin/cache/dart-sdk/` rather than the SDK's `bin/dart` launcher:
+/// that launcher is a shell script on POSIX and a `.bat` on Windows, and a process
+/// cannot be started from either.
+String _dartExecutable(String flutterRoot) {
+  final String suffix = Platform.isWindows ? '.exe' : '';
+  for (final String candidate in <String>[
+    '$flutterRoot/bin/cache/dart-sdk/bin/dart$suffix',
+    '$flutterRoot/bin/dart$suffix',
+  ]) {
+    if (File(candidate).existsSync()) {
+      return candidate;
+    }
+  }
+  throw StateError('no Dart executable under $flutterRoot');
 }
 
 /// A checkout that is the repository with its two payload trees copied, so a test

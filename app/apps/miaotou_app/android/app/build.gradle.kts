@@ -16,17 +16,48 @@ val copySharedMaterial by tasks.registering(Sync::class) {
     from(File(repoRoot, "goutoujunshi")) { into("goutoujunshi") }
     into(sharedAssets)
 }
-// `python3` is not an executable name on Windows; PYTHON overrides it there.
-val pythonExecutable = providers.environmentVariable("PYTHON").getOrElse("python3")
+// The payload assertion is a Dart script (ADR-0027), so it runs on the Dart SDK
+// that already ships with Flutter — no Python, and nothing extra to install.
+// `local.properties` is where Flutter records that SDK: its own Gradle plugin
+// reads `flutter.sdk` from the same file, and reading it here is what keeps this
+// task working when Gradle is started by Android Studio, where the Flutter SDK is
+// not on Gradle's `PATH`. `DART` overrides the lookup.
+//
+// The value is parsed out of the text rather than through `java.util.Properties`:
+// `Properties.load` is overloaded on `InputStream` and `Reader`, and a build
+// script cannot choose between the two while the stream's own type is still being
+// inferred.
+val localProperties = File(rootProject.projectDir, "local.properties")
+val localPropertiesText: String =
+    if (localProperties.exists()) localProperties.readText() else ""
+val flutterSdk: String = localPropertiesText
+    .lines()
+    .firstOrNull { line -> line.startsWith("flutter.sdk=") }
+    ?.removePrefix("flutter.sdk=")
+    ?.trim()
+    ?: ""
+
+// The path names the VM under `bin/cache/dart-sdk/`, not the SDK's `bin/dart`
+// launcher: that launcher is a shell script on POSIX and a `.bat` on Windows, and
+// a process cannot be started from either.
+val dartVm: String? = if (flutterSdk.isEmpty()) {
+    null
+} else {
+    listOf("dart", "dart.exe")
+        .map { name -> File(flutterSdk, "bin/cache/dart-sdk/bin/$name") }
+        .firstOrNull { candidate -> candidate.exists() }
+        ?.absolutePath
+}
+val dartExecutable = providers.environmentVariable("DART").getOrElse(dartVm ?: "dart")
 
 val validateSharedPayload by tasks.registering(Exec::class) {
     description = "Asserts every runtime payload key is present in Android assets"
     dependsOn(copySharedMaterial)
     commandLine(
-        pythonExecutable,
+        dartExecutable,
         File(
             repoRoot,
-            "app/apps/miaotou_app/macos/Runner/validate_payload_keys.py",
+            "app/apps/miaotou_app/tool/validate_payload_keys.dart",
         ),
         repoRoot,
         sharedAssets.get().asFile,
