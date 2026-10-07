@@ -37,8 +37,10 @@ dependencies:
     path: ../../packages/miaotou_capabilities_macos
   miaotou_capabilities_windows:
     path: ../../packages/miaotou_capabilities_windows
-  # Not imported yet: the domain is a skeleton until #7. The edge is declared now
-  # so the layering is visible from the manifest rather than only from the plan.
+  # Everything this application decides with and no platform may reach: judging
+  # and prompt assembly, the knowledge base's logic, the panel's read-only
+  # derivation, the runtime's state machine. Platform-free by construction, and
+  # pinned that way by its own dependency-direction test (ADR-0009).
   miaotou_domain:
     path: ../../packages/miaotou_domain
 

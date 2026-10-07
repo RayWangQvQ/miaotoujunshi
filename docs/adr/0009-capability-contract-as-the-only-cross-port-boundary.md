@@ -125,3 +125,17 @@ implementation packages are the only code that differs per platform.**
   domain needs but no port can implement, or a port detail that only one port can
   honour, shows up as an awkward `UnsupportedError`. That pressure is intended:
   the contract is supposed to make platform differences loud.
+- **Decision 3's line is now drawn inside the runtime, and it holds.** The runtime's
+  state machine moved into `miaotou_domain` as `ConversationEngine`: what the panel
+  is showing, whether a second round is refused or deferred, whether an event with
+  no words ends a review, whether a refusal carries a way out. The pacing did **not**
+  move with it — the rate limit, the backoff, the watchdog, the panel hide/restore
+  around a screenshot and the chosen target window are all still in the
+  implementations, and the rejected alternative above is still rejected. What the
+  move showed is that "the domain owns *what*" was never only about snapshots and
+  advice: 识别中 and 分析中 are things the panel shows, and the runtime had been
+  answering for them from the application side. The shape that keeps the two apart
+  mechanically is the effect list — the engine asks for a read, a capture or an
+  injection and awaits none of them, so a decision cannot quietly turn into a timing
+  decision. It is also what makes every transition reachable from `dart test` with
+  nothing attached.
