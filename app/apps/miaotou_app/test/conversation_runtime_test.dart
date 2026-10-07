@@ -6,7 +6,6 @@ import 'package:miaotou_app/src/design/copy.dart';
 import 'package:miaotou_app/src/panel/protocol.dart';
 import 'package:miaotou_app/src/panel/session.dart';
 import 'package:miaotou_app/src/runtime/conversation_runtime.dart';
-import 'package:miaotou_app/src/runtime/model_settings.dart';
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 import 'package:miaotou_capabilities/testing.dart';
 import 'package:miaotou_domain/miaotou_domain.dart';

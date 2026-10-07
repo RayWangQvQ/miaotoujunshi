@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:miaotou_app/src/panel/protocol.dart';
-import 'package:miaotou_app/src/runtime/model_settings.dart';
 import 'package:miaotou_app/src/runtime/panel_settings.dart';
 import 'package:miaotou_app/src/shell/destination.dart';
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
@@ -216,9 +215,9 @@ void main() {
         await harness.capabilities.preferences.getString('analysis.goal'),
         '先接住情绪',
         reason: 'the slider writes its own key. A slider wired through the '
-            'settings page\'s save path would blank goal/tone/length/'
-            'candidateCount on the way past, because that path rebuilds a '
-            'ModelSettings from defaults',
+            'settings page\'s save path would reset goal to the copy default '
+            'and blank tone/length/candidateCount on the way past, because '
+            'that path rebuilds a ModelSettings from defaults',
       );
     });
   });

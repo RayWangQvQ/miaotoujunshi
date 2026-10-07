@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:miaotou_app/src/design/copy.dart';
-import 'package:miaotou_app/src/runtime/model_settings.dart';
 import 'package:miaotou_app/src/runtime/model_transport.dart';
 import 'package:miaotou_domain/miaotou_domain.dart';
 
@@ -51,7 +50,7 @@ void main() {
         );
       await request.response.close();
     });
-    final ModelSettings settings = ModelSettings.defaults.copyWith(
+    final ModelSettings settings = ModelSettings.defaults().copyWith(
       replyBaseUrl: '$base/v1',
       replyModel: 'reply-model',
       replyKey: 'secret',
@@ -89,7 +88,7 @@ void main() {
       await request.response.close();
     });
     final ConfiguredModelTransport transport = ConfiguredModelTransport(
-      ModelSettings.defaults.copyWith(
+      ModelSettings.defaults().copyWith(
         replyBaseUrl: '$base/v1',
         replyKey: 'secret',
       ),

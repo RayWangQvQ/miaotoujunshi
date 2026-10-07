@@ -1,9 +1,21 @@
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 
-import '../design/copy.dart';
-
+/// Which independent strategy step this round runs, if any.
 enum StrategyProvider { none, jev, deepseek }
 
+/// How one round is configured: the two model routes, and what the analysis is
+/// told about the person and the relationship.
+///
+/// **Here rather than in the application, because the engine reads it.** The
+/// engine decides whether a round can run at all ([isReady]) and refuses to
+/// publish words when it cannot — that is a decision, and ADR-0009 puts the
+/// decisions in this package. Loading and storing are here too, and are not an
+/// exception: they go through [Preferences] and [SecretStore], which are
+/// contract members, so no platform is reached. [SharedMaterial.load] is the
+/// same shape and has been here since #9.
+///
+/// **The one thing that is not here is [goal]'s default.** The field is a
+/// sentence a person reads, so the domain cannot supply it — see [defaults].
 final class ModelSettings {
   const ModelSettings({
     required this.replyBaseUrl,
@@ -24,7 +36,15 @@ final class ModelSettings {
   static const String replySecretKey = 'model.reply.key';
   static const String strategySecretKey = 'model.strategy.key';
 
-  static final ModelSettings defaults = ModelSettings(
+  /// Everything a fresh install starts from, apart from [goal].
+  ///
+  /// [goal] is a parameter with an empty default rather than a constant because
+  /// it is copy: `settingsGoalDefault` is a sentence the user reads in a field,
+  /// and this package holds no sentence a screen shows (the application's own
+  /// audit is what keeps that true). A caller that is about to *store* these
+  /// settings passes the copy default; a caller that only wants to read a
+  /// non-text field off a fresh install can ignore it.
+  static ModelSettings defaults({String goal = ''}) => ModelSettings(
     replyBaseUrl: 'https://openrouter.ai/api/v1',
     replyModel: 'deepseek/deepseek-chat-v3.1',
     replyKey: '',
@@ -34,7 +54,7 @@ final class ModelSettings {
     strategyKey: '',
     autoAnalyze: false,
     relationshipBackground: '',
-    goal: AppCopy.zh.text(CopyKey.settingsGoalDefault),
+    goal: goal,
     tone: null,
     length: null,
     candidateCount: null,
@@ -68,33 +88,41 @@ final class ModelSettings {
       _endpoint(strategyBaseUrl, 'chat/completions');
   Uri get systemoneEndpoint => _endpoint(strategyBaseUrl, 'v1/systemone');
 
+  /// Reads the settings, falling back to [defaults] for anything unset.
+  ///
+  /// [goal] is the fallback for an unset goal, and already being the caller's
+  /// own words it is passed rather than looked up — see [defaults]. A caller
+  /// that reads these settings only to fill in fields on a page, and never
+  /// stores them, may leave it out and ignore the result.
   static Future<ModelSettings> load(
     Preferences preferences,
-    SecretStore secrets,
-  ) async {
+    SecretStore secrets, {
+    String goal = '',
+  }) async {
+    final ModelSettings fallback = defaults(goal: goal);
     final String? provider = await preferences.getString(_strategyProvider);
     return ModelSettings(
       replyBaseUrl:
-          await preferences.getString(_replyBaseUrl) ?? defaults.replyBaseUrl,
+          await preferences.getString(_replyBaseUrl) ?? fallback.replyBaseUrl,
       replyModel:
-          await preferences.getString(_replyModel) ?? defaults.replyModel,
+          await preferences.getString(_replyModel) ?? fallback.replyModel,
       replyKey: await secrets.read(replySecretKey) ?? '',
       strategyProvider: StrategyProvider.values.firstWhere(
         (StrategyProvider value) => value.name == provider,
-        orElse: () => defaults.strategyProvider,
+        orElse: () => fallback.strategyProvider,
       ),
       strategyBaseUrl:
           await preferences.getString(_strategyBaseUrl) ??
-          defaults.strategyBaseUrl,
+          fallback.strategyBaseUrl,
       strategyModel:
-          await preferences.getString(_strategyModel) ?? defaults.strategyModel,
+          await preferences.getString(_strategyModel) ?? fallback.strategyModel,
       strategyKey: await secrets.read(strategySecretKey) ?? '',
       autoAnalyze:
-          await preferences.getBool(_autoAnalyze) ?? defaults.autoAnalyze,
+          await preferences.getBool(_autoAnalyze) ?? fallback.autoAnalyze,
       relationshipBackground:
           await preferences.getString(_relationshipBackground) ??
-          defaults.relationshipBackground,
-      goal: await preferences.getString(_goal) ?? defaults.goal,
+          fallback.relationshipBackground,
+      goal: await preferences.getString(_goal) ?? fallback.goal,
       tone: await preferences.getString(_tone),
       length: await preferences.getString(_length),
       candidateCount: await preferences.getInt(_candidateCount),

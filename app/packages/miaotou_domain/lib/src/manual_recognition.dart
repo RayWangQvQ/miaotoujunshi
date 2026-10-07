@@ -38,10 +38,13 @@ const double sideBoundary = 0.5;
 /// transcripts depending on who asked for the capture. The meridiem may sit on
 /// either side, because applications disagree about that.
 ///
-/// The two meridiem words are written as escapes rather than as themselves only
-/// because `lib/` outside `design/copy.dart` may not hold a Han character in a
-/// string literal — the pattern is not copy, and the audit that enforces that
-/// rule is right not to care.
+/// The two meridiem words are escapes rather than themselves because this file
+/// began in the application package, where a Han character in a string literal
+/// outside the copy file is an audit failure — the pattern is not copy, and the
+/// audit is right not to care. The escapes came along when the file moved into
+/// the domain, and are kept: no audit here would object either way, but the
+/// pattern is not read by a person, so spelling the words out would only put
+/// copy in a place that has no business holding any.
 final RegExp _pureTime = RegExp(
   '^\\s*(\u4e0a\u5348|\u4e0b\u5348|AM|PM|am|pm)?'
   '\\s*\\d{1,2}[:：]\\d{2}'

@@ -1,8 +1,8 @@
 import 'dart:typed_data';
 
-import 'package:flutter_test/flutter_test.dart';
-import 'package:miaotou_app/src/runtime/manual_recognition.dart';
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
+import 'package:miaotou_domain/miaotou_domain.dart';
+import 'package:test/test.dart';
 
 /// The whole-frame calibration, pinned (ADR-0019 decision 5, ADR-0011).
 ///

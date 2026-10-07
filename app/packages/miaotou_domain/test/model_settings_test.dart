@@ -1,11 +1,11 @@
-import 'package:flutter_test/flutter_test.dart';
-import 'package:miaotou_app/src/runtime/model_settings.dart';
 import 'package:miaotou_capabilities/testing.dart';
+import 'package:miaotou_domain/miaotou_domain.dart';
+import 'package:test/test.dart';
 
 void main() {
   test('model settings keep credentials out of plain preferences', () async {
     final InMemoryCapabilities capabilities = InMemoryCapabilities();
-    final ModelSettings settings = ModelSettings.defaults.copyWith(
+    final ModelSettings settings = ModelSettings.defaults().copyWith(
       replyBaseUrl: 'https://reply.example/v1',
       replyModel: 'reply-model',
       replyKey: 'reply-secret',
@@ -41,7 +41,7 @@ void main() {
   });
 
   test('endpoint assembly accepts a base ending at v1', () {
-    final ModelSettings settings = ModelSettings.defaults.copyWith(
+    final ModelSettings settings = ModelSettings.defaults().copyWith(
       replyBaseUrl: 'https://reply.example/v1/',
       strategyBaseUrl: 'https://strategy.example/',
     );

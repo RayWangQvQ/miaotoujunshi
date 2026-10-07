@@ -46,6 +46,14 @@
 ///   port ever hashed anything, and [Snapshot.signature] is the identity they
 ///   compare.
 ///
+/// * **The runtime's own two halves.** [groupRecognisedLines] is the whole-frame
+///   calibration (ADR-0019) — pure arithmetic over a [CaptureFrame], and the
+///   reason a photographed conversation can be pinned without a device.
+///   [ModelSettings] is how one round is configured. Both were written in the
+///   application and moved here when the runtime's decisions did: the first
+///   because it never touched anything but a frame, the second because the
+///   engine reads it to decide whether a round may run at all.
+///
 /// ## The one thing worth knowing before adding to it
 ///
 /// A member that needs a platform is a member that belongs behind the contract
@@ -67,8 +75,10 @@ export 'src/csv.dart';
 export 'src/errors.dart';
 export 'src/injection_filter.dart';
 export 'src/judging.dart';
+export 'src/manual_recognition.dart';
 export 'src/memory.dart';
 export 'src/model_gateway.dart';
+export 'src/model_settings.dart';
 export 'src/preferences.dart';
 export 'src/prompts.dart';
 export 'src/relationship.dart';

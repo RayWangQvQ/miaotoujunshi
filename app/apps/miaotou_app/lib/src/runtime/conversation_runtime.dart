@@ -7,9 +7,7 @@ import 'package:miaotou_domain/miaotou_domain.dart';
 import '../design/copy.dart';
 import '../panel/protocol.dart';
 import '../panel/session.dart';
-import 'model_settings.dart';
 import 'model_transport.dart';
-import 'manual_recognition.dart';
 
 typedef ConversationAnalyzer = Future<Advice> Function(
   ChatUiSnapshot snapshot,
@@ -172,6 +170,7 @@ final class ConversationRuntime {
     final ModelSettings settings = await ModelSettings.load(
       capabilities.preferences,
       capabilities.secretStore,
+      goal: copy.text(CopyKey.settingsGoalDefault),
     );
     if (settings.autoAnalyze) {
       await _analyze(manual: false);
@@ -508,6 +507,7 @@ final class ConversationRuntime {
       final ModelSettings settings = await ModelSettings.load(
         capabilities.preferences,
         capabilities.secretStore,
+        goal: copy.text(CopyKey.settingsGoalDefault),
       );
       if (_customAnalyzer == null && !settings.isReady) {
         _publish(

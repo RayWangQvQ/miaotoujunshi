@@ -5,7 +5,6 @@ import 'package:http/http.dart' as http;
 import 'package:miaotou_domain/miaotou_domain.dart';
 
 import '../design/copy.dart';
-import 'model_settings.dart';
 
 final class ConfiguredModelTransport implements ModelTransport {
   ConfiguredModelTransport(

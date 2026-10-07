@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
+import 'package:miaotou_domain/miaotou_domain.dart';
 
 import '../design/copy.dart';
 import '../design/spacing.dart';
 import '../panel/protocol.dart';
 import '../panel/session.dart';
-import '../runtime/model_settings.dart';
 import '../runtime/panel_settings.dart';
 import 'destination.dart';
 import 'permission_section.dart';
@@ -53,8 +53,8 @@ class _SettingsPageState extends State<SettingsPage> {
   final TextEditingController _strategyKey = TextEditingController();
   final TextEditingController _background = TextEditingController();
 
-  StrategyProvider _provider = ModelSettings.defaults.strategyProvider;
-  bool _autoAnalyze = ModelSettings.defaults.autoAnalyze;
+  StrategyProvider _provider = ModelSettings.defaults().strategyProvider;
+  bool _autoAnalyze = ModelSettings.defaults().autoAnalyze;
   int _opacity = PanelAppearance.defaultOpacity;
   bool _loading = true;
 
@@ -97,8 +97,17 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
+  /// The page's save button: everything the panel does not own.
+  ///
+  /// Rebuilt from `defaults` rather than loaded and amended, which is why the
+  /// goal default has to be handed in: `defaults` lives in the domain now and
+  /// holds no sentence a screen shows, so the caller that is about to *store*
+  /// these settings is the one that supplies it.
   Future<void> _save() async {
-    final ModelSettings settings = ModelSettings.defaults.copyWith(
+    final AppCopy copy = CopyScope.of(context);
+    final ModelSettings settings = ModelSettings.defaults(
+      goal: copy.text(CopyKey.settingsGoalDefault),
+    ).copyWith(
       replyBaseUrl: _replyBase.text,
       replyModel: _replyModel.text,
       replyKey: _replyKey.text,
@@ -143,9 +152,9 @@ class _SettingsPageState extends State<SettingsPage> {
   ///
   /// Deliberately its own write rather than a trip through [_save]. That path
   /// rebuilds a [ModelSettings] from `defaults`, so a slider that went through it
-  /// would blank `goal`, `tone`, `length` and `candidateCount` on the way past;
-  /// the panel's settings are a separate type under a separate prefix for exactly
-  /// that reason (ADR-0020 decision 4).
+  /// would put `goal` back to the copy default and blank `tone`, `length` and
+  /// `candidateCount` on the way past; the panel's settings are a separate type
+  /// under a separate prefix for exactly that reason (ADR-0020 decision 4).
   Future<void> _commitOpacity(double value) async {
     try {
       await PanelSettings.saveAppearance(
