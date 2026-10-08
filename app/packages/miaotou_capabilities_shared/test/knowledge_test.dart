@@ -569,6 +569,22 @@ void main() {
   test('the document is named knowledge.json', () {
     expect(KnowledgeLedger.fileName, 'knowledge.json');
   });
+
+  group('app names', () {
+    test('a name written under a key is read back, and a missing key is null', () async {
+      await knowledge.saveAppName('com.example.unknown', '示例');
+
+      expect(await knowledge.appNameFor('com.example.unknown'), '示例');
+      expect(await knowledge.appNameFor('com.tencent.mm'), isNull);
+    });
+
+    test('a later write under the same key replaces the earlier one', () async {
+      await knowledge.saveAppName('com.example.unknown', '旧名');
+      await knowledge.saveAppName('com.example.unknown', '新名');
+
+      expect(await knowledge.appNameFor('com.example.unknown'), '新名');
+    });
+  });
 }
 
 KnowledgeNote _note(String id, String content) => KnowledgeNote(

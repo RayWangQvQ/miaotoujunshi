@@ -27,10 +27,14 @@ void main() {
 
 /// The panel window's application.
 ///
-/// The frame it starts with is [ConversationRef.none] on purpose. The panel
-/// resolves a package to a display name — or, failing that, shows the package
-/// name itself (ADR-0026) — so the first thing worth seeing on screen is the
-/// 「未知应用」 placeholder rather than a plausible-looking name.
+/// The frame it starts with is [ConversationRef.none] on purpose, and it is the
+/// only frame that prints 「未知应用」: the main window pushes the conversation in
+/// front immediately after `show`, and the header names it from then on — as the
+/// conversation being analysed once there is one, and as the one in front until
+/// then (ADR-0028). An app named in front with a person not yet read is
+/// 「抖音 · 未知人」, not the whole-window placeholder. A panel that had to be
+/// analysed before it would name the application was the defect this reading
+/// answers.
 class PanelApp extends StatefulWidget {
   const PanelApp({
     super.key,

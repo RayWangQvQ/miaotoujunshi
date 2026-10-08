@@ -1,5 +1,22 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <!--
+        Package visibility (Android 11+). `ChatApps.displayName` asks
+        PackageManager for the label of whatever package the accessibility
+        service saw in front — Douyin's included — and an app that declares
+        nothing sees almost nothing. A MAIN/LAUNCHER intent query is what makes
+        that question answerable, and it deliberately stops short of
+        QUERY_ALL_PACKAGES: every app with a launcher icon is enough, because a
+        chat app the user can be sitting in has one.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
     <application>
         <service
             android:name=".RetainedCaptureService"

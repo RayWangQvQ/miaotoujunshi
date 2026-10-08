@@ -90,19 +90,30 @@ final class GallerySamples {
       ),
       metricNote: copy.text(CopyKey.gallerySampleNote),
       currentFrame: PanelFrame(
-        analysed: ConversationRef(packageName: 'com.tencent.mm', title: thread),
-        live: ConversationRef(packageName: 'com.tencent.mm', title: thread),
+        analysed: ConversationRef(
+          packageName: 'com.tencent.mm',
+          appName: app,
+          title: thread,
+        ),
+        live: ConversationRef(
+          packageName: 'com.tencent.mm',
+          appName: app,
+          title: thread,
+        ),
         advice: advice,
-        appNames: <String, String>{'com.tencent.mm': app},
       ),
       browsingFrame: PanelFrame(
-        analysed: ConversationRef(packageName: 'com.tencent.mm', title: thread),
-        live: ConversationRef(packageName: 'com.tencent.mobileqq', title: threadOther),
+        analysed: ConversationRef(
+          packageName: 'com.tencent.mm',
+          appName: app,
+          title: thread,
+        ),
+        live: ConversationRef(
+          packageName: 'com.tencent.mobileqq',
+          appName: appOther,
+          title: threadOther,
+        ),
         advice: advice,
-        appNames: <String, String>{
-          'com.tencent.mm': app,
-          'com.tencent.mobileqq': appOther,
-        },
       ),
     );
   }

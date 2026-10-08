@@ -419,7 +419,6 @@ final class PanelWireCodec {
             for (final PanelLine line in frame.transcript) _encodeLine(line),
           ],
         if (frame.reviewing) 'reviewing': true,
-        'appNames': frame.appNames,
       };
 
   static PanelFrame decodeFrame(Object? value) {
@@ -430,7 +429,6 @@ final class PanelWireCodec {
       advice: map['advice'] == null ? null : _decodeAdvice(map['advice']),
       note: map['note'] == null ? null : _decodeNote(map['note']),
       transcript: _decodeTranscript(map['transcript']),
-      appNames: _stringMap(map['appNames'], 'appNames'),
       reviewing: _flag(map['reviewing'], 'reviewing'),
     );
   }
@@ -535,6 +533,8 @@ final class PanelWireCodec {
           'lines': <Map<String, Object?>>[
             for (final PanelLine line in command.lines!) _encodeLine(line),
           ],
+        if (command.title != null) 'title': command.title,
+        if (command.appName != null) 'appName': command.appName,
       };
 
   static PanelCommand decodeCommand(Object? value) {
@@ -569,6 +569,8 @@ final class PanelWireCodec {
       text: rawText as String?,
       permission: rawPermission == null ? null : _decodeKind(rawPermission),
       lines: lines,
+      title: map['title'] as String?,
+      appName: map['appName'] as String?,
     );
   }
 
@@ -587,6 +589,7 @@ final class PanelWireCodec {
   static Map<String, Object?> _encodeReference(ConversationRef reference) =>
       <String, Object?>{
         'packageName': reference.packageName,
+        if (reference.appName != null) 'appName': reference.appName,
         if (reference.title != null) 'title': reference.title,
       };
 
@@ -594,6 +597,7 @@ final class PanelWireCodec {
     final Map<Object?, Object?> map = _map(value, 'conversation reference');
     return ConversationRef(
       packageName: _string(map, 'packageName'),
+      appName: map['appName'] as String?,
       title: map['title'] as String?,
     );
   }
@@ -702,14 +706,6 @@ final class PanelWireCodec {
       throw FormatException('$name must be a string list');
     }
     return value.cast<String>();
-  }
-
-  static Map<String, String> _stringMap(Object? value, String name) {
-    final Map<String, Object?> values = _stringObjectMap(value, name);
-    if (values.values.any((Object? item) => item is! String)) {
-      throw FormatException('$name values must be strings');
-    }
-    return values.cast<String, String>();
   }
 
   static Map<String, Object?> _stringObjectMap(Object? value, String name) {

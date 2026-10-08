@@ -13,6 +13,7 @@ import 'package:miaotou_domain/miaotou_domain.dart';
 void main() {
   const ConversationRef conversation = ConversationRef(
     packageName: 'com.tencent.mm',
+    appName: '微信',
     title: '张三',
   );
   const Advice advice = Advice(
@@ -47,7 +48,6 @@ void main() {
         PanelLine(speaker: Speaker.other, text: '在的'),
         PanelLine(speaker: Speaker.unknown, text: '？'),
       ],
-      appNames: <String, String>{'com.tencent.mm': '微信'},
     );
 
     final PanelFrame after = PanelWireCodec.decodeFrame(
@@ -76,7 +76,15 @@ void main() {
       after.transcript.map((PanelLine line) => line.text),
       <String>['在吗', '在的', '？'],
     );
-    expect(after.appNames, <String, String>{'com.tencent.mm': '微信'});
+    expect(
+      after.analysed.appName,
+      '微信',
+      reason:
+          'the resolved name rides on the reference (ADR-0028). Losing it on '
+          'the wire leaves the panel printing a package name at best, which is '
+          'the state the header was in before this: nothing ever filled the map '
+          'the name used to travel in',
+    );
   });
 
   test('a note with nothing to press crosses without a remedy', () {
@@ -113,6 +121,8 @@ void main() {
                 PanelLine(speaker: Speaker.unknown, text: '？'),
               ]
             : null,
+        title: carriesBatch ? '张三' : null,
+        appName: carriesBatch ? '抖音' : null,
       );
       final PanelCommand after = PanelWireCodec.decodeCommand(
         PanelWireCodec.encodeCommand(before),
@@ -134,6 +144,19 @@ void main() {
       expect(
         after.lines?.map((PanelLine line) => line.text).toList(),
         before.lines?.map((PanelLine line) => line.text).toList(),
+      );
+      expect(
+        after.title,
+        before.title,
+        reason: 'ADR-0030: the person name the review confirmed rides the '
+            'command, and a title that does not survive the wire comes back as '
+            '未命名 and the header keeps printing 未知人',
+      );
+      expect(
+        after.appName,
+        before.appName,
+        reason: 'the app name entered by hand in the review must reach the '
+            'engine too',
       );
     }
   });
@@ -206,7 +229,6 @@ void main() {
         analysed: conversation,
         live: conversation,
         advice: advice,
-        appNames: <String, String>{'com.tencent.mm': '微信'},
       ),
     );
     await tester.pump();

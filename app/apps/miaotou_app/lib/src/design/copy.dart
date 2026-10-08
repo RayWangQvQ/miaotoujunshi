@@ -57,6 +57,20 @@ enum CopyKey {
 
   knowledgeTitle,
   knowledgeEmpty,
+  knowledgeAppUnknown,
+  knowledgeHistoryEmpty,
+  knowledgeNoFields,
+  knowledgeEdit,
+  knowledgeEditTitle,
+  knowledgeEditSave,
+  knowledgeEditCancel,
+  knowledgeViewHistory,
+  knowledgeHistoryTitle,
+  knowledgeHistoryLoadMore,
+  knowledgeStageHelp,
+  knowledgeGoalHelp,
+  knowledgeBackgroundHelp,
+  knowledgeNotesHelp,
   profileLabel,
   profileStage,
   profileGoal,
@@ -154,6 +168,7 @@ enum CopyKey {
   // punctuation typed into a widget.
   panelLabelPair,
   panelLabelTitleOnly,
+  panelLabelUnknownPerson,
   panelLabelUnrecognised,
   panelStatusNotAnalysed,
   panelStatusViewing,
@@ -187,12 +202,19 @@ enum CopyKey {
   panelReviewNothingLeft,
   panelActionDeleteLine,
   panelNoteReviewed,
+  // The identity fields the review now collects (ADR-0030): the person's name
+  // and, when the platform could not name the application, the application's.
+  panelReviewPersonLabel,
+  panelReviewAppLabel,
+  panelReviewPersonRequired,
+  panelReviewAppRequired,
   // The label on the button a note carries when the refusal is the transcript
   // being unconfirmed (ADR-0022 decision 13).
   panelActionGoReview,
 
   runtimeAnalysing,
   runtimeConfigureModels,
+  runtimeIdentityIncomplete,
   runtimeConversationChanged,
   runtimeNoConversation,
   runtimeCopied,
@@ -295,7 +317,21 @@ final class AppCopy {
     CopyKey.trendSource: '来源',
 
     CopyKey.knowledgeTitle: '知识库',
-    CopyKey.knowledgeEmpty: '还没有记录过任何人的资料。',
+    CopyKey.knowledgeEmpty: '还没有记录过任何人。核对过一次对话后，对方就会出现在这里。',
+    CopyKey.knowledgeAppUnknown: '未命名应用',
+    CopyKey.knowledgeHistoryEmpty: '还没有保存过与对方的对话。',
+    CopyKey.knowledgeNoFields: '还没有填写过对方的信息。',
+    CopyKey.knowledgeEdit: '编辑',
+    CopyKey.knowledgeEditTitle: '补充对方信息',
+    CopyKey.knowledgeEditSave: '保存',
+    CopyKey.knowledgeEditCancel: '取消',
+    CopyKey.knowledgeViewHistory: '查看历史',
+    CopyKey.knowledgeHistoryTitle: '聊天记录',
+    CopyKey.knowledgeHistoryLoadMore: '加载更多',
+    CopyKey.knowledgeStageHelp: '你们现在的关系到了哪一步。',
+    CopyKey.knowledgeGoalHelp: '这一轮你最想推进什么。',
+    CopyKey.knowledgeBackgroundHelp: '对方的背景，比如怎么认识、在做什么。',
+    CopyKey.knowledgeNotesHelp: '其他想记住的点，比如对方的偏好、雷区。',
     CopyKey.profileLabel: '称呼',
     CopyKey.profileStage: '阶段',
     CopyKey.profileGoal: '目标',
@@ -392,6 +428,7 @@ final class AppCopy {
 
     CopyKey.panelLabelPair: '{app} · {title}',
     CopyKey.panelLabelTitleOnly: '{title}',
+    CopyKey.panelLabelUnknownPerson: '未知人',
     CopyKey.panelLabelUnrecognised: '未知应用',
     CopyKey.panelStatusNotAnalysed: '尚未分析',
     CopyKey.panelStatusViewing: '正在看',
@@ -410,6 +447,10 @@ final class AppCopy {
     CopyKey.panelActionDeleteLine: '删行',
     CopyKey.panelNoteReviewed: '原文与说话人已人工核对。',
     CopyKey.panelActionGoReview: '去核对',
+    CopyKey.panelReviewPersonLabel: '人',
+    CopyKey.panelReviewAppLabel: '应用',
+    CopyKey.panelReviewPersonRequired: '请填写对方是谁',
+    CopyKey.panelReviewAppRequired: '请填写应用名',
     CopyKey.panelNoteSidesGuessed: '这一屏是截图识别的，左右按位置推定，可能有误；填入前请核对。',
     CopyKey.panelNoteSidesNotSplit: 'OCR 未分边，把全部消息当作对方所说',
     CopyKey.panelTranscriptLabel: '识别到的原文',
@@ -424,6 +465,7 @@ final class AppCopy {
 
     CopyKey.runtimeAnalysing: '正在分析当前会话…',
     CopyKey.runtimeConfigureModels: '请先在设置中填写回复模型地址、模型和密钥。',
+    CopyKey.runtimeIdentityIncomplete: '应用或人还没确定，先识别并核对，把缺失的一项补上。',
     CopyKey.runtimeConversationChanged: '会话已切换，未填入；请分析当前会话后重试。',
     CopyKey.runtimeNoConversation: '当前没有可分析的会话。',
     CopyKey.runtimeCopied: '已复制。',
@@ -448,6 +490,34 @@ final class AppCopy {
     CopyKey.noValue: '未填写',
   };
 }
+
+/// A package id to the application name a person reads, for the chat apps this
+/// build knows how to name without asking the platform.
+///
+/// Android resolves an app's name through `PackageManager` (ADR-0028); the
+/// desktop ports do not, so a package seen on Windows arrives with no `appName`
+/// and would otherwise group under its raw id in the knowledge base. This table
+/// is that desktop fallback: a well-known chat application gets its familiar
+/// name, and anything unlisted falls back to the package id rather than
+/// guessing. The names live here, not in the page, because they are strings a
+/// person reads and this file is their one home.
+const Map<String, String> appDisplayNames = <String, String>{
+  'com.tencent.mm': '微信',
+  'com.tencent.mobileqq': 'QQ',
+  'com.ss.android.lark': '飞书',
+  'com.tencent.wework': '企业微信',
+  'com.ss.android.ugc.aweme': '抖音',
+  'com.smile.gifmaker': '快手',
+  'com.xingin.xhs': '小红书',
+  'com.immomo.momo': '陌陌',
+  'com.soul.android': 'Soul',
+  'com.twitter.android': 'X',
+  'com.whatsapp': 'WhatsApp',
+  'org.telegram.messenger': 'Telegram',
+  'com.discord': 'Discord',
+  'com.skype.raider': 'Skype',
+  'jp.naver.line.android': 'LINE',
+};
 
 /// Puts a copy where every page below it can read it.
 ///

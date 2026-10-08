@@ -162,6 +162,15 @@ final class ConversationRuntime {
 
       case InjectText(:final String windowId, :final String text):
         return _inject(windowId, text);
+
+      case PersistIdentity(
+        :final String title,
+        :final String packageName,
+        :final String appName,
+        :final List<ChatLine> lines,
+      ):
+        await _persistIdentity(title, packageName, appName, lines);
+        return null;
     }
   }
 
@@ -333,6 +342,64 @@ final class ConversationRuntime {
     );
   }
 
+  /// Writes the identity a review confirmed into the knowledge base (ADR-0030).
+  ///
+  /// The person half becomes a contact, merged by name rather than duplicated;
+  /// an application name entered with no package behind it is stored under the
+  /// name itself as the key. Both are best-effort: a store that will not answer
+  /// must not turn a successful confirmation into a failure, because the
+  /// analysis that follows does not read these — they are for the next time.
+  ///
+  /// The confirmed lines are appended to that contact's history so the knowledge
+  /// base can later show the conversation, not just who the person is.
+  Future<void> _persistIdentity(
+    String title,
+    String packageName,
+    String appName,
+    List<ChatLine> lines,
+  ) async {
+    if (title.trim().isNotEmpty) {
+      try {
+        final List<KnowledgeContact> existing =
+            await capabilities.knowledgeStore.contacts();
+        final KnowledgeContact contact = contactForName(
+          existing: existing,
+          name: title,
+          packageName: packageName,
+          appName: appName,
+          now: DateTime.now(),
+        );
+        await capabilities.knowledgeStore.saveContact(contact);
+        if (lines.isNotEmpty) {
+          await capabilities.knowledgeStore.appendLog(
+            contact.id,
+            <KnowledgeLogEntry>[
+              for (final ChatLine line in lines)
+                KnowledgeLogEntry(
+                  speaker: line.speaker,
+                  text: line.text,
+                  timestamp: DateTime.now(),
+                  packageName: packageName,
+                ),
+            ],
+          );
+        }
+      } on Object {
+        // The contact is a convenience for the next session, not this round.
+      }
+    }
+    if (packageName.trim().isEmpty && appName.trim().isNotEmpty) {
+      try {
+        await capabilities.knowledgeStore.saveAppName(
+          appName.trim(),
+          appName.trim(),
+        );
+      } on Object {
+        // Same as above.
+      }
+    }
+  }
+
   Future<ModelSettings> _loadSettings() => ModelSettings.load(
     capabilities.preferences,
     capabilities.secretStore,
@@ -341,11 +408,12 @@ final class ConversationRuntime {
 
   /// The state, as the panel is fed it.
   ///
-  /// Six of the seven fields are a straight translation. The seventh is
-  /// [PanelFrame.appNames], which comes off the frame already on the panel
-  /// rather than out of the state: it is the platform's own resolution of a
-  /// package name and no decision in the engine reads one (ADR-0026 makes an
-  /// unresolved package a real answer).
+  /// A straight translation of seven fields, and nothing is added to it: the
+  /// app's display name used to ride beside the frame in a map the panel
+  /// resolved against, and nothing ever filled that map on any port — so the
+  /// header could not name an application at all (ADR-0018, settled by
+  /// ADR-0028). The name travels on the reference now, where the platform that
+  /// resolved it put it.
   void _publishFrame() {
     final ConversationState state = _engine.state;
     panel.publish(
@@ -358,7 +426,6 @@ final class ConversationRuntime {
           for (final ChatLine line in state.transcript)
             PanelLine(speaker: line.speaker, text: line.text),
         ],
-        appNames: panel.current.appNames,
         reviewing: state.reviewing,
       ),
     );

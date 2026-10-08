@@ -1,6 +1,7 @@
 package com.miaotoujunshi.capabilities.android
 
 import android.accessibilityservice.AccessibilityService
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Rect
@@ -15,6 +16,7 @@ import com.jev.probe.capture.QQAdapter
 import com.jev.probe.capture.XAdapter
 import com.jev.probe.capture.ocr.MlKitOcr
 import com.jev.probe.capture.ocr.ScreenCapture
+import com.jev.probe.core.ChatApps
 import com.jev.probe.core.ChatSnapshot
 import com.jev.probe.core.ConversationRef
 import java.io.ByteArrayOutputStream
@@ -83,7 +85,7 @@ class RetainedCaptureService : AccessibilityService() {
     }
 
     internal fun readActiveChat(): Map<String, Any?>? =
-        currentSnapshot?.toWire(currentConversation.pkg)
+        currentSnapshot?.toWire(currentConversation.pkg, this)
 
     internal fun publishCurrent() {
         emitConversation(force = true)
@@ -98,12 +100,10 @@ class RetainedCaptureService : AccessibilityService() {
     }
 
     private fun emitConversation(force: Boolean = false) {
-        val shown = boundConversation ?: currentConversation
         val event = mapOf(
             "kind" to "conversation",
-            "current" to currentConversation.toWire(),
-            "bound" to boundConversation?.toWire(),
-            "displayLabel" to shown.displayLabel(this),
+            "current" to currentConversation.toWire(this),
+            "bound" to boundConversation?.toWire(this),
             "readOnly" to (boundConversation != null && boundConversation != currentConversation),
         )
         if (force || event != lastConversationEvent) {
@@ -345,7 +345,7 @@ class RetainedCaptureService : AccessibilityService() {
         RetainedAndroidBridge.emit(
             mapOf(
                 "kind" to "snapshot",
-                "snapshot" to snapshot.toWire(packageName),
+                "snapshot" to snapshot.toWire(packageName, this),
             ),
         )
     }
@@ -491,8 +491,8 @@ internal object RetainedAndroidBridge {
     }
 }
 
-private fun ChatSnapshot.toWire(packageName: String): Map<String, Any?> = mapOf(
-    "conversation" to ConversationRef(packageName, title).toWire(),
+private fun ChatSnapshot.toWire(packageName: String, context: Context): Map<String, Any?> = mapOf(
+    "conversation" to ConversationRef(packageName, title).toWire(context),
     "lines" to messages.map { message ->
         mapOf(
             "speaker" to message.side,
@@ -520,8 +520,18 @@ private fun ChatSnapshot.ocrSignature(packageName: String): String {
     }
 }
 
-private fun ConversationRef.toWire(): Map<String, Any?> = mapOf(
+/**
+ * The conversation as the wire carries it.
+ *
+ * The display name rides beside the package rather than instead of it (ADR-0028):
+ * [ChatApps.displayName] asks the system, and answer `null` is a real answer —
+ * the domain's fallback order turns it into the bare package name. Resolving it
+ * here and nowhere else is what keeps one implementation of that order instead
+ * of two.
+ */
+private fun ConversationRef.toWire(context: Context): Map<String, Any?> = mapOf(
     "packageName" to pkg,
+    "appName" to ChatApps.displayName(pkg, context),
     "title" to title,
 )
 

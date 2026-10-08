@@ -83,11 +83,32 @@ final class DesktopMultiWindowPanelNative implements WindowsPanelNative {
     return controller;
   }
 
+  /// Runs [call] against the panel window, recreating it once if the window
+  /// was closed out from under the cache and the first attempt hit an
+  /// unregistered channel.
+  Future<T?> _invoke<T>(
+    Future<T?> Function(WindowController controller) call,
+  ) async {
+    try {
+      return await call(await _window());
+    } on WindowChannelException catch (failure) {
+      if (failure.code != 'CHANNEL_UNREGISTERED') {
+        rethrow;
+      }
+      // The panel engine is gone; forget it and try once more against a fresh
+      // window. If it is still unregistered the call fails as before.
+      _controller = null;
+      return call(await _window());
+    }
+  }
+
   @override
   Future<PanelGeometry> panelGeometry() async {
-    final WindowController controller = await _window();
     final Map<Object?, Object?> result =
-        (await controller.invokeMethod<Map<Object?, Object?>>('geometry')) ??
+        (await _invoke<Map<Object?, Object?>>(
+          (WindowController controller) =>
+              controller.invokeMethod<Map<Object?, Object?>>('geometry'),
+        )) ??
         <Object?, Object?>{};
     return PanelGeometry(
       screen: _rect(result['screen']),
@@ -100,33 +121,36 @@ final class DesktopMultiWindowPanelNative implements WindowsPanelNative {
     required PanelPlacement placement,
     ScreenRect? at,
   }) async {
-    final WindowController controller = await _window();
-    await controller.invokeMethod<void>('showPanel', <String, Object?>{
-      'anchor': placement.anchor.name,
-      'dx': placement.dx,
-      'dy': placement.dy,
-      if (placement.width != null) 'width': placement.width,
-      if (placement.height != null) 'height': placement.height,
-      if (at != null) 'at': _rectMap(at),
-    });
+    await _invoke<void>((WindowController controller) =>
+        controller.invokeMethod<void>('showPanel', <String, Object?>{
+          'anchor': placement.anchor.name,
+          'dx': placement.dx,
+          'dy': placement.dy,
+          if (placement.width != null) 'width': placement.width,
+          if (placement.height != null) 'height': placement.height,
+          if (at != null) 'at': _rectMap(at),
+        }));
   }
 
   @override
   Future<bool> hidePanel() async {
-    final WindowController controller = await _window();
-    return await controller.invokeMethod<bool>('hidePanel') ?? false;
+    return await _invoke<bool>(
+      (WindowController controller) =>
+          controller.invokeMethod<bool>('hidePanel'),
+    ) ??
+        false;
   }
 
   @override
   Future<void> restorePanel() async {
-    final WindowController controller = await _window();
-    await controller.invokeMethod<void>('restorePanel');
+    await _invoke<void>((WindowController controller) =>
+        controller.invokeMethod<void>('restorePanel'));
   }
 
   @override
   Future<void> setPanelFocusable(bool value) async {
-    final WindowController controller = await _window();
-    await controller.invokeMethod<void>('setFocusable', value);
+    await _invoke<void>((WindowController controller) =>
+        controller.invokeMethod<void>('setFocusable', value));
   }
 
   @override

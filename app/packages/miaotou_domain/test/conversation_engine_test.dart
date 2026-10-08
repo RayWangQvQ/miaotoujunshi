@@ -422,6 +422,24 @@ void main() {
       );
     });
 
+    test('a capture names the application in front, not a blank', () {
+      // A capture photographs the conversation the user is looking at, and the
+      // service has already named that application on `live` (ADR-0028). The
+      // batch must carry that name rather than fall back to `none` — otherwise
+      // the review always asks for the application by hand, even though it was
+      // already known.
+      final ConversationEngine engine = ConversationEngine();
+      engine.apply(SnapshotPushed(snapshot('在吗')));
+
+      engine.apply(const CommandReceived(ConversationCommandKind.recogniseOnce));
+      engine.apply(FrameCaptured(frame));
+      engine.apply(
+        LinesRecognised(frame: frame, lines: twoSidedScreen, at: DateTime.utc(2025)),
+      );
+
+      expect(engine.state.latest!.snapshot.conversation.packageName, 'com.tencent.mm');
+    });
+
     test('a frame that read nothing says so and leaves the batch alone', () {
       final ConversationEngine engine = ConversationEngine();
 
@@ -451,16 +469,18 @@ void main() {
       captureInto(engine, frame, twoSidedScreen);
 
       expect(
-        engine.apply(
-          const CommandReceived(
-            ConversationCommandKind.confirmTranscript,
-            lines: <ChatLine>[
-              ChatLine(speaker: Speaker.me, text: '在吗'),
-              ChatLine(speaker: Speaker.me, text: '在的'),
-            ],
+        kinds(
+          engine.apply(
+            const CommandReceived(
+              ConversationCommandKind.confirmTranscript,
+              lines: <ChatLine>[
+                ChatLine(speaker: Speaker.me, text: '在吗'),
+                ChatLine(speaker: Speaker.me, text: '在的'),
+              ],
+            ),
           ),
         ),
-        isEmpty,
+        <Type>[PersistIdentity],
       );
 
       expect(engine.state.reviewing, isFalse);
@@ -517,6 +537,144 @@ void main() {
         isEmpty,
       );
       expect(engine.state.note, const CopyNote(NoteCode.noConversation));
+    });
+  });
+
+  group('the identity gate', () {
+    test('an unnamed conversation refuses the round and points at the review', () {
+      // ADR-0030: both halves must be named before a round runs. A capture on a
+      // port with no tree reads neither, so the refusal is the identity's and
+      // carries the review as its way out.
+      final ConversationEngine engine = ConversationEngine(
+        requiresConfiguredModels: false,
+      );
+      engine.apply(const CommandReceived(ConversationCommandKind.recogniseOnce));
+      engine.apply(FrameCaptured(frame));
+      engine.apply(
+        LinesRecognised(
+          frame: frame,
+          lines: twoSidedScreen,
+          at: DateTime.utc(2025),
+        ),
+      );
+
+      engine.apply(const CommandReceived(ConversationCommandKind.reanalyse));
+      expect(
+        engine.apply(const TreeAnswered(TreeReadPurpose.analysis)),
+        isEmpty,
+      );
+      expect(
+        engine.state.note,
+        const CopyNote(NoteCode.identityIncomplete, remedy: AskReview()),
+      );
+    });
+
+    test('the review names both halves and the round then runs', () {
+      // ADR-0030: the halves the platform could not read are entered by hand,
+      // and the confirmed identity rides the batch into the round.
+      final ConversationEngine engine = ConversationEngine(
+        requiresConfiguredModels: false,
+      );
+      engine.apply(const CommandReceived(ConversationCommandKind.recogniseOnce));
+      engine.apply(FrameCaptured(frame));
+      engine.apply(
+        LinesRecognised(
+          frame: frame,
+          lines: twoSidedScreen,
+          at: DateTime.utc(2025),
+        ),
+      );
+
+      engine.apply(
+        const CommandReceived(
+          ConversationCommandKind.confirmTranscript,
+          lines: <ChatLine>[
+            ChatLine(speaker: Speaker.me, text: '在吗'),
+            ChatLine(speaker: Speaker.other, text: '在的'),
+          ],
+          title: '张三',
+          appName: '抖音',
+        ),
+      );
+
+      expect(
+        engine.state.analysed,
+        const ConversationRef(packageName: '', appName: '抖音', title: '张三'),
+      );
+
+      engine.apply(const CommandReceived(ConversationCommandKind.reanalyse));
+      expect(
+        kinds(engine.apply(const TreeAnswered(TreeReadPurpose.analysis))),
+        <Type>[LoadRoundSettings],
+      );
+    });
+  });
+
+  group('contactForName', () {
+    test('a new name becomes a contact', () {
+      final KnowledgeContact contact = contactForName(
+        existing: const <KnowledgeContact>[],
+        name: ' 张三 ',
+        packageName: 'com.tencent.mm',
+        appName: '微信',
+        now: DateTime.utc(2026),
+      );
+
+      expect(contact.name, '张三');
+      expect(contact.packageNames, <String>['com.tencent.mm']);
+      expect(contact.packageAppNames, <String, String>{
+        'com.tencent.mm': '微信',
+      });
+      expect(contact.id, isNotEmpty);
+    });
+
+    test('a known name gains the package and keeps the rest', () {
+      final KnowledgeContact contact = contactForName(
+        existing: <KnowledgeContact>[
+          KnowledgeContact(
+            id: 'c1',
+            name: '张三',
+            updatedAt: DateTime.utc(2025),
+            aliases: <String>['阿三'],
+            packageNames: <String>['com.tencent.mm'],
+            relationship: '朋友',
+          ),
+        ],
+        name: '张三',
+        packageName: 'com.ss.android.ugc.aweme',
+        appName: '抖音',
+        now: DateTime.utc(2026),
+      );
+
+      expect(contact.id, 'c1');
+      expect(
+        contact.packageNames,
+        <String>['com.tencent.mm', 'com.ss.android.ugc.aweme'],
+      );
+      expect(contact.packageAppNames, <String, String>{
+        'com.ss.android.ugc.aweme': '抖音',
+      });
+      expect(contact.relationship, '朋友');
+      expect(contact.aliases, <String>['阿三']);
+    });
+
+    test('a package already on the contact is not duplicated', () {
+      final KnowledgeContact before = KnowledgeContact(
+        id: 'c1',
+        name: '张三',
+        updatedAt: DateTime.utc(2025),
+        packageNames: <String>['com.tencent.mm'],
+      );
+
+      final KnowledgeContact after = contactForName(
+        existing: <KnowledgeContact>[before],
+        name: '张三',
+        packageName: 'com.tencent.mm',
+        appName: '',
+        now: DateTime.utc(2026),
+      );
+
+      expect(identical(after, before), isTrue);
     });
   });
 
@@ -673,11 +831,16 @@ ChatUiSnapshot snapshot(String text, {bool reviewed = false, String? note}) =>
 ModelSettings ready() => ModelSettings.defaults().copyWith(replyKey: 'secret');
 
 /// Drives a whole-frame capture through to the review state.
+///
+/// Seeded with an identified conversation first: a capture names the person
+/// only through the review (ADR-0030), so the transitions these tests exercise
+/// must not trip over the identity gate on the way.
 void captureInto(
   ConversationEngine engine,
   CaptureFrame frame,
   List<OcrLine> lines,
 ) {
+  engine.apply(SnapshotPushed(snapshot('在吗')));
   engine.apply(const CommandReceived(ConversationCommandKind.recogniseOnce));
   engine.apply(FrameCaptured(frame));
   engine.apply(

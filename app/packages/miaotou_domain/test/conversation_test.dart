@@ -4,23 +4,30 @@ import 'package:test/test.dart';
 
 /// The panel's identity and read-only rules, ported from ADR-0002 — which was
 /// written against Android because Android was the only port that had the
-/// problem. The expectations below are Android's own, from
-/// `ConversationRefTest.kt` and `ChatModels.displayLabel()`, so a unification
-/// that drops one of them goes red here rather than on a device.
+/// problem. The expectations below are Android's own, so a unification that
+/// drops one of them goes red here rather than on a device.
 ///
 /// ADR-0026 revised the fallback: an app with no resolved display name now
-/// shows its package name rather than a placeholder, so a header is never empty
+/// shows its package name rather than a placeholder, so a label is never empty
 /// while a window is in front. Only NONE (no window) drops to the placeholder.
+///
+/// ADR-0028 moved *who resolves* the name: it arrives on the reference, already
+/// resolved by the port that owns the platform, so these tests supply it the way
+/// Android's `ChatApps.displayName` would rather than handing a resolver to
+/// [derivePanel]. It also made the header able to name the app before there is
+/// any analysis — the group at the bottom is that rule.
 void main() {
-  const ConversationRef qq = ConversationRef(packageName: 'com.tencent.mobileqq');
-  const ConversationRef wechat = ConversationRef(packageName: 'com.tencent.mm');
-  const ConversationRef stranger = ConversationRef(packageName: 'com.example.unknown');
-
-  /// Android's `ChatApps.displayName`: null is a real answer, not a failure.
-  String? appName(ConversationRef reference) => <String, String>{
-        'com.tencent.mobileqq': 'QQ',
-        'com.tencent.mm': '微信',
-      }[reference.packageName];
+  const ConversationRef qq = ConversationRef(
+    packageName: 'com.tencent.mobileqq',
+    appName: 'QQ',
+  );
+  const ConversationRef wechat = ConversationRef(
+    packageName: 'com.tencent.mm',
+    appName: '微信',
+  );
+  const ConversationRef stranger = ConversationRef(
+    packageName: 'com.example.unknown',
+  );
 
   Advice adviceWith(List<Candidate> candidates) => Advice(
         support: '.',
@@ -42,8 +49,11 @@ void main() {
   group('naming a conversation', () {
     test('both halves known', () {
       final ConversationLabel label = ConversationLabel.of(
-        const ConversationRef(packageName: 'com.tencent.mm', title: '张三'),
-        appName: '微信',
+        const ConversationRef(
+          packageName: 'com.tencent.mm',
+          appName: '微信',
+          title: '张三',
+        ),
       );
       expect(label.kind, ConversationLabelKind.appAndTitle);
       expect(label.appName, '微信');
@@ -74,8 +84,9 @@ void main() {
     });
 
     test('the app is named but the title could not be read', () {
-      // Android's own case: `QQ · 未知应用`.
-      final ConversationLabel label = ConversationLabel.of(qq, appName: appName(qq));
+      // Android's own case: `QQ · 未知人` — the app half is known, the person is
+      // not. This is not the placeholder 未知应用, which is reserved for NONE.
+      final ConversationLabel label = ConversationLabel.of(qq);
       expect(label.kind, ConversationLabelKind.appOnly);
       expect(label.appName, 'QQ');
       expect(label.title, isNull);
@@ -87,8 +98,11 @@ void main() {
       // a null title — a transient placeholder is not a name anyone can confirm
       // a fill against.
       final ConversationLabel label = ConversationLabel.of(
-        const ConversationRef(packageName: 'com.tencent.mobileqq', title: '   '),
-        appName: 'QQ',
+        const ConversationRef(
+          packageName: 'com.tencent.mobileqq',
+          appName: 'QQ',
+          title: '   ',
+        ),
       );
       expect(label.kind, ConversationLabelKind.appOnly);
       expect(label.title, isNull);
@@ -122,7 +136,6 @@ void main() {
         analysed: const ConversationRef(packageName: 'com.tencent.mm', title: '张三'),
         live: const ConversationRef(packageName: 'com.tencent.mm', title: '张三'),
         advice: adviceWith(<Candidate>[one]),
-        appName: appName,
       );
       expect(view.status, PanelStatus.viewing);
       expect(view.readOnly, isFalse);
@@ -139,7 +152,6 @@ void main() {
         analysed: const ConversationRef(packageName: 'com.tencent.mm', title: '张三'),
         live: const ConversationRef(packageName: 'com.tencent.mobileqq', title: '李四'),
         advice: adviceWith(<Candidate>[one]),
-        appName: appName,
       );
       expect(view.status, PanelStatus.browsingReadOnly);
       expect(view.readOnly, isTrue);
@@ -159,13 +171,11 @@ void main() {
         analysed: const ConversationRef(packageName: 'com.tencent.mm', title: '张三'),
         live: const ConversationRef(packageName: 'com.tencent.mm', title: '张三'),
         advice: adviceWith(<Candidate>[one]),
-        appName: appName,
       );
       final PanelView whenBrowsing = derivePanel(
         analysed: const ConversationRef(packageName: 'com.tencent.mm', title: '张三'),
         live: const ConversationRef(packageName: 'com.tencent.mobileqq', title: '李四'),
         advice: adviceWith(<Candidate>[one]),
-        appName: appName,
       );
       expect(whenCurrent.allows(PanelAction.reanalyse), isTrue);
       expect(whenCurrent.allows(PanelAction.analyseCurrent), isFalse);
@@ -178,7 +188,6 @@ void main() {
         analysed: null,
         live: wechat,
         advice: null,
-        appName: appName,
       );
       expect(view.status, PanelStatus.notAnalysed);
       expect(view.readOnly, isFalse,
@@ -196,7 +205,6 @@ void main() {
         analysed: wechat,
         live: wechat,
         advice: adviceWith(<Candidate>[one]),
-        appName: appName,
       );
       expect(view.analysed.kind, ConversationLabelKind.appOnly);
       expect(view.allows(PanelAction.fill), isFalse);
@@ -210,7 +218,6 @@ void main() {
         analysed: const ConversationRef(packageName: 'com.tencent.mm', title: '张三'),
         live: const ConversationRef(packageName: 'com.tencent.mm', title: '张三'),
         advice: adviceWith(const <Candidate>[]),
-        appName: appName,
       );
       expect(view.allows(PanelAction.fill), isFalse);
       expect(view.allows(PanelAction.copy), isTrue,
@@ -223,10 +230,82 @@ void main() {
         analysed: wechat,
         live: wechat,
         advice: null,
-        appName: appName,
         note: 'OCR 无法判断说话人',
       );
       expect(view.note, 'OCR 无法判断说话人');
+    });
+  });
+
+  /// ADR-0028. The header used to print [PanelView.analysed] and nothing else,
+  /// which on Android meant it printed 未知应用 for every application this build
+  /// has no adapter for — Douyin — because without an adapter there is no tree
+  /// reading, therefore no analysis, therefore never a name. The header now
+  /// names the app in front (抖音) while the person half is still 未知人.
+  group('what the header names', () {
+    test('the app in front, before there is any analysis', () {
+      const ConversationRef douyin = ConversationRef(
+        packageName: 'com.ss.android.ugc.aweme',
+        appName: '抖音',
+      );
+      final PanelView view = derivePanel(
+        analysed: ConversationRef.none,
+        live: douyin,
+        advice: null,
+      );
+
+      expect(view.header.kind, ConversationLabelKind.appOnly);
+      expect(view.header.appName, '抖音');
+      expect(view.status, PanelStatus.notAnalysed);
+    });
+
+    test('the conversation the panel is about, once there is one', () {
+      // While read-only the two halves disagree, and the header keeps saying
+      // which conversation the drafts below it belong to; the badge and the
+      // banner are what qualify it.
+      const ConversationRef douyin = ConversationRef(
+        packageName: 'com.ss.android.ugc.aweme',
+        appName: '抖音',
+      );
+      const ConversationRef zhang = ConversationRef(
+        packageName: 'com.tencent.mm',
+        appName: '微信',
+        title: '张三',
+      );
+      final PanelView view = derivePanel(
+        analysed: zhang,
+        live: douyin,
+        advice: adviceWith(<Candidate>[one]),
+      );
+
+      expect(view.header.appName, '微信');
+      expect(view.header.title, '张三');
+      expect(view.live.appName, '抖音');
+      expect(view.readOnly, isTrue);
+    });
+
+    test('nothing known on either side is still the placeholder', () {
+      final PanelView view = derivePanel(
+        analysed: ConversationRef.none,
+        live: ConversationRef.none,
+        advice: null,
+      );
+
+      expect(view.header.kind, ConversationLabelKind.unrecognised);
+    });
+
+    test('a package the system could not name is still named by its package', () {
+      // ADR-0026 standing, ADR-0028 carrying it: the name is resolved on the
+      // platform, and a port with no answer leaves the package to speak for
+      // itself — which is what 「抖音」 degrades to on a build whose manifest
+      // cannot see other apps.
+      final PanelView view = derivePanel(
+        analysed: ConversationRef.none,
+        live: stranger,
+        advice: null,
+      );
+
+      expect(view.header.kind, ConversationLabelKind.appOnly);
+      expect(view.header.appName, 'com.example.unknown');
     });
   });
 

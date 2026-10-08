@@ -1,6 +1,7 @@
 import 'package:miaotou_capabilities/miaotou_capabilities.dart';
 
 import 'advice.dart';
+import 'conversation.dart';
 import 'conversation_note.dart';
 import 'manual_recognition.dart';
 import 'model_settings.dart';
@@ -152,7 +153,11 @@ final class ConversationEngine {
       case ConversationCommandKind.openReview:
         return _onOpenReview();
       case ConversationCommandKind.confirmTranscript:
-        return _onConfirmTranscript(event.lines ?? const <ChatLine>[]);
+        return _onConfirmTranscript(
+          event.lines ?? const <ChatLine>[],
+          title: event.title,
+          appName: event.appName,
+        );
       case ConversationCommandKind.cancelReview:
         return _onCancelReview();
     }
@@ -198,12 +203,23 @@ final class ConversationEngine {
   /// beside it: the next analysis is gated on this confirmation, so a
   /// confirmation that left the old transcript in place would be a dialog.
   ///
+  /// The title and the app name the user entered are read the same way: a
+  /// non-empty entry replaces the platform's own (or supplies the half the
+  /// platform could not read at all — ADR-0030), and an empty entry leaves the
+  /// platform's value where there was one. The confirmed identity rides the
+  /// batch forward, so the round that follows is about the conversation the
+  /// user just named.
+  ///
   /// The source does not change. A batch read off a screenshot is still a batch
   /// read off a screenshot after a person has corrected it, so the lines keep
   /// their provenance and the model keeps being told where they came from
   /// (ADR-0022 decision 4). The note does change, because the old one asked the
   /// user to check the sides and the user just did.
-  List<ConversationEffect> _onConfirmTranscript(List<ChatLine> lines) {
+  List<ConversationEffect> _onConfirmTranscript(
+    List<ChatLine> lines, {
+    String? title,
+    String? appName,
+  }) {
     final PanelBatch? batch = state.latest;
     if (batch == null) {
       return const <ConversationEffect>[];
@@ -219,9 +235,18 @@ final class ConversationEngine {
     if (kept.isEmpty) {
       return const <ConversationEffect>[];
     }
+    final ConversationRef conversation = ConversationRef(
+      packageName: batch.snapshot.conversation.packageName,
+      appName: (appName == null || appName.trim().isEmpty)
+          ? batch.snapshot.conversation.appName
+          : appName.trim(),
+      title: (title == null || title.trim().isEmpty)
+          ? batch.snapshot.conversation.title
+          : title.trim(),
+    );
     state.latest = PanelBatch(
       snapshot: ChatUiSnapshot(
-        conversation: batch.snapshot.conversation,
+        conversation: conversation,
         lines: kept,
         capturedAt: batch.snapshot.capturedAt,
         reviewed: true,
@@ -230,13 +255,20 @@ final class ConversationEngine {
       note: const CopyNote(NoteCode.reviewed),
     );
     _publish(
-      analysed: batch.snapshot.conversation,
-      live: batch.snapshot.conversation,
+      analysed: conversation,
+      live: conversation,
       note: state.latest!.note,
       transcript: kept,
       reviewing: false,
     );
-    return const <ConversationEffect>[];
+    return <ConversationEffect>[
+      PersistIdentity(
+        title: conversation.title ?? '',
+        packageName: conversation.packageName,
+        appName: conversation.appName ?? '',
+        lines: kept,
+      ),
+    ];
   }
 
   /// Throws the batch away instead of confirming it (ADR-0022 decision 11).
@@ -359,7 +391,13 @@ final class ConversationEngine {
     }
     state.latest = PanelBatch(
       snapshot: ChatUiSnapshot(
-        conversation: state.latest?.snapshot.conversation ?? ConversationRef.none,
+        // The conversation the capture is about is the one in front of the user,
+        // not the last batch: a capture names the app it photographed, and the
+        // last read (`state.live`) is the platform's word for what is in front.
+        // Falling back to `none` is what used to make the review always ask for
+        // the application by hand, even though the service had already named it.
+        conversation:
+            state.live ?? state.latest?.snapshot.conversation ?? ConversationRef.none,
         lines: capture.lines,
         capturedAt: event.at,
       ),
@@ -483,6 +521,23 @@ final class ConversationEngine {
         : PanelBatch.of(read, source: pushedByTree);
     if (batch == null || batch.snapshot.lines.isEmpty) {
       _publish(note: const CopyNote(NoteCode.noConversation));
+      return _endRound();
+    }
+    // ADR-0030: a round runs only once both halves of the conversation are
+    // named — the application and the person. The application is named when it
+    // has a package *or* a name the review supplied (a port with no tree cannot
+    // read either, and the user enters the name by hand); the person is named
+    // when the title is read. The review supplies the missing halves, so an
+    // unnamed one here is the review not having been done, and the way out is
+    // the review itself.
+    if (ConversationLabel.of(batch.snapshot.conversation).kind !=
+        ConversationLabelKind.appAndTitle) {
+      _publish(
+        note: const CopyNote(
+          NoteCode.identityIncomplete,
+          remedy: AskReview(),
+        ),
+      );
       return _endRound();
     }
     round.batch = batch;
@@ -882,6 +937,30 @@ final class InjectText extends ConversationEffect {
   final String text;
 }
 
+/// Remember the identity a review confirmed, into the knowledge base (ADR-0030).
+///
+/// The person half becomes a contact (merged by name, not duplicated), and an
+/// application name entered with no package behind it is stored under the name
+/// itself as the key. What to write is the runtime's call — the engine only
+/// reports the identity that was confirmed and lets the implementation decide
+/// which halves are worth keeping.
+final class PersistIdentity extends ConversationEffect {
+  const PersistIdentity({
+    required this.title,
+    required this.packageName,
+    required this.appName,
+    this.lines = const <ChatLine>[],
+  });
+
+  final String title;
+  final String packageName;
+  final String appName;
+
+  /// The confirmed lines, so the runtime can append this round's history to the
+  /// contact instead of only remembering who they are.
+  final List<ChatLine> lines;
+}
+
 /// Something that happened, as the engine sees it.
 sealed class ConversationEvent {
   const ConversationEvent();
@@ -937,6 +1016,8 @@ final class CommandReceived extends ConversationEvent {
     this.text,
     this.permission,
     this.lines,
+    this.title,
+    this.appName,
   });
 
   final ConversationCommandKind kind;
@@ -955,6 +1036,14 @@ final class CommandReceived extends ConversationEvent {
   /// "an empty batch" — the latter is refused by the panel, which disables the
   /// button rather than sending it.
   final List<ChatLine>? lines;
+
+  /// The thread title the user entered, for [ConversationCommandKind.
+  /// confirmTranscript]. Null or blank means "leave the platform's reading".
+  final String? title;
+
+  /// The application name the user entered, for [ConversationCommandKind.
+  /// confirmTranscript]. Null or blank means "leave the platform's reading".
+  final String? appName;
 }
 
 /// One thing the panel is asking for, in this package's own words.
@@ -1074,4 +1163,95 @@ final class InjectionResolved extends ConversationEvent {
 
   /// Whether the text was seen where it was supposed to land.
   final bool verified;
+}
+
+/// The contact a confirmed name belongs to, merged rather than duplicated.
+///
+/// A name the knowledge base already holds — matched case-insensitively against
+/// a contact's `name` — gains the new package instead of becoming a second
+/// contact for the same person. A name it does not hold becomes a new contact
+/// keyed by a timestamp id. The aliases and every other field the existing
+/// contact carried are kept: only the package list (and its display name) change
+/// (ADR-0030).
+KnowledgeContact contactForName({
+  required List<KnowledgeContact> existing,
+  required String name,
+  required String packageName,
+  required String appName,
+  required DateTime now,
+}) {
+  final String wanted = name.trim();
+  for (final KnowledgeContact contact in existing) {
+    if (contact.name.trim().toLowerCase() != wanted.toLowerCase()) {
+      continue;
+    }
+    if (packageName.isEmpty || contact.packageNames.contains(packageName)) {
+      return _withAppName(contact, packageName, appName, now);
+    }
+    return _withAppName(
+      KnowledgeContact(
+        id: contact.id,
+        name: contact.name,
+        updatedAt: now,
+        aliases: contact.aliases,
+        packageNames: <String>[...contact.packageNames, packageName],
+        packageAppNames: contact.packageAppNames,
+        relationship: contact.relationship,
+        notes: contact.notes,
+        stage: contact.stage,
+        goal: contact.goal,
+        autoSummary: contact.autoSummary,
+      ),
+      packageName,
+      appName,
+      now,
+    );
+  }
+  return _withAppName(
+    KnowledgeContact(
+      id: 'contact-${now.microsecondsSinceEpoch}',
+      name: wanted,
+      updatedAt: now,
+      packageNames: packageName.isEmpty
+          ? const <String>[]
+          : <String>[packageName],
+    ),
+    packageName,
+    appName,
+    now,
+  );
+}
+
+/// Records [appName] against [packageName] when both are present, leaving the
+/// contact untouched otherwise. The display name rides beside the package so the
+/// knowledge base groups by what a person reads rather than the id.
+KnowledgeContact _withAppName(
+  KnowledgeContact contact,
+  String packageName,
+  String appName,
+  DateTime now,
+) {
+  final String trimmedApp = appName.trim();
+  if (packageName.isEmpty || trimmedApp.isEmpty) {
+    return contact;
+  }
+  if (contact.packageAppNames[packageName] == trimmedApp) {
+    return contact;
+  }
+  return KnowledgeContact(
+    id: contact.id,
+    name: contact.name,
+    updatedAt: now,
+    aliases: contact.aliases,
+    packageNames: contact.packageNames,
+    packageAppNames: <String, String>{
+      ...contact.packageAppNames,
+      packageName: trimmedApp,
+    },
+    relationship: contact.relationship,
+    notes: contact.notes,
+    stage: contact.stage,
+    goal: contact.goal,
+    autoSummary: contact.autoSummary,
+  );
 }

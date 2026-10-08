@@ -112,6 +112,7 @@ void main() {
     );
     const ConversationRef conversation = ConversationRef(
       packageName: 'com.ss.android.lark',
+      appName: '飞书',
       title: '另一个会话',
     );
 
@@ -120,13 +121,19 @@ void main() {
       const AndroidConversationEvent(
         current: conversation,
         bound: null,
-        displayLabel: '另一个会话',
         readOnly: true,
       ),
     );
 
     final ChatUiSnapshot snapshot = await pushed;
     expect(snapshot.conversation, conversation);
+    expect(
+      snapshot.conversation.appName,
+      '飞书',
+      reason:
+          'the service resolves the name while it has the Context and the '
+          'reference carries it across (ADR-0028)',
+    );
     expect(snapshot.lines, isEmpty);
     await events.close();
   });

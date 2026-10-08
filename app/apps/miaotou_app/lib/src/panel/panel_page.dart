@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:miaotou_capabilities/miaotou_capabilities.dart'
-    show PermissionKind, Speaker;
+    show ConversationRef, PermissionKind, Speaker;
 import 'package:miaotou_domain/miaotou_domain.dart';
 
 import '../design/colors.dart';
@@ -17,12 +17,14 @@ import 'review_session.dart';
 
 /// The conversation label as the header prints it, built out of copy.
 ///
-/// Four branches and not one interpolation, because the fallbacks are the rule:
-/// a thread whose title could not be read is named after the app (its display
-/// name or, failing that, its package name — ADR-0026), and a conversation we
-/// know nothing about is the placeholder alone. The domain decides *which*
-/// branch ([ConversationLabelKind]); only the words live in [AppCopy].
+/// A conversation is the app plus the person (ADR-0028): 「抖音 · 张三」. The
+/// four branches are one decision each because the fallbacks are the rule — an
+/// app we know but a person whose title could not be read is 「抖音 · 未知人」
+/// (never 未知应用, which now means "no window in front" and nothing else). The
+/// domain decides *which* branch ([ConversationLabelKind]); only the words live
+/// in [AppCopy].
 String panelLabelText(AppCopy copy, ConversationLabel label) {
+  final String unknownPerson = copy.text(CopyKey.panelLabelUnknownPerson);
   final String unrecognised = copy.text(CopyKey.panelLabelUnrecognised);
   return switch (label.kind) {
     ConversationLabelKind.appAndTitle => _fill(
@@ -37,7 +39,7 @@ String panelLabelText(AppCopy copy, ConversationLabel label) {
     ConversationLabelKind.appOnly => _fill(
       copy.text(CopyKey.panelLabelPair),
       app: label.appName!,
-      title: unrecognised,
+      title: unknownPerson,
     ),
     ConversationLabelKind.unrecognised => unrecognised,
   };
@@ -73,8 +75,8 @@ String _fill(String template, {String app = '', String title = ''}) =>
 /// application is in front, because asking would put a second source of truth
 /// beside the main window's — which is the drift ADR-0002 decision 2 exists to
 /// prevent. It derives read-only from the two refs in the frame, exactly as that
-/// decision says the view should, and it resolves a package to a name using the
-/// map the frame brought.
+/// decision says the view should, and the app's display name is already on each
+/// ref (ADR-0028), so nothing here resolves a package either.
 ///
 /// ADR-0012 gives the panel a window of its own; until #18 and #21 create it,
 /// the gallery hosts this so it is not dead code.
@@ -120,6 +122,15 @@ class _PanelPageState extends State<PanelPage> {
   /// here.
   final TextEditingController _reviewController = TextEditingController();
   final FocusNode _reviewFocus = FocusNode();
+
+  /// The person's name and the application's name, as the review collects them
+  /// (ADR-0030). Seeded from the conversation once, then the user's to edit.
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _appNameController = TextEditingController();
+  bool _identitySeeded = false;
+
+  /// What the confirm button said the last time a required half was missing.
+  String? _identityError;
 
   /// The review's rules, built on the first frame that can read the copy.
   ///
@@ -172,12 +183,59 @@ class _PanelPageState extends State<PanelPage> {
     if (block != null) {
       _reviewController.text = block;
     }
+    _seedIdentity();
   }
+
+  /// Fills the identity fields from the conversation the review is about, once.
+  ///
+  /// Seeded on the first frame that enters the review and never again: a later
+  /// frame republishes the same batch, and overwriting the fields then would
+  /// wipe what the user just typed under their hands. What the platform already
+  /// read (the title, the application's name) is pre-filled; what it could not
+  /// is left empty for the user to supply (ADR-0030).
+  void _seedIdentity() {
+    if (_identitySeeded) {
+      return;
+    }
+    final ConversationRef ref = widget.frame.analysed;
+    final String? title = ref.title?.trim();
+    if (title != null && title.isNotEmpty) {
+      _titleController.text = title;
+    }
+    // The app half is whatever names it: the resolved display name or, failing
+    // that, the bare package name (ADR-0026). Pre-filled once, and read-only
+    // when the platform named it at all — see [_appIsNamed].
+    final String? appName = _resolvedAppName(ref);
+    if (appName != null) {
+      _appNameController.text = appName;
+    }
+    _identitySeeded = true;
+  }
+
+  /// What names the app half of the review: the platform's display name, or the
+  /// bare package name when the system could not name it (ADR-0026). Null only
+  /// when even the package is unknown — the one case the field is left for the
+  /// user to fill (ADR-0030).
+  String? _resolvedAppName(ConversationRef ref) {
+    final String? displayName = ref.appName?.trim();
+    if (displayName != null && displayName.isNotEmpty) {
+      return displayName;
+    }
+    final String package = ref.packageName.trim();
+    return package.isEmpty ? null : package;
+  }
+
+  /// True when the platform already named the application — a display name or a
+  /// bare package — so the field must not be editable (ADR-0030 decision 2: the
+  /// user fills it only when the platform could not name the app at all).
+  bool get _appIsNamed => _resolvedAppName(widget.frame.analysed) != null;
 
   @override
   void dispose() {
     _reviewController.dispose();
     _reviewFocus.dispose();
+    _titleController.dispose();
+    _appNameController.dispose();
     super.dispose();
   }
 
@@ -195,7 +253,6 @@ class _PanelPageState extends State<PanelPage> {
       analysed: widget.frame.analysed,
       live: widget.frame.live,
       advice: widget.frame.advice,
-      appName: widget.frame.appNameFor,
       note: widget.frame.note?.text,
     );
     final Advice? advice = view.advice;
@@ -387,7 +444,7 @@ class _PanelPageState extends State<PanelPage> {
                   children: <Widget>[
                     Flexible(
                       child: Text(
-                        panelLabelText(copy, view.analysed),
+                        panelLabelText(copy, view.header),
                         style: theme.textTheme.bodySmall,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -644,6 +701,51 @@ class _PanelPageState extends State<PanelPage> {
             ],
           ),
           AppSpacing.gapXs,
+          // The identity the review confirms, before the block it edits
+          // (ADR-0030): a conversation is the application plus the person, and
+          // the analysis is gated on both. The person is always the user's to
+          // fill; the application is asked for only when the platform could not
+          // name it at all — once it is named, there is no field to type in.
+          TextField(
+            key: const Key('panel-review-title'),
+            controller: _titleController,
+            textAlignVertical: TextAlignVertical.top,
+            style: theme.textTheme.bodySmall,
+            onChanged: (_) => setState(() => _identityError = null),
+            onTapOutside: (_) => _releaseInputFocus(),
+            decoration: InputDecoration(
+              isDense: true,
+              labelText: copy.text(CopyKey.panelReviewPersonLabel),
+              border: const OutlineInputBorder(),
+            ),
+          ),
+          if (!_appIsNamed) ...<Widget>[
+            AppSpacing.gapXs,
+            TextField(
+              key: const Key('panel-review-app'),
+              controller: _appNameController,
+              textAlignVertical: TextAlignVertical.top,
+              style: theme.textTheme.bodySmall,
+              onChanged: (_) => setState(() => _identityError = null),
+              onTapOutside: (_) => _releaseInputFocus(),
+              decoration: InputDecoration(
+                isDense: true,
+                labelText: copy.text(CopyKey.panelReviewAppLabel),
+                border: const OutlineInputBorder(),
+              ),
+            ),
+          ],
+          if (_identityError != null)
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.xs),
+              child: Text(
+                _identityError!,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.error,
+                ),
+              ),
+            ),
+          AppSpacing.gapXs,
           // The block grows with its content and the panel body scrolls it; there
           // is no `Expanded` here because the body already sits inside a
           // `SingleChildScrollView` whose height is unbounded.
@@ -773,16 +875,35 @@ class _PanelPageState extends State<PanelPage> {
     ),
   );
 
-  /// Sends the block up as the user left it.
+  /// Sends the block up as the user left it, after the identity is complete.
   ///
   /// The command and the confirm button's own enablement read the same door
   /// ([ReviewSession.lines]), so the batch cannot arrive empty on the one frame
-  /// the button said it would not (ADR-0025 decision 15).
+  /// the button said it would not (ADR-0025 decision 15). ADR-0030 adds a second
+  /// door before it: the person must be named, and the application too when the
+  /// platform could not name it at all — otherwise the round behind the next
+  /// button would refuse, so the refusal is said here, at the moment it can be
+  /// fixed.
   void _confirmReview() {
+    final String title = _titleController.text.trim();
+    final String appName = _appNameController.text.trim();
+    final bool missingTitle = title.isEmpty;
+    final bool missingApp = !_appIsNamed && appName.isEmpty;
+    if (missingTitle || missingApp) {
+      setState(() {
+        _identityError = missingTitle
+            ? CopyScope.of(context).text(CopyKey.panelReviewPersonRequired)
+            : CopyScope.of(context).text(CopyKey.panelReviewAppRequired);
+      });
+      return;
+    }
+    setState(() => _identityError = null);
     widget.onCommand(
       PanelCommand(
         PanelCommandKind.confirmTranscript,
         lines: _review.lines(_reviewController.text),
+        title: title.isEmpty ? null : title,
+        appName: appName.isEmpty ? null : appName,
       ),
     );
   }

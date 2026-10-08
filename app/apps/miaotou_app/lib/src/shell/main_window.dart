@@ -103,7 +103,10 @@ class _MainWindowShellState extends State<MainWindowShell> {
       case ShellDestination.trend:
         return TrendPage(content: widget.content);
       case ShellDestination.knowledge:
-        return KnowledgePage(content: widget.content);
+        return KnowledgePage(
+          store: widget.session.capabilities.knowledgeStore,
+          payload: widget.session.capabilities.sharedPayload,
+        );
       case ShellDestination.settings:
         return SettingsPage(
           onOpen: _open,

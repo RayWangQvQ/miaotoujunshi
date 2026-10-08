@@ -13,17 +13,22 @@ final class AndroidSnapshotEvent extends AndroidIngestEvent {
   final ChatUiSnapshot snapshot;
 }
 
+/// The service saw the foreground application change, and this is whose
+/// conversation it is now.
+///
+/// It carries the reference and nothing a screen would print: the label's
+/// fallback order is the domain's rule, and the service's job is only to have
+/// resolved the app's *display name* onto the reference while it had the
+/// `Context` to ask with (ADR-0028).
 final class AndroidConversationEvent extends AndroidIngestEvent {
   const AndroidConversationEvent({
     required this.current,
     required this.bound,
-    required this.displayLabel,
     required this.readOnly,
   });
 
   final ConversationRef current;
   final ConversationRef? bound;
-  final String displayLabel;
 
   /// Computed by the accessibility service. The panel must only render it.
   final bool readOnly;
@@ -202,7 +207,6 @@ final class MethodChannelAndroidIngestNative implements AndroidIngestNative {
         bound: raw['bound'] == null
             ? null
             : _decodeConversation(_map(raw['bound'], 'bound')),
-        displayLabel: _string(raw, 'displayLabel'),
         readOnly: raw['readOnly'] == true,
       ),
       'captureError' => AndroidCaptureErrorEvent(
@@ -251,12 +255,14 @@ final class MethodChannelAndroidIngestNative implements AndroidIngestNative {
   static Map<String, Object?> _encodeConversation(ConversationRef ref) =>
       <String, Object?>{
         'packageName': ref.packageName,
+        if (ref.appName != null) 'appName': ref.appName,
         if (ref.title != null) 'title': ref.title,
       };
 
   static ConversationRef _decodeConversation(Map<Object?, Object?> raw) =>
       ConversationRef(
         packageName: _string(raw, 'packageName'),
+        appName: _nullableString(raw, 'appName'),
         title: _nullableString(raw, 'title'),
       );
 

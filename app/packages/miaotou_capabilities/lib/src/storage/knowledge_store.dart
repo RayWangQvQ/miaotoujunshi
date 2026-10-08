@@ -42,6 +42,7 @@ final class KnowledgeContact {
     required this.updatedAt,
     this.aliases = const <String>[],
     this.packageNames = const <String>[],
+    this.packageAppNames = const <String, String>{},
     this.relationship = '',
     this.notes = '',
     this.stage = '',
@@ -58,6 +59,12 @@ final class KnowledgeContact {
 
   /// Package names this contact has been seen in, e.g. `com.tencent.mm`.
   final List<String> packageNames;
+
+  /// Display name for each package in [packageNames], e.g.
+  /// `com.ss.android.ugc.aweme` → `抖音`. A package without an entry shows its
+  /// bare package name. Kept beside the packages so the knowledge base can group
+  /// by the name a person reads rather than the id the platform reports.
+  final Map<String, String> packageAppNames;
 
   final String relationship;
   final String notes;
@@ -124,6 +131,18 @@ abstract interface class KnowledgeStore {
   Future<void> saveContact(KnowledgeContact contact);
 
   Future<void> deleteContact(String id);
+
+  /// Records a display name under [key].
+  ///
+  /// [key] is the package name when one is known, and the user's own entry when
+  /// it is not (ADR-0030): a package the system cannot name has nothing else to
+  /// be keyed by, and the name the user typed is the only stable handle left.
+  /// The read side is not wired to the platform's name resolution yet — the
+  /// mapping is stored so a later port can ask for it, and nothing displays it.
+  Future<void> saveAppName(String key, String displayName);
+
+  /// The display name recorded under [key], or null when there is none.
+  Future<String?> appNameFor(String key);
 
   /// Appends lines to one contact's history, oldest first. Whether a line is
   /// worth keeping is the caller's decision.

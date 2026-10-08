@@ -4,6 +4,8 @@ import android.app.Activity
 import android.content.Context
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.os.Handler
+import android.os.Looper
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -55,8 +57,26 @@ internal class AndroidOverlayHost(
     /** Whether the panel is currently drawn as nothing for a screenshot. */
     private var hiddenForCapture = false
 
+    /**
+     * What a window does when its engine never reaches Dart.
+     *
+     * The window exists whether or not the panel engine does, so a dead engine is
+     * invisible rather than absent: `isVisible=true`, `mDrawState=HAS_DRAWN`, the
+     * touch region at (12dp, 56dp) still live, and the platform's freezer still
+     * skipping this process because it "has floating or onScreen window". The
+     * user sees a missing ball and nothing in a log. See [PanelReadiness].
+     */
+    private val readiness = PanelReadiness()
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var watchdog: Runnable? = null
+
+    /** The arguments of the last [show], so a rebuilt window lands where the old one did. */
+    private var lastArguments: Map<*, *>? = null
+
     fun show(arguments: Map<*, *>) {
+        lastArguments = arguments
         ensurePanel()
+        watchForReadiness()
         val window = params ?: createParams(arguments).also { params = it }
         place(window, arguments)
         if (visible) {
@@ -165,7 +185,52 @@ internal class AndroidOverlayHost(
         }
     }
 
+    /**
+     * Starts the countdown that turns "the engine never reached Dart" into an
+     * action, once per window.
+     *
+     * A panel that is already talking is left alone, and a countdown already
+     * running is not restarted: [show] is called again on every placement change
+     * and on [restore], and resetting the timer there would let a window that
+     * keeps being poked stay broken forever.
+     */
+    private fun watchForReadiness() {
+        if (panelReady || watchdog != null) {
+            return
+        }
+        val check = Runnable { onReadinessTimeout() }
+        watchdog = check
+        mainHandler.postDelayed(check, readiness.timeoutMs)
+    }
+
+    private fun cancelWatchdog() {
+        watchdog?.let { mainHandler.removeCallbacks(it) }
+        watchdog = null
+    }
+
+    /**
+     * The engine never said hello. Burn it and start another, or stop.
+     *
+     * Stopping matters as much as retrying: the window is dropped and no budget
+     * is left, so a failing engine cannot leave an invisible touch-eater behind
+     * and cannot loop. The user is left with no ball, which is at least a fact
+     * they can act on by relaunching.
+     */
+    private fun onReadinessTimeout() {
+        watchdog = null
+        if (panelReady) {
+            return
+        }
+        val arguments = lastArguments
+        val wasVisible = visible
+        destroy()
+        if (wasVisible && arguments != null && readiness.canStartAgain) {
+            show(arguments)
+        }
+    }
+
     fun destroy() {
+        cancelWatchdog()
         if (visible) {
             windowManager.removeViewImmediate(container)
             visible = false
@@ -177,12 +242,24 @@ internal class AndroidOverlayHost(
         panelProtocol = null
         engine?.destroy()
         engine = null
+        // The next engine starts from scratch, and so do the three facts below:
+        // they describe the engine that just died, while `params` outlives it and
+        // would otherwise hand a rebuilt window a transparent, untouchable
+        // surface left behind by [hideForCapture].
+        panelReady = false
+        hiddenForCapture = false
+        params?.let { window ->
+            window.alpha = 1f
+            window.flags =
+                window.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
+        }
     }
 
     private fun ensurePanel() {
         if (engine != null) {
             return
         }
+        readiness.start()
         val panelEngine = engineGroup.createAndRunEngine(
             FlutterEngineGroup.Options(context)
                 .setDartEntrypoint(DartExecutor.DartEntrypoint.createDefault())
@@ -213,6 +290,10 @@ internal class AndroidOverlayHost(
                     when (call.method) {
                         "panelReady" -> {
                             panelReady = true
+                            // The engine is alive, so the countdown and the
+                            // retry budget it guards both end here.
+                            cancelWatchdog()
+                            readiness.ready()
                             latestFrame?.let { channel.invokeMethod("frame", it) }
                             latestAppearance?.let {
                                 channel.invokeMethod("appearance", it)

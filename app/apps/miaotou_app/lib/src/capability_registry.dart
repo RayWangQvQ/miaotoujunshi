@@ -329,7 +329,6 @@ Future<void> _showPanel({
         advice: current.advice,
         note: panelShowFailureNote(failure, copy),
         transcript: current.transcript,
-        appNames: current.appNames,
         reviewing: current.reviewing,
       ),
     );

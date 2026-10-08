@@ -28,8 +28,9 @@ import 'package:miaotou_domain/miaotou_domain.dart';
 /// and who the user is looking at now — and derives read-only itself. A frame
 /// carrying pre-resolved labels would move that decision to the sender, and a
 /// frame carrying only labels could not derive anything at all. So the refs go
-/// down, and [PanelFrame.appNames] is how the package name becomes a name
-/// *before* the label is built: the panel never sees one to print.
+/// down, with the app's display name already on each one: the platform resolves
+/// a package to a name, the reference carries it, and the panel neither sees a
+/// package nor holds a resolver (ADR-0028).
 final class PanelFrame {
   const PanelFrame({
     required this.analysed,
@@ -37,7 +38,6 @@ final class PanelFrame {
     this.advice,
     this.note,
     this.transcript = const <PanelLine>[],
-    this.appNames = const <String, String>{},
     this.reviewing = false,
   });
 
@@ -75,13 +75,6 @@ final class PanelFrame {
   /// last thing that was photographed".
   final List<PanelLine> transcript;
 
-  /// Package name to display name, resolved by the side that owns the platform.
-  ///
-  /// A package left out of this map has no *resolved* name, which is a real
-  /// answer and drives the package-name fallback (ADR-0026). It is never a
-  /// reason to print a placeholder.
-  final Map<String, String> appNames;
-
   /// True while the panel is asking the user to read the batch and confirm it
   /// (ADR-0022).
   ///
@@ -91,10 +84,6 @@ final class PanelFrame {
   /// rather than left to the panel because "there is a transcript" is not the
   /// same question — a confirmed batch is still shown.
   final bool reviewing;
-
-  /// The resolver [derivePanel] wants, over this frame's map.
-  String? appNameFor(ConversationRef reference) =>
-      appNames[reference.packageName];
 }
 
 /// One line of that transcript.
@@ -291,6 +280,8 @@ final class PanelCommand {
     this.text,
     this.permission,
     this.lines,
+    this.title,
+    this.appName,
   });
 
   final PanelCommandKind kind;
@@ -317,12 +308,20 @@ final class PanelCommand {
   /// button rather than sending it.
   final List<PanelLine>? lines;
 
+  /// The thread title the user entered, for [PanelCommandKind.confirmTranscript].
+  final String? title;
+
+  /// The application name the user entered, for [PanelCommandKind.confirmTranscript].
+  final String? appName;
+
   @override
   String toString() =>
       'PanelCommand(${kind.name}${candidateIndex == null ? '' : ', $candidateIndex'}'
       '${text == null ? '' : ', edited'}'
       '${permission == null ? '' : ', ${permission!.name}'}'
-      '${lines == null ? '' : ', ${lines!.length} lines'})';
+      '${lines == null ? '' : ', ${lines!.length} lines'}'
+      '${title == null ? '' : ', title'}'
+      '${appName == null ? '' : ', appName'})';
 }
 
 /// The one seam between the two windows.

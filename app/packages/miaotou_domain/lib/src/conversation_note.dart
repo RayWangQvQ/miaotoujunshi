@@ -128,6 +128,11 @@ enum NoteCode {
   /// the application is usable and the one thing missing is a route.
   configureModels,
 
+  /// A round cannot run until the application and the person are both named.
+  /// The way out is the review, where the missing half is entered by hand
+  /// (ADR-0030).
+  identityIncomplete,
+
   /// A round threw something that is not the domain's own refusal.
   analysisFailed,
 

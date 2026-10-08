@@ -34,6 +34,7 @@ CopyKey copyKeyOf(NoteCode code) => switch (code) {
   NoteCode.reviewed => CopyKey.panelNoteReviewed,
   NoteCode.analysing => CopyKey.runtimeAnalysing,
   NoteCode.configureModels => CopyKey.runtimeConfigureModels,
+  NoteCode.identityIncomplete => CopyKey.runtimeIdentityIncomplete,
   NoteCode.analysisFailed => CopyKey.runtimeAnalysisFailed,
   NoteCode.copied => CopyKey.runtimeCopied,
   NoteCode.filled => CopyKey.runtimeFilled,
@@ -119,4 +120,6 @@ CommandReceived commandOf(PanelCommand command) => CommandReceived(
           for (final PanelLine line in command.lines!)
             ChatLine(speaker: line.speaker, text: line.text),
         ],
+  title: command.title,
+  appName: command.appName,
 );

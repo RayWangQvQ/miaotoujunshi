@@ -277,6 +277,8 @@ void main() {
             PanelLine(speaker: Speaker.me, text: '在吗'),
             PanelLine(speaker: Speaker.other, text: '在的'),
           ],
+          title: '张三',
+          appName: '抖音',
         ),
       );
       await _until(
@@ -410,20 +412,21 @@ void main() {
     panel.receive(const PanelCommand(PanelCommandKind.recogniseOnce));
     await _until(() => panel.current.reviewing);
 
-    // Asking for an analysis right here is what the user did, and it is refused
-    // — but the refusal now carries the way out instead of being a full stop
-    // (ADR-0022 decision 13).
+    // Asking for an analysis right here is refused, and the refusal carries the
+    // way out (ADR-0022 decision 13, and now ADR-0030: the person is not named
+    // yet either, so the identity gate answers first with the same way out).
     panel.receive(const PanelCommand(PanelCommandKind.reanalyse));
     await _until(() => panel.current.note?.remedy == const EnterReview());
     expect(
       panel.current.note?.text,
-      '当前对话全部待核对，请先确认说话人和原文，再生成回复',
-      reason: 'the refusal the report named, unchanged',
+      AppCopy.zh.text(CopyKey.runtimeIdentityIncomplete),
+      reason: 'a capture names the person only through the review (ADR-0030)',
     );
     expect(analysed, isNull);
 
-    // 「去核对」, and the user fixes the sides: 在的 was read as the other party
-    // and is their own.
+    // 「去核对」, and the user fixes the sides and names the person: 在的 was
+    // read as the other party and is their own, and the title the platform
+    // could not read is entered by hand.
     panel.receive(const PanelCommand(PanelCommandKind.openReview));
     await _until(() => panel.current.reviewing);
     panel.receive(
@@ -433,6 +436,8 @@ void main() {
           PanelLine(speaker: Speaker.me, text: '在吗'),
           PanelLine(speaker: Speaker.me, text: '在的'),
         ],
+        title: '张三',
+        appName: '抖音',
       ),
     );
     await _until(
@@ -502,6 +507,8 @@ void main() {
           PanelLine(speaker: Speaker.me, text: '在吗'),
           PanelLine(speaker: Speaker.me, text: '在的'),
         ],
+        title: '张三',
+        appName: '抖音',
       ),
     );
     await _until(

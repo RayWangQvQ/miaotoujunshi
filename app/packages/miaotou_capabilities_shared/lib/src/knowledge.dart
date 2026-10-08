@@ -58,6 +58,7 @@ final class KnowledgeLedger implements KnowledgeStore {
   static const String _notesKey = 'notes';
   static const String _contactsKey = 'contacts';
   static const String _logsKey = 'logs';
+  static const String _appNamesKey = 'appNames';
 
   final JsonDocument _file;
 
@@ -218,6 +219,28 @@ final class KnowledgeLedger implements KnowledgeStore {
   @override
   Future<void> clearAll() => _file.write(<String, Object?>{});
 
+  @override
+  Future<void> saveAppName(String key, String displayName) async {
+    final Map<String, Object?> contents = await _file.read();
+    final Map<String, Object?> appNames = _map(contents[_appNamesKey]);
+    await _file.write(<String, Object?>{
+      ...contents,
+      _appNamesKey: <String, Object?>{
+        ...appNames,
+        key: displayName,
+      },
+    });
+  }
+
+  @override
+  Future<String?> appNameFor(String key) async {
+    final Map<String, Object?> appNames = _map(
+      (await _file.read())[_appNamesKey],
+    );
+    final Object? value = appNames[key];
+    return value is String ? value : null;
+  }
+
   static String _normalise(String value) => value.trim().toLowerCase();
 
   /// Removes every row with this id, reporting whether there was one.
@@ -254,6 +277,7 @@ final class KnowledgeLedger implements KnowledgeStore {
         'updatedAt': contact.updatedAt.toUtc().toIso8601String(),
         'aliases': contact.aliases,
         'packageNames': contact.packageNames,
+        'packageAppNames': contact.packageAppNames,
         'relationship': contact.relationship,
         'notes': contact.notes,
         'stage': contact.stage,
@@ -288,6 +312,7 @@ final class KnowledgeLedger implements KnowledgeStore {
         updatedAt: _time(row['updatedAt']),
         aliases: _texts(row['aliases']),
         packageNames: _texts(row['packageNames']),
+        packageAppNames: _textMap(row['packageAppNames']),
         relationship: _text(row['relationship']),
         notes: _text(row['notes']),
         stage: _text(row['stage']),
@@ -379,6 +404,15 @@ final class KnowledgeLedger implements KnowledgeStore {
     for (final Object? item in _list(raw))
       if (item is String) item,
   ];
+
+  /// A map of string keys to string values, with non-string entries dropped.
+  static Map<String, String> _textMap(Object? raw) => raw is Map
+      ? <String, String>{
+          for (final MapEntry<Object?, Object?> entry in raw.entries)
+            if (entry.key is String && entry.value is String)
+              entry.key as String: entry.value as String,
+        }
+      : <String, String>{};
 
   static DateTime _time(Object? raw) => raw is String
       ? DateTime.parse(raw).toLocal()

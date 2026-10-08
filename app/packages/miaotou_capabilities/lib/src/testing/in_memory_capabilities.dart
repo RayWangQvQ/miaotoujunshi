@@ -488,6 +488,16 @@ final class InMemoryKnowledgeStore implements KnowledgeStore {
     logs.remove(id);
   }
 
+  final Map<String, String> appNames = <String, String>{};
+
+  @override
+  Future<void> saveAppName(String key, String displayName) async {
+    appNames[key] = displayName;
+  }
+
+  @override
+  Future<String?> appNameFor(String key) async => appNames[key];
+
   @override
   Future<void> appendLog(String contactId, List<KnowledgeLogEntry> entries) async {
     logs.putIfAbsent(contactId, () => <KnowledgeLogEntry>[]).addAll(entries);

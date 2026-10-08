@@ -1,6 +1,5 @@
 package com.jev.probe.core
 
-import android.content.Context
 import android.graphics.Rect
 
 /** One captured chat bubble. side is "me" (right) or "other" (left). */
@@ -46,39 +45,23 @@ data class ChatSnapshot(
  * error: an OCR capture has no title to read, an app can be showing a transient
  * placeholder title, and there may be no chat window in front of the user at all
  * (see [NONE]). Never infer one field from the other, and never treat "unknown"
- * as "the same as last time" — [displayLabel] exists so the UI can say so out
- * loud instead of guessing.
+ * as "the same as last time" — the wire carries both fields separately so the UI
+ * can say so out loud instead of guessing.
+ *
+ * **Naming is not here** (ADR-0028). The display name is resolved where the
+ * platform is (`ChatApps.displayName`) and travels on the wire beside the
+ * package, rather than being rendered into a sentence on this side: the label's
+ * fallback order is the domain's rule, and a second implementation of it in
+ * Kotlin is a second thing to keep in step.
  */
 data class ConversationRef(val pkg: String, val title: String?) {
 
     /** Enough identity to name the thread to the user and to guard a fill with. */
     val isIdentified: Boolean get() = pkg.isNotBlank() && !title.isNullOrBlank()
 
-    /**
-     * Short label for the overlay header, e.g. `QQ · 张三`.
-     *
-     * Falls back through "we know the app but not the thread" to "we know
-     * neither" without ever printing a raw package name *when a name is
-     * resolvable*. The app half resolves through [ChatApps.displayName], which
-     * ends at the bare package name only when the system has no label either
-     * (ADR-0026).
-     */
-    fun displayLabel(context: Context?): String {
-        val app = ChatApps.displayName(pkg, context)
-        val thread = title?.takeIf { it.isNotBlank() }
-        return when {
-            app != null && thread != null -> "$app · $thread"
-            thread != null -> thread
-            app != null -> "$app · $UNKNOWN_LABEL"
-            else -> UNKNOWN_LABEL
-        }
-    }
-
     companion object {
         /** No chat window is in front of the user. */
         val NONE = ConversationRef("", null)
-
-        const val UNKNOWN_LABEL = "未知应用"
     }
 }
 

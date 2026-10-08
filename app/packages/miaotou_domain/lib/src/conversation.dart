@@ -16,9 +16,10 @@ import 'advice.dart';
 ///
 /// * **The label carries a resolved name, never a package.** [ConversationLabel]
 ///   has an `appName` and a `title` and nothing else. The `appName` is resolved
-///   by whoever owns the platform — and, since ADR-0026, an app with no resolved
-///   display name falls back to its package name *as the name*, so the header is
-///   never empty while a window is in front.
+///   by whoever owns the platform and arrives on the reference itself
+///   ([ConversationRef.appName], ADR-0028) — and, since ADR-0026, an app the
+///   system cannot name falls back to its package name *as the name*, so the
+///   label is never empty while a window is in front.
 /// * **The derivation is a pure function of two refs and an advice.** ADR-0002
 ///   decision 2 puts the verdict on the side that knows which conversation the
 ///   user is looking at, and forbids the renderer from going and looking for
@@ -32,10 +33,12 @@ import 'advice.dart';
 /// How much of a conversation can be named to the user.
 ///
 /// Four cases and not a nullable string, because the fallbacks are the rule:
-/// Android's `ConversationRef.displayLabel()` goes `app · title` → `title` →
-/// `app · 未知应用` → `未知应用`, and the app half itself resolves display name
-/// → package name (ADR-0026). The port keeps that order; only the words live in
-/// the application's copy file.
+/// the label goes `app · title` → `title` → `app · 未知人` → `未知应用`, and
+/// the app half itself resolves display name → package name (ADR-0026). The
+/// words live in the application's copy file, but the split between the two
+/// placeholders is semantic: 未知人 is "the app is named, the person is not",
+/// and 未知应用 is "no window in front" ([NONE]) — the only case left after the
+/// package-name fallback. Keeping that order is this type's whole job.
 enum ConversationLabelKind {
   /// Both halves are known: `微信 · 张三`.
   appAndTitle,
@@ -43,9 +46,10 @@ enum ConversationLabelKind {
   /// The thread is known but this build has no name for the app behind it.
   titleOnly,
 
-  /// The app is known but the thread title could not be read. [appName] here is
-  /// whatever names the app: the resolved display name, or the bare package
-  /// name when no display name was resolved (ADR-0026).
+  /// The app is known but the thread title could not be read — the person half
+  /// is what is missing, and the renderer says so (未知人, not 未知应用).
+  /// [appName] here is whatever names the app: the resolved display name, or
+  /// the bare package name when no display name was resolved (ADR-0026).
   appOnly,
 
   /// Nothing at all is known — no chat window in front of the user ([NONE]).
@@ -71,24 +75,24 @@ final class ConversationLabel {
 
   /// Resolves a reference into something a header may print.
   ///
-  /// `appName` is the chat application's display name, already resolved by the
-  /// platform, or null when this build has no name for that package — which is
-  /// a real answer and not a failure, and which is why the fallback order
-  /// exists. A blank title is treated as absent, because a transient
-  /// placeholder title is not a name anyone can confirm a fill against.
-  factory ConversationLabel.of(
-    ConversationRef reference, {
-    String? appName,
-  }) {
+  /// `reference.appName` is the chat application's display name, already
+  /// resolved by the platform (ADR-0028), or null when that port has no name for
+  /// the package — which is a real answer and not a failure, and which is why
+  /// the fallback order exists. A blank title is treated as absent, because a
+  /// transient placeholder title is not a name anyone can confirm a fill
+  /// against.
+  factory ConversationLabel.of(ConversationRef reference) {
     final String? thread = reference.title?.trim();
     final String? name = (thread == null || thread.isEmpty) ? null : thread;
 
     // The app half is whatever names the package to the user: the resolved
     // display name when the platform has one, the bare package name when it
     // does not (ADR-0026), or null when even the package is unknown (NONE).
-    final String? resolvedApp = (appName == null || appName.trim().isEmpty) ? null : appName;
+    final String? resolved = reference.appName?.trim();
     final String package = reference.packageName.trim();
-    final String? app = resolvedApp ?? (package.isEmpty ? null : package);
+    final String? app = (resolved == null || resolved.isEmpty)
+        ? (package.isEmpty ? null : package)
+        : resolved;
 
     if (app != null && name != null) {
       return ConversationLabel._(kind: ConversationLabelKind.appAndTitle, appName: app, title: name);
@@ -163,6 +167,7 @@ final class PanelView {
   const PanelView({
     required this.analysed,
     required this.live,
+    required this.header,
     required this.status,
     required this.readOnly,
     required this.actions,
@@ -175,6 +180,24 @@ final class PanelView {
 
   /// What the user is looking at right now.
   final ConversationLabel live;
+
+  /// The one label the header prints: [analysed] once there is one, and [live]
+  /// before that.
+  ///
+  /// **The fallback is the point** (ADR-0028). A panel with nothing analysed yet
+  /// that says 未知应用 while the user is standing in an application the build
+  /// has no adapter for — Douyin — names nothing at all, which is the exact
+  /// complaint ADR-0026 was written to answer and which the header's old
+  /// `analysed`-only reading silently preserved: without an adapter there is no
+  /// tree reading, so no analysis, so never a name. The header therefore names
+  /// the conversation the panel is *about* when there is one, and the one in
+  /// front of the user when there is not — and, once it does, the app half is
+  /// named even while the person half is not (抖音 · 未知人, not 未知应用).
+  ///
+  /// It is not [live] as a general rule: while read-only the two disagree, and
+  /// the header has to keep saying which conversation the drafts below it
+  /// belong to. That is what the read-only badge and banner then qualify.
+  final ConversationLabel header;
 
   /// The verdict and the drafts, or null when there has been no analysis.
   final Advice? advice;
@@ -201,24 +224,22 @@ final class PanelView {
 
 /// Derives everything the panel shows.
 ///
-/// `appName` resolves a package to a display name, and is supplied by the side
-/// that owns the platform: the panel has no business asking. Returning null is
-/// a legitimate answer and is what drives the [ConversationLabelKind.appOnly]
-/// and [ConversationLabelKind.unrecognised] fallbacks.
+/// Three facts in and nothing asked of anybody: the display name is already on
+/// the reference ([ConversationRef.appName], ADR-0028), so this is a pure
+/// function of what the caller holds and the panel never goes looking.
 PanelView derivePanel({
   required ConversationRef? analysed,
   required ConversationRef? live,
   required Advice? advice,
-  required String? Function(ConversationRef reference) appName,
   String? note,
 }) {
   final bool hasAnalysis = analysed != null && !analysed.isNone;
   final ConversationLabel analysedLabel = hasAnalysis
-      ? ConversationLabel.of(analysed, appName: appName(analysed))
+      ? ConversationLabel.of(analysed)
       : ConversationLabel.none;
   final ConversationLabel liveLabel = (live == null || live.isNone)
       ? ConversationLabel.none
-      : ConversationLabel.of(live, appName: appName(live));
+      : ConversationLabel.of(live);
 
   // ADR-0002 decision 2, verbatim: readOnly = shown != null && shown != live.
   final bool readOnly = hasAnalysis && analysed != live;
@@ -247,6 +268,7 @@ PanelView derivePanel({
   return PanelView(
     analysed: analysedLabel,
     live: liveLabel,
+    header: hasAnalysis ? analysedLabel : liveLabel,
     advice: advice,
     note: note,
     status: status,

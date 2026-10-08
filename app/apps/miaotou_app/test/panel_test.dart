@@ -17,30 +17,44 @@ import 'support/harness.dart';
 /// it loses when the user looks away (ADR-0002).
 ///
 /// The header rules are ADR-0002 decision 1 — a second line naming the analysed
-/// conversation. ADR-0026 revised the fallback: an app with no resolved display
-/// name shows its package name rather than a placeholder, so a header is never
-/// empty while a window is in front. Only NONE (no window) drops to the
-/// placeholder 「未知应用」.
+/// conversation — as revised by ADR-0026: an app the system cannot name shows its
+/// package name rather than a placeholder, so a header is never empty while a
+/// window is in front. Only NONE (no window) drops to the placeholder 「未知应用」;
+/// an app that is named but a person who is not drops to 「未知人」 instead.
+///
+/// ADR-0028 moved the resolution to the platform and pointed the header at
+/// [PanelView.header]: the analysed conversation once there is one, and the one
+/// in front until then — which is what lets an application this build has no
+/// adapter for be named at all.
 void main() {
   const ConversationRef wechat = ConversationRef(
     packageName: 'com.tencent.mm',
+    appName: '微信',
     title: '张三',
   );
   const ConversationRef qq = ConversationRef(
     packageName: 'com.tencent.mobileqq',
+    appName: 'QQ',
     title: '李四',
   );
   const ConversationRef unnamed = ConversationRef(
     packageName: 'com.tencent.mm',
+    appName: '微信',
   );
   const ConversationRef stranger = ConversationRef(
     packageName: 'com.example.unknown',
   );
-
-  const Map<String, String> appNames = <String, String>{
-    'com.tencent.mm': '微信',
-    'com.tencent.mobileqq': 'QQ',
-  };
+  const ConversationRef douyin = ConversationRef(
+    packageName: 'com.ss.android.ugc.aweme',
+    appName: '抖音',
+  );
+  // A name with no package behind it: the review entered it by hand once, and
+  // a later review must not ask for it again (ADR-0030 — the app is already
+  // named).
+  const ConversationRef namedNoPackage = ConversationRef(
+    packageName: '',
+    appName: '微信',
+  );
 
   Advice adviceWith(String text) => Advice(
     support: '.',
@@ -85,7 +99,6 @@ void main() {
     analysed: analysed,
     live: live,
     advice: advice,
-    appNames: appNames,
   );
 
   group('the header names the analysed conversation', () {
@@ -127,8 +140,9 @@ void main() {
       );
 
       // ADR-0026: an app with no resolved name shows its package name, not a
-      // neutral placeholder. `com.example.unknown` is the label here.
-      expect(find.text('com.example.unknown · 未知应用'), findsOneWidget);
+      // neutral placeholder. `com.example.unknown` is the label here, and the
+      // missing half is the person, so the placeholder is 未知人.
+      expect(find.text('com.example.unknown · 未知人'), findsOneWidget);
     });
 
     testWidgets('an unnamed thread is a state, not an error', (
@@ -142,7 +156,7 @@ void main() {
       );
 
       expect(tester.takeException(), isNull);
-      expect(find.text('微信 · 未知应用'), findsOneWidget);
+      expect(find.text('微信 · 未知人'), findsOneWidget);
       expect(
         find.byType(CandidateCard),
         findsOneWidget,
@@ -156,6 +170,41 @@ void main() {
         reason:
             'a fill writes into a specific thread, and this one is not '
             'named — macOS gates on the same thing',
+      );
+    });
+
+    testWidgets('the app in front is named before there is any analysis', (
+      WidgetTester tester,
+    ) async {
+      // ADR-0028, and the report it answers: opening the ball in Douyin read
+      // 「未知应用」. The header printed the analysed conversation, and a build
+      // with no adapter for an app never analyses one — no adapter means no tree
+      // reading, which means no analysis, which meant never a name. The app half
+      // now names the current app while the person half is still missing.
+      await pumpPanel(
+        tester,
+        frame(analysed: ConversationRef.none, live: douyin),
+      );
+
+      expect(find.text('抖音 · 未知人'), findsOneWidget);
+      expect(
+        find.text(AppCopy.zh.text(CopyKey.panelStatusNotAnalysed)),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('with nothing in front at all the placeholder stands', (
+      WidgetTester tester,
+    ) async {
+      // The one case ADR-0026 leaves the placeholder for: no window, no package.
+      await pumpPanel(
+        tester,
+        frame(analysed: ConversationRef.none, live: ConversationRef.none),
+      );
+
+      expect(
+        find.text(AppCopy.zh.text(CopyKey.panelLabelUnrecognised)),
+        findsOneWidget,
       );
     });
   });
@@ -534,7 +583,6 @@ void main() {
             PanelLine(speaker: Speaker.me, text: '在吗'),
             PanelLine(speaker: Speaker.other, text: '在的'),
           ],
-          appNames: appNames,
         ),
       );
 
@@ -561,7 +609,6 @@ void main() {
           transcript: const <PanelLine>[
             PanelLine(speaker: Speaker.unknown, text: '嗯'),
           ],
-          appNames: appNames,
         ),
       );
 
@@ -599,7 +646,6 @@ void main() {
             PanelLine(speaker: Speaker.me, text: '在吗'),
             PanelLine(speaker: Speaker.other, text: '在的'),
           ],
-          appNames: appNames,
         ),
       );
 
@@ -629,10 +675,9 @@ void main() {
       analysed: wechat,
       live: wechat,
       note: PanelNote(AppCopy.zh.text(CopyKey.panelNoteSidesGuessed)),
-      transcript: lines,
-      reviewing: true,
-      appNames: appNames,
-    );
+          transcript: lines,
+          reviewing: true,
+        );
 
     testWidgets('the form takes the body, with the batch as one block', (
       WidgetTester tester,
@@ -754,6 +799,71 @@ void main() {
         ),
         <String>['me:在吗', 'me:在的，刚看到'],
       );
+    });
+
+    testWidgets('an unnamed conversation cannot be confirmed until named', (
+      WidgetTester tester,
+    ) async {
+      // ADR-0030: the person must be named before the batch can be confirmed,
+      // so the round that follows has both halves. The refusal is said at the
+      // confirm, the moment it can be fixed.
+      final InMemoryPanelChannel channel = await pumpPanel(
+        tester,
+        PanelFrame(
+          analysed: unnamed,
+          live: unnamed,
+          transcript: batch,
+          reviewing: true,
+        ),
+      );
+
+      await tester.enterText(
+        find.byKey(const Key('panel-review-block')),
+        '我：在吗\n对方：在的',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('panel-review-confirm')));
+      await tester.pumpAndSettle();
+
+      expect(
+        channel.sent,
+        isEmpty,
+        reason: 'the confirm is refused until the person is named',
+      );
+      expect(
+        find.text(AppCopy.zh.text(CopyKey.panelReviewPersonRequired)),
+        findsOneWidget,
+      );
+
+      await tester.enterText(
+        find.byKey(const Key('panel-review-title')),
+        '张三',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('panel-review-confirm')));
+      await tester.pumpAndSettle();
+
+      expect(channel.sent.last.kind, PanelCommandKind.confirmTranscript);
+      expect(channel.sent.last.title, '张三');
+    });
+
+    testWidgets('an already-named app is not asked for again', (
+      WidgetTester tester,
+    ) async {
+      // The app is named even with no package behind it (a review entered it by
+      // hand once), so the field is not shown at all rather than left for the
+      // user to type again.
+      await pumpPanel(
+        tester,
+        PanelFrame(
+          analysed: namedNoPackage,
+          live: namedNoPackage,
+          transcript: batch,
+          reviewing: true,
+        ),
+      );
+
+      expect(find.byKey(const Key('panel-review-app')), findsNothing);
     });
 
     testWidgets('a missing line is a carriage return, not a button', (
@@ -1021,7 +1131,6 @@ void main() {
           advice: adviceWith('好呀'),
           transcript: batch,
           reviewing: true,
-          appNames: appNames,
         ),
       );
 
@@ -1043,7 +1152,6 @@ void main() {
           analysed: wechat,
           live: wechat,
           transcript: batch,
-          appNames: appNames,
         ),
       );
 
@@ -1071,7 +1179,6 @@ void main() {
             remedy: EnterReview(),
           ),
           transcript: batch,
-          appNames: appNames,
         ),
       );
 

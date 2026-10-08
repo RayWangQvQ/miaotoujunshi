@@ -1,9 +1,11 @@
 package com.miaotoujunshi.capabilities.android
 
+import com.jev.probe.core.ChatApps
 import com.jev.probe.core.ConversationRef
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -21,17 +23,16 @@ class ConversationStateTest {
     }
 
     @Test
-    fun displayLabelFallsBackToThePackageThenThePlaceholder() {
-        // No Context means PackageManager is unavailable, so the package name
-        // itself is the app label (ADR-0026). Only NONE drops to the placeholder.
-        assertEquals(
-            "com.example.private · ${ConversationRef.UNKNOWN_LABEL}",
-            ConversationRef("com.example.private", null).displayLabel(null),
-        )
-        assertEquals(
-            ConversationRef.UNKNOWN_LABEL,
-            ConversationRef("", null).displayLabel(null),
-        )
+    fun theNameTheWireCarriesFallsBackToThePackage() {
+        // No Context means PackageManager is unavailable, so the package name is
+        // all that names the app (ADR-0026), and null is reserved for a
+        // conversation with no package at all. The order that turns that null
+        // into 「未知应用」 is the domain's (ADR-0028): it is not implemented
+        // twice.
+        assertEquals("com.example.private", ChatApps.displayName("com.example.private", null))
+        assertEquals("微信", ChatApps.displayName("com.tencent.mm", null))
+        assertNull(ChatApps.displayName("", null))
+        assertNull(ChatApps.displayName(null, null))
     }
 
     @Test
