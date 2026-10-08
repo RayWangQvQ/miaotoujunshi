@@ -283,6 +283,11 @@ class _PanelPageState extends State<PanelPage> {
       _header(context, copy, theme, view),
       if (view.readOnly) _banner(copy, colors, theme),
       if (widget.frame.note != null) _note(copy, colors, theme),
+      // The review's title row — the two speaker buttons and 删行 — stays
+      // pinned while the block below scrolls. It acts on the caret of the
+      // block, so scrolling to a line must not scroll the very buttons that
+      // rewrite it out of reach.
+      if (widget.frame.reviewing) _reviewHeader(copy, theme),
     ];
     final Widget body = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -301,7 +306,7 @@ class _PanelPageState extends State<PanelPage> {
         // is what 「重新分析」 looked like when it appeared to do nothing
         // (ADR-0024).
         if (widget.frame.reviewing)
-          _reviewForm(copy, colors, theme)
+          _reviewForm(copy, theme)
         else if ((advice == null || advice.candidates.isEmpty) &&
             widget.frame.transcript.isNotEmpty)
           _transcript(copy, colors, theme)
@@ -365,24 +370,31 @@ class _PanelPageState extends State<PanelPage> {
         offset: _landing,
         child: Card(
           margin: EdgeInsets.zero,
-          child: LayoutBuilder(
-            builder: (BuildContext context, BoxConstraints constraints) =>
-                Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                ...fixed,
-                if (_expanded)
-                  if (constraints.hasBoundedHeight)
-                    Expanded(
-                      child: SingleChildScrollView(
-                        key: const Key('panel-scroll'),
-                        child: body,
-                      ),
-                    )
-                  else
-                    body,
-              ],
+          // One tap region over the whole panel — fixed header row included —
+          // so a tap on the pinned review buttons (我 / 对方 / 删行) is *not*
+          // a tap outside the review block's field. The buttons read the
+          // caret, and a tap that first dismissed it would leave them nothing
+          // to act on.
+          child: TextFieldTapRegion(
+            child: LayoutBuilder(
+              builder: (BuildContext context, BoxConstraints constraints) =>
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      ...fixed,
+                      if (_expanded)
+                        if (constraints.hasBoundedHeight)
+                          Expanded(
+                            child: SingleChildScrollView(
+                              key: const Key('panel-scroll'),
+                              child: body,
+                            ),
+                          )
+                        else
+                          body,
+                    ],
+                  ),
             ),
           ),
         ),
@@ -585,9 +597,8 @@ class _PanelPageState extends State<PanelPage> {
       child: _buttonWrap(<Widget>[
         if (view.allows(PanelAction.details))
           OutlinedButton(
-            onPressed: () => widget.onCommand(
-              const PanelCommand(PanelCommandKind.details),
-            ),
+            onPressed: () =>
+                widget.onCommand(const PanelCommand(PanelCommandKind.details)),
             style: _compactButtonStyle(),
             child: Text(copy.text(CopyKey.panelActionDetails)),
           ),
@@ -668,117 +679,116 @@ class _PanelPageState extends State<PanelPage> {
   /// 删行 deletes the caret's whole physical line. They are disabled until the
   /// block has been focused, because before that there is no line to act on and
   /// guessing "the last one" would be an intention the user did not state.
-  Widget _reviewForm(AppCopy copy, AppColors colors, ThemeData theme) => Padding(
+  Widget _reviewForm(AppCopy copy, ThemeData theme) => Padding(
     padding: AppSpacing.panel,
-    // The whole form — title, shortcut buttons and the block — sits inside one
-    // `TextFieldTapRegion` so that tapping a shortcut is *not* a tap outside
-    // the field. The shortcut buttons act on the caret, and a tap that first
-    // dismissed the caret would leave them nothing to act on: the field's own
-    // `onTapOutside` unfocuses it, which flips `_reviewFocus.hasFocus` to false
-    // and the buttons disable themselves in the very frame the tap lands. One
-    // region keeps the buttons and the block in the same `EditableText` group,
-    // so the buttons read the caret instead of killing it.
-    child: TextFieldTapRegion(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          // The title and the shortcut buttons share one row, because the
-          // block is what the user reads and the header is what the 300dp panel
-          // can least afford to give two lines (ADR-0025 amendment: the hint and
-          // the fixed example line are gone — the block's own `我：`/`对方：`
-          // prefixes teach the rule by being in front of the user's eyes).
-          Row(
-            children: <Widget>[
-              Expanded(
-                child: Text(
-                  copy.text(CopyKey.panelReviewTitle),
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: colors.textMuted,
-                  ),
-                ),
-              ),
-              _reviewSpeakerButtons(copy, theme),
-            ],
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        // The identity the review confirms, before the block it edits
+        // (ADR-0030): a conversation is the application plus the person, and
+        // the analysis is gated on both. The person is always the user's to
+        // fill; the application is asked for only when the platform could not
+        // name it at all — once it is named, there is no field to type in.
+        TextField(
+          key: const Key('panel-review-title'),
+          controller: _titleController,
+          textAlignVertical: TextAlignVertical.top,
+          style: theme.textTheme.bodySmall,
+          onChanged: (_) => setState(() => _identityError = null),
+          onTapOutside: (_) => _releaseInputFocus(),
+          decoration: InputDecoration(
+            isDense: true,
+            labelText: copy.text(CopyKey.panelReviewPersonLabel),
+            border: const OutlineInputBorder(),
           ),
+        ),
+        if (!_appIsNamed) ...<Widget>[
           AppSpacing.gapXs,
-          // The identity the review confirms, before the block it edits
-          // (ADR-0030): a conversation is the application plus the person, and
-          // the analysis is gated on both. The person is always the user's to
-          // fill; the application is asked for only when the platform could not
-          // name it at all — once it is named, there is no field to type in.
           TextField(
-            key: const Key('panel-review-title'),
-            controller: _titleController,
+            key: const Key('panel-review-app'),
+            controller: _appNameController,
             textAlignVertical: TextAlignVertical.top,
             style: theme.textTheme.bodySmall,
             onChanged: (_) => setState(() => _identityError = null),
             onTapOutside: (_) => _releaseInputFocus(),
             decoration: InputDecoration(
               isDense: true,
-              labelText: copy.text(CopyKey.panelReviewPersonLabel),
+              labelText: copy.text(CopyKey.panelReviewAppLabel),
               border: const OutlineInputBorder(),
             ),
           ),
-          if (!_appIsNamed) ...<Widget>[
-            AppSpacing.gapXs,
-            TextField(
-              key: const Key('panel-review-app'),
-              controller: _appNameController,
-              textAlignVertical: TextAlignVertical.top,
-              style: theme.textTheme.bodySmall,
-              onChanged: (_) => setState(() => _identityError = null),
-              onTapOutside: (_) => _releaseInputFocus(),
-              decoration: InputDecoration(
-                isDense: true,
-                labelText: copy.text(CopyKey.panelReviewAppLabel),
-                border: const OutlineInputBorder(),
-              ),
-            ),
-          ],
-          if (_identityError != null)
-            Padding(
-              padding: const EdgeInsets.only(top: AppSpacing.xs),
-              child: Text(
-                _identityError!,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.error,
-                ),
-              ),
-            ),
-          AppSpacing.gapXs,
-          // The block grows with its content and the panel body scrolls it; there
-          // is no `Expanded` here because the body already sits inside a
-          // `SingleChildScrollView` whose height is unbounded.
-          Listener(
-            onPointerDown: (_) async {
-              await _takeInputFocus();
-              _reviewFocus.requestFocus();
-            },
-            child: TextField(
-              key: const Key('panel-review-block'),
-              controller: _reviewController,
-              focusNode: _reviewFocus,
-              minLines: 6,
-              maxLines: null,
-              textAlignVertical: TextAlignVertical.top,
-              // The block is the densest surface on the panel, so it reads at a
-              // size below the body default: a ten-line capture in a 300dp window
-              // is what it has to fit, and every point the text gives up is a line
-              // the user does not scroll to find.
-              style: theme.textTheme.bodySmall,
-              // The confirm button is disabled on a block with nothing left in
-              // it, so it has to know when the last text goes away.
-              onChanged: (_) => setState(() {}),
-              onTapOutside: (_) => _releaseInputFocus(),
-              decoration: const InputDecoration(
-                isDense: true,
-                alignLabelWithHint: true,
-                border: OutlineInputBorder(),
+        ],
+        if (_identityError != null)
+          Padding(
+            padding: const EdgeInsets.only(top: AppSpacing.xs),
+            child: Text(
+              _identityError!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.error,
               ),
             ),
           ),
-        ],
-      ),
+        AppSpacing.gapXs,
+        // The block grows with its content and the panel body scrolls it; there
+        // is no `Expanded` here because the body already sits inside a
+        // `SingleChildScrollView` whose height is unbounded.
+        Listener(
+          onPointerDown: (_) async {
+            await _takeInputFocus();
+            _reviewFocus.requestFocus();
+          },
+          child: TextField(
+            key: const Key('panel-review-block'),
+            controller: _reviewController,
+            focusNode: _reviewFocus,
+            minLines: 6,
+            maxLines: null,
+            textAlignVertical: TextAlignVertical.top,
+            // The block is the densest surface on the panel, so it reads at a
+            // size below the body default: a ten-line capture in a 300dp window
+            // is what it has to fit, and every point the text gives up is a line
+            // the user does not scroll to find.
+            style: theme.textTheme.bodySmall,
+            // The confirm button is disabled on a block with nothing left in
+            // it, so it has to know when the last text goes away.
+            onChanged: (_) => setState(() {}),
+            onTapOutside: (_) => _releaseInputFocus(),
+            decoration: const InputDecoration(
+              isDense: true,
+              alignLabelWithHint: true,
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+
+  /// The review's pinned title row: the label plus the two speaker buttons and
+  /// 删行.
+  ///
+  /// It sits above the scroll region (see [build]'s `fixed` list) so that
+  /// scrolling the block to edit a line keeps the very controls that rewrite it
+  /// on screen. The row itself reads the caret off the controller at press time,
+  /// so being pinned away from the block costs it nothing.
+  Widget _reviewHeader(AppCopy copy, ThemeData theme) => Padding(
+    padding: const EdgeInsets.fromLTRB(
+      AppSpacing.s,
+      AppSpacing.s,
+      AppSpacing.s,
+      AppSpacing.xs,
+    ),
+    child: Row(
+      children: <Widget>[
+        Expanded(
+          child: Text(
+            copy.text(CopyKey.panelReviewTitle),
+            style: Theme.of(context).textTheme.labelSmall
+                ?.copyWith(color: AppColors.of(context).textMuted),
+          ),
+        ),
+        _reviewSpeakerButtons(copy, theme),
+      ],
     ),
   );
 
@@ -934,7 +944,11 @@ class _PanelPageState extends State<PanelPage> {
   /// the lines go where the empty state was: the panel has nothing else to say
   /// until the user asks for an analysis, and a read that worked is the most
   /// interesting thing it knows.
-  Widget _transcript(AppCopy copy, AppColors colors, ThemeData theme) => Padding(
+  Widget _transcript(
+    AppCopy copy,
+    AppColors colors,
+    ThemeData theme,
+  ) => Padding(
     padding: AppSpacing.panel,
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -957,11 +971,12 @@ class _PanelPageState extends State<PanelPage> {
   );
 
   /// The side, in the panel's own words rather than the wire's.
-  static String _speakerLabel(AppCopy copy, Speaker speaker) => switch (speaker) {
-    Speaker.me => copy.text(CopyKey.panelSpeakerMe),
-    Speaker.other => copy.text(CopyKey.panelSpeakerOther),
-    Speaker.unknown => copy.text(CopyKey.panelSpeakerUnknown),
-  };
+  static String _speakerLabel(AppCopy copy, Speaker speaker) =>
+      switch (speaker) {
+        Speaker.me => copy.text(CopyKey.panelSpeakerMe),
+        Speaker.other => copy.text(CopyKey.panelSpeakerOther),
+        Speaker.unknown => copy.text(CopyKey.panelSpeakerUnknown),
+      };
 
   /// Why 「填入」 is gone, in so many words. ADR-0002 decision 3 asks for a
   /// banner rather than a silently missing button.
