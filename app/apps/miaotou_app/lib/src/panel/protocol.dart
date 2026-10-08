@@ -39,6 +39,7 @@ final class PanelFrame {
     this.note,
     this.transcript = const <PanelLine>[],
     this.reviewing = false,
+    this.busy = false,
   });
 
   /// Whose analysis is on the panel. [ConversationRef.none] before the first
@@ -84,6 +85,11 @@ final class PanelFrame {
   /// rather than left to the panel because "there is a transcript" is not the
   /// same question — a confirmed batch is still shown.
   final bool reviewing;
+
+  /// True while a round is running, so the panel disables its actions and waits
+  /// for the result rather than letting a second press interrupt one already in
+  /// flight.
+  final bool busy;
 }
 
 /// One line of that transcript.

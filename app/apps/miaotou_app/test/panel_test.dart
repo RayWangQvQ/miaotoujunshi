@@ -283,6 +283,20 @@ void main() {
             'conversation, so tapping it silently did nothing',
       );
     });
+
+    testWidgets('a confirmed batch with no advice yet is the first analysis', (
+      WidgetTester tester,
+    ) async {
+      // After 确认 the engine publishes analysed == live with no advice, so the
+      // button must read 「分析」 — 「重新」 would claim a round that never ran.
+      await pumpPanel(
+        tester,
+        frame(analysed: wechat, live: wechat, advice: null),
+      );
+
+      expect(find.text('重新分析'), findsNothing);
+      expect(find.text('分析'), findsOneWidget);
+    });
   });
 
   group('commands going up', () {

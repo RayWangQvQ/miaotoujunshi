@@ -419,6 +419,7 @@ final class PanelWireCodec {
             for (final PanelLine line in frame.transcript) _encodeLine(line),
           ],
         if (frame.reviewing) 'reviewing': true,
+        if (frame.busy) 'busy': true,
       };
 
   static PanelFrame decodeFrame(Object? value) {
@@ -430,6 +431,7 @@ final class PanelWireCodec {
       note: map['note'] == null ? null : _decodeNote(map['note']),
       transcript: _decodeTranscript(map['transcript']),
       reviewing: _flag(map['reviewing'], 'reviewing'),
+      busy: _flag(map['busy'], 'busy'),
     );
   }
 

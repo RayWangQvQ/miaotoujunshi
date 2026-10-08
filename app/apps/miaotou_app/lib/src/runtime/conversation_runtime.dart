@@ -427,6 +427,7 @@ final class ConversationRuntime {
             PanelLine(speaker: line.speaker, text: line.text),
         ],
         reviewing: state.reviewing,
+        busy: state.round != null,
       ),
     );
   }

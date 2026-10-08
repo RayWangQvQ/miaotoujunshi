@@ -597,8 +597,11 @@ class _PanelPageState extends State<PanelPage> {
       child: _buttonWrap(<Widget>[
         if (view.allows(PanelAction.details))
           OutlinedButton(
-            onPressed: () =>
-                widget.onCommand(const PanelCommand(PanelCommandKind.details)),
+            onPressed: widget.frame.busy
+                ? null
+                : () => widget.onCommand(
+                    const PanelCommand(PanelCommandKind.details),
+                  ),
             style: _compactButtonStyle(),
             child: Text(copy.text(CopyKey.panelActionDetails)),
           ),
@@ -608,38 +611,55 @@ class _PanelPageState extends State<PanelPage> {
         if (widget.frame.transcript.isNotEmpty)
           OutlinedButton(
             key: const Key('panel-review-open'),
-            onPressed: () => widget.onCommand(
-              const PanelCommand(PanelCommandKind.openReview),
-            ),
+            onPressed: widget.frame.busy
+                ? null
+                : () => widget.onCommand(
+                    const PanelCommand(PanelCommandKind.openReview),
+                  ),
             style: _compactButtonStyle(),
             child: Text(copy.text(CopyKey.panelActionReview)),
           ),
         _recogniseButton(copy),
         FilledButton(
-          onPressed: () => widget.onCommand(
-            PanelCommand(
-              view.readOnly
-                  ? PanelCommandKind.analyseCurrent
-                  : PanelCommandKind.reanalyse,
-            ),
-          ),
+          onPressed: widget.frame.busy
+              ? null
+              : () => widget.onCommand(
+                  PanelCommand(
+                    view.readOnly
+                        ? PanelCommandKind.analyseCurrent
+                        : PanelCommandKind.reanalyse,
+                  ),
+                ),
           style: _compactButtonStyle(),
-          child: Text(
-            copy.text(
-              view.readOnly
-                  ? CopyKey.panelActionAnalyseCurrent
-                  : CopyKey.panelActionReanalyse,
-            ),
-          ),
+          child: Text(copy.text(_analyseButtonKey(view))),
         ),
       ]),
     );
   }
 
+  /// The analysis button's label: three states, not two.
+  ///
+  /// `readOnly` decides which *conversation* the button acts on and keeps
+  /// 「分析当前会话」 for the case the user has moved on. When the user is still
+  /// looking at the analysed conversation, the word depends on whether there is
+  /// an analysis to redo: a confirmed batch with no advice yet is the *first*
+  /// analysis, and 「重新」 would claim a previous round that never ran.
+  static CopyKey _analyseButtonKey(PanelView view) {
+    if (view.readOnly) {
+      return CopyKey.panelActionAnalyseCurrent;
+    }
+    return view.advice == null
+        ? CopyKey.panelActionAnalyse
+        : CopyKey.panelActionReanalyse;
+  }
+
   Widget _recogniseButton(AppCopy copy) => OutlinedButton(
     key: const Key('panel-recognise-once'),
-    onPressed: () =>
-        widget.onCommand(const PanelCommand(PanelCommandKind.recogniseOnce)),
+    onPressed: widget.frame.busy
+        ? null
+        : () => widget.onCommand(
+            const PanelCommand(PanelCommandKind.recogniseOnce),
+          ),
     style: _compactButtonStyle(),
     child: Text(copy.text(CopyKey.panelActionRecognise)),
   );
