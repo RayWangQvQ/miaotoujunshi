@@ -438,9 +438,13 @@ class RetainedCaptureService : AccessibilityService() {
          * manual path uses (`manual_recognition.dart`): an unanchored version
          * also swallowed lines that merely contained a time ("会议改到 8:11"),
          * and the two whole-frame paths must read one screen the same way.
+         *
+         * A dated divider — `10/04 11:39`, `2026-10-04 11:39` — is chrome too,
+         * so the date (with or without a year) may precede the time. The date
+         * separator accepts `-`, `/`, `.` and 年/月/日.
          */
         val PURE_TIME = Regex(
-            """^\s*(上午|下午|AM|PM|am|pm)?\s*\d{1,2}[:：]\d{2}\s*(上午|下午|AM|PM|am|pm)?\s*$"""
+            """^\s*(?:(\d{4}[-/.年]\d{1,2}[-/.月]\d{1,2}[日]?\s*)?(\d{1,2}[-/.月]\d{1,2}[日]?\s*)?(上午|下午|AM|PM|am|pm)?\s*\d{1,2}[:：]\d{2}(?::\d{2})?\s*(上午|下午|AM|PM|am|pm)?)\s*$"""
         )
     }
 }

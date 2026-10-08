@@ -325,6 +325,32 @@ void main() {
       expect(await knowledge.recentLog('c1', limit: 100), hasLength(1));
     });
 
+    test('an occurredAt survives the round trip, and its absence stays null',
+        () async {
+      await knowledge.appendLog('c1', <KnowledgeLogEntry>[
+        KnowledgeLogEntry(
+          speaker: Speaker.me,
+          text: '周末有空吗',
+          timestamp: DateTime(2026, 10, 4, 12, 1),
+          packageName: 'com.tencent.xinWeChat',
+          occurredAt: DateTime(2026, 10, 1, 20, 30),
+        ),
+        _entry('other', '有', 2),
+      ]);
+
+      final List<KnowledgeLogEntry> recent = await knowledge.recentLog(
+        'c1',
+        limit: 2,
+      );
+
+      expect(recent[0].occurredAt, DateTime(2026, 10, 1, 20, 30),
+          reason: 'the message time is a different fact from the capture time '
+              'and must survive the write');
+      expect(recent[1].occurredAt, isNull,
+          reason: 'a line with no message time reads back as null, not a fake '
+              'epoch');
+    });
+
     test('appending nothing does not rewrite the document', () async {
       await knowledge.appendLog('c1', <KnowledgeLogEntry>[_entry('me', '在吗', 1)]);
       final int before = documents.writeCount('knowledge.json');

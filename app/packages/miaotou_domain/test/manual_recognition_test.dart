@@ -79,6 +79,47 @@ void main() {
       expect(capture.lines.single.text, '会议改到 8:11');
     });
 
+    test('a dated timestamp is chrome, not speech', () {
+      // The old pattern matched only a bare `HH:MM`, so a day divider rendered
+      // as `10/04 11:39` survived as a message and was folded into a speaker.
+      final RecognisedCapture capture = recognise(
+        <OcrLine>[
+          line('在的', left: 40, top: 100, right: 300, bottom: 140),
+          line('10/04 11:39', left: 440, top: 160, right: 560, bottom: 190),
+          line('2026-10-04 11:39', left: 440, top: 210, right: 620, bottom: 240),
+          line('10月4日 11:39', left: 440, top: 260, right: 560, bottom: 290),
+          line('刚刚你发的', left: 40, top: 320, right: 300, bottom: 360),
+        ],
+      );
+
+      expect(capture.lines.map((ChatLine l) => l.text).toList(), <String>[
+        '在的',
+        '刚刚你发的',
+      ]);
+    });
+
+    test('a dated divider records its time on the message below it', () {
+      // The divider above a message is that message's time; the message before
+      // it keeps null, and a divider with no year is dropped without a time.
+      final RecognisedCapture capture = recognise(
+        <OcrLine>[
+          line('昨天说的', left: 40, top: 100, right: 300, bottom: 140),
+          line('10/04 11:39', left: 440, top: 160, right: 560, bottom: 190),
+          line('2026-10-05 08:30:05', left: 440, top: 210, right: 640, bottom: 240),
+          line('今天这个', left: 40, top: 260, right: 300, bottom: 300),
+        ],
+      );
+
+      expect(capture.lines, hasLength(2));
+      expect(capture.lines[0].text, '昨天说的');
+      expect(capture.lines[0].occurredAt, isNull,
+          reason: 'a divider sits above the message it introduces, so the one '
+              'before it has no time of its own');
+      expect(capture.lines[1].text, '今天这个');
+      expect(capture.lines[1].occurredAt, DateTime(2026, 10, 5, 8, 30, 5),
+          reason: 'the year-bearing divider above it names the message time');
+    });
+
     test('no lines at all produces no capture and no split', () {
       final RecognisedCapture capture = recognise(<OcrLine>[]);
 

@@ -4,7 +4,12 @@ import 'speaker.dart';
 
 /// One chat line the accessibility tree could read.
 final class ChatLine {
-  const ChatLine({required this.speaker, required this.text, this.bounds});
+  const ChatLine({
+    required this.speaker,
+    required this.text,
+    this.bounds,
+    this.occurredAt,
+  });
 
   final Speaker speaker;
   final String text;
@@ -12,6 +17,14 @@ final class ChatLine {
   /// Screen coordinates when the tree exposes them. Null when it does not —
   /// which is the normal case for a line the tree could read but not place.
   final ScreenRect? bounds;
+
+  /// When the message itself was sent, when a chat's own timestamp named it.
+  ///
+  /// Distinct from a snapshot's `capturedAt`, which is the capture moment. A
+  /// whole-frame capture reads a day divider (`10/04 11:39`) above a message and
+  /// records that as the message's time; the tree path has no such divider and
+  /// leaves this null. A time is a convenience, never something to invent.
+  final DateTime? occurredAt;
 
   @override
   String toString() => 'ChatLine(${speaker.name}, $text)';

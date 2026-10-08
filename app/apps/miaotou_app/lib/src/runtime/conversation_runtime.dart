@@ -379,6 +379,7 @@ final class ConversationRuntime {
                   speaker: line.speaker,
                   text: line.text,
                   timestamp: DateTime.now(),
+                  occurredAt: line.occurredAt,
                   packageName: packageName,
                 ),
             ],

@@ -38,6 +38,11 @@ const double sideBoundary = 0.5;
 /// transcripts depending on who asked for the capture. The meridiem may sit on
 /// either side, because applications disagree about that.
 ///
+/// A date is part of the same divider: a chat stamps `10/04 11:39` or
+/// `2026-10-04 11:39` between days, and that line is no more speech than a bare
+/// `11:39`. The date separator accepts `-`, `/`, `.` and `年/月/日`, and the
+/// date may precede the time with or without a year.
+///
 /// The two meridiem words are escapes rather than themselves because this file
 /// began in the application package, where a Han character in a string literal
 /// outside the copy file is an audit failure — the pattern is not copy, and the
@@ -45,11 +50,55 @@ const double sideBoundary = 0.5;
 /// the domain, and are kept: no audit here would object either way, but the
 /// pattern is not read by a person, so spelling the words out would only put
 /// copy in a place that has no business holding any.
-final RegExp _pureTime = RegExp(
-  '^\\s*(\u4e0a\u5348|\u4e0b\u5348|AM|PM|am|pm)?'
-  '\\s*\\d{1,2}[:：]\\d{2}'
-  '\\s*(\u4e0a\u5348|\u4e0b\u5348|AM|PM|am|pm)?\\s*\$',
+final RegExp _timestampShape = RegExp(
+  '^\\s*'
+  '(?:'
+  '(?:(\\d{4})[-/.年](\\d{1,2})[-/.月](\\d{1,2})[日]?\\s*)?'
+  '(?:\\d{1,2}[-/.月]\\d{1,2}[日]?\\s*)?'
+  '(?:\u4e0a\u5348|\u4e0b\u5348|AM|PM|am|pm)?'
+  '\\s*(\\d{1,2})[:：](\\d{2})(?::(\\d{2}))?'
+  '\\s*(?:\u4e0a\u5348|\u4e0b\u5348|AM|PM|am|pm)?'
+  ')'
+  '\\s*\$',
 );
+
+/// Whether [text] is a timestamp divider of any shape, year or not.
+///
+/// The drop gate: a `10/04 11:39` or a bare `11:39` is chrome to remove before
+/// grouping, whether or not it carries a year worth recording.
+bool isTimestampShape(String text) => _timestampShape.hasMatch(text);
+
+/// The [DateTime] a timestamp line names, or null when it has no year to pin to.
+///
+/// A divider without a year (`10/04 11:39`, `11:39`) is still dropped by
+/// [isTimestampShape] — this only answers whether there is a time worth
+/// recording, and those shapes have no year to record. The parse is strict: an
+/// impossible day or hour yields null, and the line is kept as ordinary text
+/// rather than silently mis-dated.
+DateTime? timestampOf(String text) {
+  final RegExpMatch? match = _timestampShape.firstMatch(text);
+  if (match == null) {
+    return null;
+  }
+  final int? y = int.tryParse(match.group(1) ?? '');
+  final int? month = int.tryParse(match.group(2) ?? '');
+  final int? day = int.tryParse(match.group(3) ?? '');
+  final int? h = int.tryParse(match.group(4) ?? '');
+  final int? mi = int.tryParse(match.group(5) ?? '');
+  final int s = int.tryParse(match.group(6) ?? '0') ?? 0;
+  if (y == null || month == null || day == null || h == null || mi == null) {
+    return null;
+  }
+  if (h > 23 || mi > 59 || s > 59) {
+    return null;
+  }
+  final DateTime parsed = DateTime(y, month, day, h, mi, s);
+  if (parsed.year != y || parsed.month != month || parsed.day != day) {
+    return null;
+  }
+  return parsed;
+}
+
 
 /// One frame's worth of recognised conversation.
 final class RecognisedCapture {
@@ -81,11 +130,23 @@ RecognisedCapture groupRecognisedLines(
   List<OcrLine> raw, {
   required CaptureFrame frame,
 }) {
-  final List<OcrLine> usable = raw
-      .where((OcrLine line) => line.text.trim().isNotEmpty)
-      .where((OcrLine line) => !_pureTime.hasMatch(line.text.trim()))
-      .toList()
-    ..sort((OcrLine a, OcrLine b) => a.bounds.top.compareTo(b.bounds.top));
+  final List<OcrLine> usable = <OcrLine>[];
+  final List<_Stamp> stamps = <_Stamp>[];
+  for (final OcrLine line in raw) {
+    final String text = line.text.trim();
+    if (text.isEmpty) {
+      continue;
+    }
+    if (isTimestampShape(text)) {
+      final DateTime? time = timestampOf(text);
+      if (time != null) {
+        stamps.add(_Stamp(time, line.bounds.top));
+      }
+      continue;
+    }
+    usable.add(line);
+  }
+  usable.sort((OcrLine a, OcrLine b) => a.bounds.top.compareTo(b.bounds.top));
 
   final List<_Group> groups = <_Group>[];
   OcrLine? previous;
@@ -113,10 +174,36 @@ RecognisedCapture groupRecognisedLines(
               ? Speaker.me
               : Speaker.other,
           text: group.text,
+          occurredAt: _stampAbove(group.bounds.top, stamps),
           bounds: frame.mapToScreen(group.bounds),
         ),
     ],
   );
+}
+
+/// The time of the timestamp divider nearest above a group's top, else null.
+///
+/// A chat stamps a divider before the message it introduces, so a group owns the
+/// most recent stamp at or above its top. A stamp above no message (a divider at
+/// the bottom of the frame) is simply unread — there is no message it names.
+DateTime? _stampAbove(double top, List<_Stamp> stamps) {
+  DateTime? nearest;
+  double nearestTop = double.negativeInfinity;
+  for (final _Stamp stamp in stamps) {
+    if (stamp.top <= top && stamp.top > nearestTop) {
+      nearestTop = stamp.top;
+      nearest = stamp.time;
+    }
+  }
+  return nearest;
+}
+
+/// A timestamp divider's value and its vertical position.
+final class _Stamp {
+  const _Stamp(this.time, this.top);
+
+  final DateTime time;
+  final double top;
 }
 
 /// The lines of one pseudo-bubble, accumulated as the scan walks down the frame.

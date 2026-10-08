@@ -290,6 +290,7 @@ final class KnowledgeLedger implements KnowledgeStore {
         'speaker': entry.speaker.name,
         'text': entry.text,
         'timestamp': entry.timestamp.toUtc().toIso8601String(),
+        'occurredAt': entry.occurredAt?.toUtc().toIso8601String(),
         'packageName': entry.packageName,
       };
 
@@ -325,6 +326,7 @@ final class KnowledgeLedger implements KnowledgeStore {
         speaker: _speaker(row['speaker']),
         text: _text(row['text']),
         timestamp: _time(row['timestamp']),
+        occurredAt: _optionalTime(row['occurredAt']),
         packageName: _text(row['packageName']),
       );
 
@@ -417,6 +419,14 @@ final class KnowledgeLedger implements KnowledgeStore {
   static DateTime _time(Object? raw) => raw is String
       ? DateTime.parse(raw).toLocal()
       : DateTime.fromMillisecondsSinceEpoch(0, isUtc: true).toLocal();
+
+  /// A time that is absent when it was never written, unlike [_time]'s epoch.
+  ///
+  /// `occurredAt` is optional in the contract and `''`/null is its spelling of
+  /// "not set", so a missing field reads back as null rather than a fake epoch
+  /// that would make every old line look like it happened at the dawn of 1970.
+  static DateTime? _optionalTime(Object? raw) =>
+      raw is String && raw.isNotEmpty ? DateTime.parse(raw).toLocal() : null;
 
   /// A speaker this store does not recognise reads back as [Speaker.other].
   ///

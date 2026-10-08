@@ -98,6 +98,48 @@ void main() {
     }
   });
 
+  test('a dated timestamp with a full-width colon is not speech', () {
+    // A day divider rendered as `2026-10-09 00：59` — full-width colon, the way
+    // OCR often reads it — must not survive as a message. The old shape matched
+    // only a bare `HH:MM` and let the dated form fold into the previous speaker.
+    final List<OcrLine> dated = <OcrLine>[
+      line('你上次说的那家', left: 340, top: 300, width: 300, height: 22),
+      line('2026-10-09 00：59', left: 500, top: 360, width: 160, height: 16),
+      line('那周三下午？', left: 700, top: 420, width: 260, height: 24),
+    ];
+    final List<PerceivedMessage> messages = read(lines: dated).messages;
+    expect(
+      messages.map((PerceivedMessage m) => m.text),
+      isNot(contains('2026-10-09 00：59')),
+    );
+  });
+
+  test('a timestamp belongs to the message that follows it, not the one before',
+      () {
+    final List<OcrLine> dated = <OcrLine>[
+      line('你上次说的那家', left: 340, top: 300, width: 300, height: 22),
+      line('2026-10-09 00:59', left: 500, top: 360, width: 160, height: 16),
+      line('那周三下午？', left: 700, top: 420, width: 260, height: 24),
+    ];
+    final List<PerceivedMessage> messages = read(lines: dated).messages;
+    expect(messages.first.occurredAt, isNull,
+        reason: 'the divider sits above the reply, so the earlier message has no '
+            'time of its own');
+    expect(messages.last.occurredAt, DateTime(2026, 10, 9, 0, 59),
+        reason: 'a chat stamps a divider before the message it introduces');
+  });
+
+  test('a date without a year is dropped, never mis-dated', () {
+    final List<OcrLine> dated = <OcrLine>[
+      line('10-09 00:59', left: 500, top: 360, width: 160, height: 16),
+      line('那周三下午？', left: 700, top: 420, width: 260, height: 24),
+    ];
+    final List<PerceivedMessage> messages = read(lines: dated).messages;
+    expect(messages.single.text, '那周三下午？');
+    expect(messages.single.occurredAt, isNull,
+        reason: 'no year to pin to, and inventing one is worse than no time');
+  });
+
   test('a run at least half as long as the name is part of the name', () {
     // The header holds the name and, beside it, whatever the window's buttons
     // were rendered as. Half the length is the line between "the same name, run

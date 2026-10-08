@@ -159,8 +159,26 @@ List<NormalisedBlock> normaliseBlocks(CaptureFrame frame, List<OcrLine> lines) {
   return blocks;
 }
 
-/// A timestamp line, which is chrome rather than speech.
-final RegExp _timestamp = RegExp(r'^\d{1,2}:\d{2}(:\d{2})?$');
+/// The timestamp shapes a chat draws as a divider between days or messages.
+///
+/// The patterns are ordered broadest first, so a full `2026-10-09 00:59` matches
+/// before the time-only fallback could see the `00:59` inside it. Every shape is
+/// anchored `^…$` because a timestamp is a whole line — a message that merely
+/// *contains* "00:59" is speech, and dropping it would delete something somebody
+/// said.
+///
+/// A colon may come back full-width (`00：59`) — OCR reads the glyph either way —
+/// so the time separator accepts both. The date separator accepts `-`, `/`, `.`
+/// and the CJK `年/月/日`, the four ways a chat renders a date.
+final List<RegExp> _timestampShapes = <RegExp>[
+  RegExp(
+    r'^(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})[日]?\s*(\d{1,2})[:：](\d{2})([:：](\d{2}))?$',
+  ),
+  RegExp(r'^(\d{1,2})[-/.月](\d{1,2})[日]?\s*(\d{1,2})[:：](\d{2})$'),
+  RegExp(r'^(\d{4})[-/.年](\d{1,2})[-/.月](\d{1,2})[日]?$'),
+  RegExp(r'^(\d{1,2})[-/.月](\d{1,2})[日]?$'),
+  RegExp(r'^(\d{1,2})[:：](\d{2})([:：](\d{2}))?$'),
+];
 
 /// The fixed furniture of the window: buttons, hints, the folded-chat banner.
 ///
@@ -187,10 +205,69 @@ bool isNoise(NormalisedBlock block) {
   if (block.confidence < minConfidence || block.text.isEmpty) {
     return true;
   }
-  if (_timestamp.hasMatch(block.text)) {
+  if (isTimestampShape(block.text)) {
     return true;
   }
-  return _uiNoise.any((RegExp pattern) => pattern.hasMatch(block.text));
+  return isUiNoise(block);
+}
+
+/// Whether [text] is a standalone timestamp of any shape, year or not.
+///
+/// Broader than [timestampOf]: a `10:23` or `10-09 00:59` is chrome to drop even
+/// though it has no year to record. The message pass uses this to skip the block,
+/// and [timestampOf] to salvage a time from the shapes that carry one.
+bool isTimestampShape(String text) =>
+    _timestampShapes.any((RegExp shape) => shape.hasMatch(text));
+
+/// The noise that is never read for anything: fixed furniture and junk glyphs.
+///
+/// Distinct from [isNoise] so the message pass can keep timestamps — which are
+/// chrome for the *speech*, but carry the time the next message happened — while
+/// still dropping buttons, hints and low-confidence text before they reach it.
+bool isUiNoise(NormalisedBlock block) =>
+    _uiNoise.any((RegExp pattern) => pattern.hasMatch(block.text));
+
+/// The [DateTime] a block names when it is a standalone timestamp, else null.
+///
+/// Separate from [isNoise] so the pipeline can both drop the timestamp from the
+/// speech *and* keep it as the time of the message that follows it. The parse is
+/// the strict one [Trend] uses: a value that names an impossible day (2026-02-30)
+/// or hour (24:00) is not a timestamp, so it returns null and the block survives
+/// as ordinary text rather than being silently mis-dated.
+///
+/// A date without a year has none to pin to, so a time-only or month-day shape
+/// yields null — its year cannot be recovered without assuming the capture's own.
+DateTime? timestampOf(String text) {
+  for (final RegExp shape in _timestampShapes) {
+    final RegExpMatch? match = shape.firstMatch(text);
+    if (match == null) {
+      continue;
+    }
+    // Only the full `YYYY…` shapes carry a year; the shorter ones are chrome to
+    // drop, not a time to record.
+    final String? year = match.groupCount >= 3 ? match.group(1) : null;
+    if (year == null || year.length != 4) {
+      return null;
+    }
+    final int? y = int.tryParse(year);
+    final int? mo = int.tryParse(match.group(2)!);
+    final int? d = int.tryParse(match.group(3)!);
+    if (y == null || mo == null || d == null) {
+      return null;
+    }
+    final int h = int.tryParse(match.group(4) ?? '0') ?? 0;
+    final int mi = int.tryParse(match.group(5) ?? '0') ?? 0;
+    final int s = int.tryParse(match.group(7) ?? '0') ?? 0;
+    if (h > 23 || mi > 59 || s > 59) {
+      return null;
+    }
+    final DateTime parsed = DateTime(y, mo, d, h, mi, s);
+    if (parsed.year != y || parsed.month != mo || parsed.day != d) {
+      return null;
+    }
+    return parsed;
+  }
+  return null;
 }
 
 /// Reads the conversation's name out of the header band.
@@ -269,6 +346,7 @@ final class PerceivedMessage {
     required this.confidence,
     required this.bounds,
     this.sender,
+    this.occurredAt,
   });
 
   final String text;
@@ -281,6 +359,13 @@ final class PerceivedMessage {
 
   /// The name a group chat draws above the bubble, when there was one.
   final String? sender;
+
+  /// The time a timestamp divider named for this message, when one sat directly
+  /// above it. A chat stamps a divider before the message it introduces, so the
+  /// time belongs to the *next* message, not the one before it. Null when no
+  /// standalone timestamp was recognised above, or when the one that was could
+  /// not be parsed — a time is a convenience, never something to invent.
+  final DateTime? occurredAt;
 
   @override
   String toString() => 'PerceivedMessage(${speaker.name}, ${text.length} chars)';
@@ -315,19 +400,34 @@ List<PerceivedMessage> extractMessages(
   List<NormalisedBlock> blocks, {
   int maxMessages = 12,
 }) {
-  final List<NormalisedBlock> chat = blocks
+  final List<NormalisedBlock> inBand = blocks
       .where((NormalisedBlock b) =>
           b.x >= chatPaneXMin &&
           b.y > inputAreaYMin &&
           b.y < titleBarYMax &&
-          !isNoise(b))
+          b.confidence >= minConfidence &&
+          b.text.isNotEmpty &&
+          !isUiNoise(b))
       .map((NormalisedBlock b) => b.copyWith(y: b.top))
       .toList();
-  if (chat.isEmpty) {
+  if (inBand.isEmpty) {
     return const <PerceivedMessage>[];
   }
 
+  // Timestamps split off before grouping: a divider on the same visual line as a
+  // message would otherwise be joined into its text. They carry no speech, but
+  // the ones with a year carry the time of the message below them.
+  final List<NormalisedBlock> stamps = <NormalisedBlock>[];
+  final List<NormalisedBlock> chat = <NormalisedBlock>[];
+  for (final NormalisedBlock b in inBand) {
+    (isTimestampShape(b.text) ? stamps : chat).add(b);
+  }
+
   chat.sort((NormalisedBlock a, NormalisedBlock b) {
+    final int byY = a.y.compareTo(b.y);
+    return byY != 0 ? byY : a.order.compareTo(b.order);
+  });
+  stamps.sort((NormalisedBlock a, NormalisedBlock b) {
     final int byY = a.y.compareTo(b.y);
     return byY != 0 ? byY : a.order.compareTo(b.order);
   });
@@ -393,6 +493,19 @@ List<PerceivedMessage> extractMessages(
     }
   }
 
+  // A timestamp divider belongs to the message it introduces — the first real
+  // message at or below it. Each message takes the nearest stamp above its top,
+  // and a stamp above no message (the newest divider, at the bottom) is dropped.
+  for (final _Folded m in folded) {
+    double nearestY = double.negativeInfinity;
+    for (final NormalisedBlock s in stamps) {
+      if (s.y <= m.y && s.y > nearestY) {
+        nearestY = s.y;
+        m.occurredAt = timestampOf(s.text);
+      }
+    }
+  }
+
   // A group chat draws the sender's name as a short line above the bubble. It is
   // recognised by two independent signals — set in smaller type, and with
   // message-sized type under it — because a wrong name is worse than no name. A
@@ -454,6 +567,7 @@ final class _Folded {
   Speaker speaker;
   String? sender;
   final int order;
+  DateTime? occurredAt;
 
   bool get isSingleLine => !text.contains('\n');
 
@@ -490,6 +604,7 @@ final class _Folded {
         speaker: speaker,
         confidence: confidence,
         sender: sender,
+        occurredAt: occurredAt,
         bounds: NormalisedBlock(
           text: text,
           confidence: confidence,

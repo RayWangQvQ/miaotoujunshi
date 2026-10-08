@@ -90,15 +90,26 @@ final class KnowledgeLogEntry {
     required this.text,
     required this.timestamp,
     required this.packageName,
+    this.occurredAt,
   });
 
   final Speaker speaker;
   final String text;
+
+  /// When the line was captured — a fact about the measurement, not the message.
   final DateTime timestamp;
 
   /// The application the line was seen in, so a merged history can still say
   /// where each part of it came from.
   final String packageName;
+
+  /// When the message itself was sent, when a chat's own timestamp named it.
+  ///
+  /// Distinct from [timestamp], which is the capture moment: a user scrolling back
+  /// three days captures "now" while the message happened three days ago, and the
+  /// latter is the time that matters to pacing and trend. Null when the source had
+  /// no readable message time — a time is a convenience, never something to invent.
+  final DateTime? occurredAt;
 
   @override
   String toString() => 'KnowledgeLogEntry(${speaker.name}, $text)';
